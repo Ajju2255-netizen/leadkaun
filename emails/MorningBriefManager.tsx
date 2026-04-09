@@ -1,7 +1,6 @@
 import {
   Button,
   Heading,
-  Link,
   Section,
   Text,
   Hr,

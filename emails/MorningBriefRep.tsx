@@ -1,7 +1,6 @@
 import {
   Button,
   Heading,
-  Link,
   Section,
   Text,
   Hr,
@@ -89,7 +88,7 @@ export function MorningBriefRep({
         <>
           <Hr style={styles.hr} />
           <Heading style={styles.h2}>Your top priorities today</Heading>
-          {top_leads.slice(0, 3).map((lead, i) => (
+          {top_leads.slice(0, 3).map((lead) => (
             <Section key={lead.id} style={styles.leadCard}>
               <Row>
                 <Column style={{ width: "32px" }}>
