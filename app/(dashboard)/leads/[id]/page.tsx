@@ -53,6 +53,7 @@ export default function LeadRecordPage() {
   const [waOpen, setWaOpen]     = useState(false)
   const [markingWon, setMarkingWon]   = useState(false)
   const [markingLost, setMarkingLost] = useState(false)
+  const [activeTab, setActiveTab]     = useState<"timeline" | "whatsapp">("timeline")
 
   const { data: lead, isLoading, error } = useQuery({
     queryKey: ["lead", leadId],
@@ -177,39 +178,64 @@ export default function LeadRecordPage() {
           <Button variant="ghost" onClick={handleMarkJunk}>Mark Junk</Button>
         </div>
 
-        {/* ── Activity Timeline ─────────────────────────────────────── */}
-        {lead.signals && lead.signals.length > 0 && (
-          <div className="space-y-3">
-            <h2 className="text-base font-semibold">Activity Timeline</h2>
-            <div className="space-y-2">
-              {lead.signals.map((signal: {
-                id: string
-                signal_type: string
-                signal_value: number
-                intent_score_before: number
-                intent_score_after: number
-                created_at: string
-              }) => {
-                const meta = SIGNAL_LABELS[signal.signal_type] ?? { label: signal.signal_type, positive: signal.signal_value > 0 }
-                const delta = signal.intent_score_after - signal.intent_score_before
-                return (
-                  <div key={signal.id} className="flex items-start gap-3 text-sm">
-                    <div className={`mt-0.5 h-2 w-2 rounded-full shrink-0 ${meta.positive ? "bg-green-500" : "bg-red-400"}`} />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium leading-snug">{meta.label}</p>
-                      <p className="text-xs text-muted-foreground">{timeAgo(signal.created_at)}</p>
-                    </div>
-                    {delta !== 0 && (
-                      <span className={`text-xs font-medium shrink-0 tabular-nums ${delta > 0 ? "text-green-600" : "text-red-500"}`}>
-                        {delta > 0 ? "+" : ""}{delta}
-                      </span>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
+        {/* ── Activity Timeline + WhatsApp Tabs ────────────────────── */}
+        <div className="space-y-3">
+          <div className="flex gap-4 border-b">
+            {["timeline", "whatsapp"].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab as "timeline" | "whatsapp")}
+                className={`pb-2 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === tab
+                    ? "border-foreground text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {tab === "timeline" ? "Activity Timeline" : "WhatsApp"}
+              </button>
+            ))}
           </div>
-        )}
+
+          {activeTab === "timeline" && (
+            <>
+              {lead.signals && lead.signals.length > 0 ? (
+                <div className="space-y-2">
+                  {lead.signals.map((signal: {
+                    id: string
+                    signal_type: string
+                    signal_value: number
+                    intent_score_before: number
+                    intent_score_after: number
+                    created_at: string
+                  }) => {
+                    const meta = SIGNAL_LABELS[signal.signal_type] ?? { label: signal.signal_type, positive: signal.signal_value > 0 }
+                    const delta = signal.intent_score_after - signal.intent_score_before
+                    return (
+                      <div key={signal.id} className="flex items-start gap-3 text-sm">
+                        <div className={`mt-0.5 h-2 w-2 rounded-full shrink-0 ${meta.positive ? "bg-green-500" : "bg-red-400"}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium leading-snug">{meta.label}</p>
+                          <p className="text-xs text-muted-foreground">{timeAgo(signal.created_at)}</p>
+                        </div>
+                        {delta !== 0 && (
+                          <span className={`text-xs font-medium shrink-0 tabular-nums ${delta > 0 ? "text-green-600" : "text-red-500"}`}>
+                            {delta > 0 ? "+" : ""}{delta}
+                          </span>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No activity logged yet.</p>
+              )}
+            </>
+          )}
+
+          {activeTab === "whatsapp" && (
+            <WhatsAppTab signals={lead.signals ?? []} onLog={() => setWaOpen(true)} />
+          )}
+        </div>
 
         <Separator />
 
@@ -291,6 +317,100 @@ function WonModal({ leadId, onClose, onSuccess }: { leadId: string; onClose: () 
           <Button onClick={submit} disabled={saving} className="flex-1">{saving ? "Saving…" : "Mark Won"}</Button>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── WhatsApp Tab ──────────────────────────────────────────────────────────
+const WA_SIGNAL_TYPES = [
+  "WA_REPLIED_1H", "WA_REPLIED_SAME_DAY", "WA_REPLIED_NEXT_DAY",
+  "WA_NO_REPLY_24H", "WA_NO_REPLY_48H", "WA_BLOCKED",
+  "WA_TAG_NEGOTIATING", "WA_TAG_SITE_VISIT", "WA_TAG_COMPARING", "WA_TAG_NOT_INTERESTED",
+]
+
+const WA_STAGE_LABELS: Record<string, string> = {
+  NOT_STARTED:  "Not started",
+  INITIATED:    "Message sent",
+  REPLIED:      "Replied",
+  NEGOTIATING:  "Negotiating",
+  SITE_VISIT:   "Site visit requested",
+  COMPARING:    "Comparing options",
+  CLOSED:       "Closed",
+}
+
+function WhatsAppTab({
+  signals,
+  onLog,
+}: {
+  signals: { id: string; signal_type: string; signal_value: number; intent_score_before: number; intent_score_after: number; created_at: string }[]
+  onLog: () => void
+}) {
+  const waSignals = signals.filter((s) => WA_SIGNAL_TYPES.includes(s.signal_type))
+
+  // Derive WA stage from signal history
+  let waStage = "NOT_STARTED"
+  for (const s of [...waSignals].reverse()) {
+    if (s.signal_type === "WA_TAG_NEGOTIATING")    { waStage = "NEGOTIATING";  break }
+    if (s.signal_type === "WA_TAG_SITE_VISIT")      { waStage = "SITE_VISIT";   break }
+    if (s.signal_type === "WA_TAG_COMPARING")       { waStage = "COMPARING";    break }
+    if (s.signal_type === "WA_TAG_NOT_INTERESTED")  { waStage = "CLOSED";       break }
+    if (s.signal_type.startsWith("WA_REPLIED"))     { waStage = "REPLIED";      break }
+    if (s.signal_type.startsWith("WA_NO_REPLY") || s.signal_type === "WA_BLOCKED") {
+      if (waStage === "NOT_STARTED") waStage = "INITIATED"
+    }
+  }
+  if (waSignals.length > 0 && waStage === "NOT_STARTED") waStage = "INITIATED"
+
+  return (
+    <div className="space-y-4">
+      {/* Stage pill */}
+      <div className="flex items-center gap-3">
+        <span className="text-xs text-muted-foreground">WA Stage</span>
+        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+          waStage === "REPLIED" || waStage === "NEGOTIATING" || waStage === "SITE_VISIT"
+            ? "bg-green-100 text-green-800"
+            : waStage === "CLOSED"
+            ? "bg-red-100 text-red-800"
+            : waStage === "COMPARING"
+            ? "bg-yellow-100 text-yellow-800"
+            : "bg-muted text-muted-foreground"
+        }`}>
+          {WA_STAGE_LABELS[waStage] ?? waStage}
+        </span>
+      </div>
+
+      {/* Conversation log */}
+      {waSignals.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No WhatsApp interactions logged yet.</p>
+      ) : (
+        <div className="space-y-2">
+          {waSignals.map((s) => {
+            const meta    = SIGNAL_LABELS[s.signal_type] ?? { label: s.signal_type, positive: s.signal_value > 0 }
+            const delta   = s.intent_score_after - s.intent_score_before
+            return (
+              <div key={s.id} className="flex items-start gap-3 text-sm rounded-lg bg-muted/30 px-3 py-2">
+                <div className={`mt-1 h-2 w-2 rounded-full shrink-0 ${meta.positive ? "bg-green-500" : "bg-red-400"}`} />
+                <div className="flex-1">
+                  <p className="font-medium">{meta.label}</p>
+                  <p className="text-xs text-muted-foreground">{timeAgo(s.created_at)}</p>
+                </div>
+                {delta !== 0 && (
+                  <span className={`text-xs font-medium tabular-nums ${delta > 0 ? "text-green-600" : "text-red-500"}`}>
+                    {delta > 0 ? "+" : ""}{delta}
+                  </span>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      <button
+        onClick={onLog}
+        className="text-sm text-primary hover:underline"
+      >
+        + Log WhatsApp interaction
+      </button>
     </div>
   )
 }
