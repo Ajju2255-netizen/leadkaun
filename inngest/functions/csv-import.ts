@@ -94,7 +94,16 @@ export const csvImportFn = inngest.createFunction(
         .from("csv-imports")
         .download(bucket_path)
       if (error || !data) throw new Error(`Storage download failed: ${error?.message}`)
-      return data.text()
+
+      // Detect encoding: try UTF-8 first; fall back to Windows-1252 (latin1)
+      // if the text contains replacement characters (U+FFFD) indicating bad UTF-8 decode.
+      const buffer = await data.arrayBuffer()
+      const utf8Text = new TextDecoder("utf-8", { fatal: false }).decode(buffer)
+      if (utf8Text.includes("\uFFFD")) {
+        // Contains invalid UTF-8 sequences → likely Windows-1252
+        return new TextDecoder("windows-1252").decode(buffer)
+      }
+      return utf8Text
     })
 
     // ── 3. Parse CSV ─────────────────────────────────────────────────────────

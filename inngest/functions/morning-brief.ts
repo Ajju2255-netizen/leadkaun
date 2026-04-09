@@ -192,22 +192,36 @@ export const morningBriefFn = inngest.createFunction(
               hours_since_assign: (Date.now() - l.created_at.getTime()) / (60 * 60 * 1000),
             }))
 
-            const repStats: RepStat[] = repData.map((rep) => {
+            const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+            const repStats: RepStat[] = await Promise.all(repData.map(async (rep) => {
               const leads  = rep.assigned_leads
               const speeds = leads.map((l) => l.speed_to_lead_hours).filter((s): s is number => s != null)
               const avgSpeed = speeds.length > 0 ? speeds.reduce((a, b) => a + b, 0) / speeds.length : null
               const missedValue = leads
                 .filter((l) => l.grade === "A" || l.grade === "B")
                 .reduce((s, l) => s + (l.expected_value ?? 0), 0)
+
+              // Compute real follow-up %
+              const [completed, overdue] = await Promise.all([
+                prisma.followUpAction.count({
+                  where: { account_id: account.id, assigned_rep_id: rep.id, status: "COMPLETED", completed_at: { gte: weekAgo } },
+                }),
+                prisma.followUpAction.count({
+                  where: { account_id: account.id, assigned_rep_id: rep.id, status: "OVERDUE" },
+                }),
+              ])
+              const total = completed + overdue
+              const fuPct = total > 0 ? Math.round((completed / total) * 100) : 100
+
               return {
                 first_name:          rep.first_name,
                 last_name:           rep.last_name,
                 assigned:            leads.length,
-                follow_up_pct:       75,   // placeholder — full calc via /api/analytics/follow-up-score
+                follow_up_pct:       fuPct,
                 speed_to_lead_hours: avgSpeed,
                 missed_value:        missedValue,
               }
-            })
+            }))
 
             const topRep = repStats.sort((a, b) => b.follow_up_pct - a.follow_up_pct)[0] ?? null
             const teamFupPct = repStats.length > 0

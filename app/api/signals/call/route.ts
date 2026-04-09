@@ -96,6 +96,35 @@ export async function POST(req: Request) {
         })
       }
 
+      // Fatigue check: 5+ non-positive call signals with no positive response → flag fatigued
+      const NEGATIVE_CALL_TYPES: SignalType[] = [
+        "CALL_NOT_ANSWERED", "CALL_BUSY", "CALL_ANSWERED_NOT_INTERESTED",
+        "CALL_INVALID", "CALL_VOICEMAIL",
+      ]
+      const POSITIVE_CALL_TYPES: SignalType[] = [
+        "CALL_ANSWERED_INTERESTED", "CALL_ANSWERED_CALLBACK",
+      ]
+      if (NEGATIVE_CALL_TYPES.includes(signalType)) {
+        const recentSignals = await tx.signal.findMany({
+          where: { lead_id: data.lead_id },
+          orderBy: { created_at: "desc" },
+          take: 10,
+          select: { signal_type: true },
+        })
+        const hasPositive = recentSignals.some((s) =>
+          POSITIVE_CALL_TYPES.includes(s.signal_type as SignalType)
+        )
+        const negativeCount = recentSignals.filter((s) =>
+          NEGATIVE_CALL_TYPES.includes(s.signal_type as SignalType)
+        ).length
+        if (!hasPositive && negativeCount >= 5) {
+          await tx.lead.update({
+            where: { id: data.lead_id },
+            data:  { is_fatigued: true },
+          })
+        }
+      }
+
       // Recompute all scores
       return processSignalAndUpdateScores(data.lead_id, session.account.id, tx)
     })
