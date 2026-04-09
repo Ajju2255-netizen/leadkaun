@@ -1,10 +1,20 @@
 import { serve } from "inngest/next"
 import { inngest } from "@/inngest/client"
-
-// All Inngest functions registered here — add to this array as they are built
-const allFunctions: Parameters<typeof serve>[0]["functions"] = []
+import { intentDecayFn } from "@/inngest/functions/intent-decay"
+import { csvImportFn } from "@/inngest/functions/csv-import"
+import { followUpOverdueFn } from "@/inngest/functions/follow-up-overdue"
+import { morningBriefFn } from "@/inngest/functions/morning-brief"
+import { missedOpportunityFn } from "@/inngest/functions/missed-opportunity"
+import { sheetsSyncFn } from "@/inngest/functions/sheets-sync"
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
-  functions: allFunctions,
+  functions: [
+    intentDecayFn,       // 5.1 — nightly intent decay
+    csvImportFn,         // 5.2 — CSV import pipeline
+    followUpOverdueFn,   // 5.3 — follow-up overdue checker
+    morningBriefFn,      // 5.4 — morning brief emails
+    missedOpportunityFn, // 5.5 — missed opportunity checker
+    sheetsSyncFn,        // 5.6 — Google Sheets sync
+  ],
 })

@@ -12,3 +12,8 @@ export const supabaseAdmin = createClient<Database>(
     },
   }
 )
+
+// Named factory for use in server actions
+export function createSupabaseAdminClient() {
+  return supabaseAdmin
+}

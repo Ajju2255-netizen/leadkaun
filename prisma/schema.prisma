@@ -1,13 +1,517 @@
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["postgresqlExtensions"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
-  provider   = "postgresql"
-  url        = env("DATABASE_URL")
-  directUrl  = env("DIRECT_URL")
-  extensions = [pg_trgm, unaccent]
+  provider = "postgresql"
 }
 
-// Models will be added in Phase 1 tasks 1.1 – 1.4
+// ─────────────────────────────────────────────
+// ENUMS — must be defined before models that reference them
+// ─────────────────────────────────────────────
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  REP
+}
+
+enum TeamSize {
+  SOLO
+  SMALL
+  MEDIUM
+  LARGE
+  ENTERPRISE
+}
+
+enum LeadVolume {
+  UNDER_50
+  BETWEEN_50_200
+  BETWEEN_200_500
+  BETWEEN_500_1000
+  OVER_1000
+}
+
+enum SalesCycle {
+  SAME_DAY
+  THREE_DAYS
+  TWO_WEEKS
+  FOUR_WEEKS
+  THREE_MONTHS
+  OVER_THREE_MONTHS
+}
+
+enum LeadGrade {
+  A
+  B
+  C
+  D
+  E
+  F
+}
+
+enum WaStage {
+  INQUIRY
+  DISCUSSION
+  NEGOTIATION
+  CLOSING
+  STALLED
+}
+
+enum WinReason {
+  COMPETITIVE_PRICE
+  BEST_FIT
+  REFERRAL_TRUST
+  FAST_DELIVERY
+  EXISTING_RELATIONSHIP
+  OTHER
+}
+
+enum LossReason {
+  PRICE_TOO_HIGH
+  WENT_COMPETITOR
+  NO_BUDGET
+  NO_RESPONSE
+  REQUIREMENT_CHANGED
+  WRONG_FIT
+  OTHER
+}
+
+enum FollowUpType {
+  CALL
+  WHATSAPP
+}
+
+enum FollowUpStatus {
+  PENDING
+  COMPLETED
+  OVERDUE
+  SKIPPED
+}
+
+enum TemplateType {
+  WHATSAPP
+  CALL_SCRIPT
+}
+
+enum ImportStatus {
+  PENDING
+  PROCESSING
+  COMPLETE
+  FAILED
+}
+
+enum FieldType {
+  TEXT
+  NUMBER
+  DATE
+  SELECT
+  BOOLEAN
+}
+
+enum AttributionType {
+  FULL
+  CONTRIBUTED
+}
+
+enum SignalType {
+  // WhatsApp reply time signals
+  WA_REPLIED_1H
+  WA_REPLIED_4H
+  WA_REPLIED_24H
+  WA_NO_REPLY
+  // WhatsApp conversation tag signals
+  WA_TAG_ASKED_PRICING
+  WA_TAG_BROCHURE
+  WA_TAG_NEGOTIATING
+  WA_TAG_COMPARING
+  WA_TAG_DECISION_PENDING
+  WA_TAG_NOT_SERIOUS
+  WA_TAG_GENERAL_CHAT
+  WA_TAG_WRONG_NUMBER
+  // WhatsApp stage signals
+  WA_STAGE_ADVANCED
+  WA_STAGE_REGRESSED
+  // Call outcome signals
+  CALL_ANSWERED_INTERESTED
+  CALL_ANSWERED_NOT_INTERESTED
+  CALL_ANSWERED_CALLBACK
+  CALL_ANSWERED_WRONG_NUMBER
+  CALL_NOT_ANSWERED
+  CALL_BUSY
+  CALL_INVALID
+  CALL_VOICEMAIL
+  // Inquiry / import-time signals
+  INQUIRY_HIGH_SPECIFICITY
+  INQUIRY_MED_SPECIFICITY
+  SOURCE_BASELINE
+  RE_INQUIRY
+  // Behavioural signals
+  INQUIRY_EVENING_WEEKEND
+  STAGE_PROPOSAL_SENT
+  EMAIL_OPENED
+  EMAIL_CLICKED
+  // Rep override signals
+  REP_VERY_INTERESTED
+  REP_NOT_INTERESTED
+  // System signals
+  INTENT_DECAY
+}
+
+// ─────────────────────────────────────────────
+// MODELS
+// ─────────────────────────────────────────────
+
+model Account {
+  id               String     @id @default(cuid())
+  name             String
+  industry         String
+  city             String
+  state            String
+  team_size        TeamSize
+  monthly_lead_vol LeadVolume
+  created_at       DateTime   @default(now())
+  updated_at       DateTime   @updatedAt
+
+  // ICP Configuration
+  icp_configured     Boolean    @default(false)
+  icp_industries     String[]   @default([])
+  icp_states         String[]   @default([])
+  icp_business_types String[]   @default([])
+  icp_roles          String[]   @default([])
+  icp_budget_min     Int?
+  icp_budget_max     Int?
+  icp_sales_cycle    SalesCycle @default(FOUR_WEEKS)
+
+  // SQL Threshold (configurable per account)
+  sql_fit_threshold    Int @default(55)
+  sql_intent_threshold Int @default(45)
+
+  // Signal weight overrides (null = use system defaults)
+  weight_overrides Json?
+
+  // Relations
+  users             User[]
+  leads             Lead[]
+  sources           LeadSource[]
+  templates         SmartTemplate[]
+  pipeline_stages   PipelineStage[]
+  custom_fields     CustomField[]
+  follow_up_configs FollowUpConfig[]
+
+  @@map("accounts")
+}
+
+model User {
+  id         String    @id @default(cuid())
+  account_id String
+  auth_id    String    @unique // Supabase auth.users.id
+  email      String
+  first_name String
+  last_name  String
+  role       UserRole
+  is_active  Boolean   @default(true)
+  invited_by String?
+  invited_at DateTime?
+  joined_at  DateTime?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+
+  account          Account          @relation(fields: [account_id], references: [id])
+  assigned_leads   Lead[]           @relation("AssignedRep")
+  signals          Signal[]
+  notes            LeadNote[]
+  win_attributions WinAttribution[]
+
+  @@unique([account_id, email])
+  @@index([account_id])
+  @@map("users")
+}
+
+model Lead {
+  id              String  @id @default(cuid())
+  account_id      String
+  assigned_rep_id String?
+
+  // Identity
+  first_name   String
+  last_name    String?
+  phone        String  // Stored as +91XXXXXXXXXX
+  phone_raw    String  // Original value before normalisation
+  email        String?
+  company_name String?
+  designation  String?
+  city         String?
+  state        String?
+  pincode      String?
+
+  // Source & Import
+  source_id      String
+  imported_at    DateTime @default(now())
+  inquiry_text   String?
+  expected_value Int?     // INR
+
+  // Three-dimensional scores (0–100)
+  fit_score     Int       @default(0)
+  intent_score  Int       @default(0)
+  quality_score Int       @default(0)
+  grade         LeadGrade @default(E)
+
+  // Score metadata
+  fit_score_breakdown     Json?
+  intent_score_baseline   Int       @default(0)
+  quality_score_breakdown Json?
+  grade_changed_at        DateTime?
+  previous_grade          LeadGrade?
+
+  // SQL status
+  is_sql         Boolean   @default(false)
+  sql_crossed_at DateTime?
+  handoff_brief  String?
+
+  // Speed to Lead (ML data — PRD Constraint 5)
+  first_contact_at    DateTime?
+  speed_to_lead_hours Float?
+
+  // Pipeline
+  stage_id         String
+  stage_entered_at DateTime @default(now())
+
+  // Flags
+  is_junk               Boolean  @default(false)
+  junk_flags            String[] @default([])
+  is_fatigued           Boolean  @default(false)
+  fatigue_contact_count Int      @default(0)
+  is_duplicate          Boolean  @default(false)
+
+  // WhatsApp conversation tracking
+  wa_conversation_stage WaStage @default(INQUIRY)
+
+  // Won / Lost outcome
+  won_at           DateTime?
+  lost_at          DateTime?
+  won_value        Int?
+  win_reason       WinReason?
+  loss_reason      LossReason?
+  outcome_snapshot Json?
+
+  // Custom field values
+  custom_values Json @default("{}")
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  account           Account         @relation(fields: [account_id], references: [id])
+  assigned_rep      User?           @relation("AssignedRep", fields: [assigned_rep_id], references: [id])
+  source            LeadSource      @relation(fields: [source_id], references: [id])
+  stage             PipelineStage   @relation(fields: [stage_id], references: [id])
+  signals           Signal[]
+  notes             LeadNote[]
+  follow_up_actions FollowUpAction[]
+  win_attributions  WinAttribution[]
+  stage_history     StageHistory[]
+
+  @@unique([account_id, phone])
+  @@index([account_id])
+  @@index([account_id, assigned_rep_id])
+  @@index([account_id, stage_id])
+  @@index([account_id, is_sql])
+  @@index([account_id, imported_at])
+  @@index([account_id, is_junk])
+  @@map("leads")
+}
+
+model Signal {
+  id         String     @id @default(cuid())
+  account_id String
+  lead_id    String
+  user_id    String?
+
+  signal_type  SignalType
+  signal_value Float
+  raw_value    Json?
+
+  // Context for Phase 2 ML
+  lead_grade_at_signal LeadGrade
+  intent_score_before  Int
+  intent_score_after   Int
+
+  created_at DateTime @default(now())
+
+  lead Lead  @relation(fields: [lead_id], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [user_id], references: [id])
+
+  @@index([lead_id])
+  @@index([lead_id, created_at])
+  @@index([account_id])
+  @@index([account_id, created_at])
+  @@map("signals")
+}
+
+model LeadNote {
+  id         String   @id @default(cuid())
+  lead_id    String
+  user_id    String
+  content    String
+  created_at DateTime @default(now())
+
+  lead Lead @relation(fields: [lead_id], references: [id], onDelete: Cascade)
+  user User @relation(fields: [user_id], references: [id])
+
+  @@index([lead_id])
+  @@map("lead_notes")
+}
+
+model PipelineStage {
+  id            String  @id @default(cuid())
+  account_id    String
+  name          String
+  key           String
+  display_order Int
+  is_terminal   Boolean @default(false)
+  is_won        Boolean @default(false)
+  is_lost       Boolean @default(false)
+
+  account Account @relation(fields: [account_id], references: [id])
+  leads   Lead[]
+
+  @@unique([account_id, key])
+  @@map("pipeline_stages")
+}
+
+model StageHistory {
+  id            String    @id @default(cuid())
+  lead_id       String
+  from_stage_id String?
+  to_stage_id   String
+  changed_by    String
+  note          String?
+  created_at    DateTime  @default(now())
+
+  lead Lead @relation(fields: [lead_id], references: [id], onDelete: Cascade)
+
+  @@index([lead_id])
+  @@map("stage_history")
+}
+
+model FollowUpAction {
+  id              String         @id @default(cuid())
+  account_id      String
+  lead_id         String
+  assigned_rep_id String
+  day_number      Int
+  action_type     FollowUpType
+  due_date        DateTime
+  status          FollowUpStatus @default(PENDING)
+  completed_at    DateTime?
+  completed_by    String?
+  is_overdue      Boolean        @default(false)
+  show_tip        Boolean        @default(false)
+  tip_text        String?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  lead Lead @relation(fields: [lead_id], references: [id], onDelete: Cascade)
+
+  @@index([lead_id])
+  @@index([account_id, due_date])
+  @@index([assigned_rep_id, due_date])
+  @@map("follow_up_actions")
+}
+
+model FollowUpConfig {
+  id         String    @id @default(cuid())
+  account_id String
+  grade      LeadGrade
+  schedule   Json
+  updated_at DateTime  @updatedAt
+
+  account Account @relation(fields: [account_id], references: [id])
+
+  @@unique([account_id, grade])
+  @@map("follow_up_configs")
+}
+
+model LeadSource {
+  id                String  @id @default(cuid())
+  account_id        String
+  name              String
+  key               String
+  intent_baseline   Int     @default(10)
+  reliability_score Float   @default(100.0)
+  is_custom         Boolean @default(false)
+
+  account Account @relation(fields: [account_id], references: [id])
+  leads   Lead[]
+
+  @@unique([account_id, key])
+  @@map("lead_sources")
+}
+
+model WinAttribution {
+  id               String          @id @default(cuid())
+  lead_id          String
+  user_id          String
+  attribution_type AttributionType
+  won_value        Int
+  created_at       DateTime        @default(now())
+
+  lead Lead @relation(fields: [lead_id], references: [id], onDelete: Cascade)
+  user User @relation(fields: [user_id], references: [id])
+
+  @@map("win_attributions")
+}
+
+model SmartTemplate {
+  id          String       @id @default(cuid())
+  account_id  String
+  name        String
+  type        TemplateType
+  stages      String[]
+  grades      LeadGrade[]
+  body        String
+  is_active   Boolean      @default(true)
+  usage_count Int          @default(0)
+  created_at  DateTime     @default(now())
+  updated_at  DateTime     @updatedAt
+
+  account Account @relation(fields: [account_id], references: [id])
+
+  @@map("smart_templates")
+}
+
+model ImportJobStatus {
+  id           String       @id @default(cuid())
+  account_id   String
+  user_id      String
+  status       ImportStatus @default(PENDING)
+  total_rows   Int          @default(0)
+  inserted     Int          @default(0)
+  duplicates   Int          @default(0)
+  errors       Int          @default(0)
+  progress_pct Int          @default(0)
+  error_detail Json?
+  created_at   DateTime     @default(now())
+  completed_at DateTime?
+
+  @@index([account_id])
+  @@map("import_job_status")
+}
+
+model CustomField {
+  id            String    @id @default(cuid())
+  account_id    String
+  label         String
+  key           String
+  field_type    FieldType
+  options       String[]  @default([])
+  display_order Int
+  is_required   Boolean   @default(false)
+
+  account Account @relation(fields: [account_id], references: [id])
+
+  @@unique([account_id, key])
+  @@map("custom_fields")
+}
