@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import { toast } from "sonner"
 import { ChevronLeft } from "lucide-react"
@@ -76,7 +76,6 @@ function UploadSection({ onComplete }: { onComplete: (jobId: string) => void }) 
     })
   }, [])
 
-  // When job completes, notify parent to refresh history
   useEffect(() => {
     if (!jobStatus) return
     if (jobStatus.status === "COMPLETE") {
@@ -87,6 +86,7 @@ function UploadSection({ onComplete }: { onComplete: (jobId: string) => void }) 
       toast.error("Import failed. Please check your CSV and try again.")
       setActiveJobId(null)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobStatus?.status, jobStatus?.id, onComplete])
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
