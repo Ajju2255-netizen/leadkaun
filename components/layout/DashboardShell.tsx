@@ -22,30 +22,29 @@ import type { AuthSession } from "@/lib/auth/session"
 import type { UserRole } from "@prisma/client"
 
 type NavItem = {
-  href:  string
-  label: string
-  icon:  LucideIcon
-  roles: UserRole[]
+  href:    string
+  label:   string
+  icon:    LucideIcon
+  roles:   UserRole[]
+  section: "main" | "settings"
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { href: "/dashboard",          label: "Dashboard",            icon: LayoutDashboard, roles: ["ADMIN", "MANAGER", "REP"] },
-  { href: "/queue",              label: "Priority Queue",       icon: Zap,             roles: ["ADMIN", "MANAGER", "REP"] },
-  { href: "/leads",              label: "All Leads",            icon: Users,           roles: ["ADMIN", "MANAGER", "REP"] },
-  { href: "/pipeline",           label: "Pipeline",             icon: Columns2,        roles: ["ADMIN", "MANAGER", "REP"] },
-  { href: "/follow-ups",         label: "Follow-ups",           icon: CalendarCheck,   roles: ["ADMIN", "MANAGER", "REP"] },
-  { href: "/analytics",          label: "Analytics",            icon: BarChart2,       roles: ["ADMIN", "MANAGER"] },
-  { href: "/missed",             label: "Missed Opps",          icon: AlertTriangle,   roles: ["ADMIN", "MANAGER"] },
-  { href: "/notifications",      label: "Notifications",        icon: Bell,            roles: ["ADMIN", "MANAGER", "REP"] },
-  { href: "/settings/team",      label: "Team",                 icon: UserCog,         roles: ["ADMIN"] },
-  { href: "/settings/icp",       label: "ICP Settings",         icon: Target,          roles: ["ADMIN"] },
-  { href: "/settings/templates", label: "Templates",            icon: FileText,        roles: ["ADMIN", "MANAGER"] },
+  { href: "/dashboard",  label: "Dashboard",     icon: LayoutDashboard, roles: ["ADMIN","MANAGER","REP"], section: "main" },
+  { href: "/queue",      label: "Priority Queue", icon: Zap,             roles: ["ADMIN","MANAGER","REP"], section: "main" },
+  { href: "/leads",      label: "All Leads",      icon: Users,           roles: ["ADMIN","MANAGER","REP"], section: "main" },
+  { href: "/pipeline",   label: "Pipeline",       icon: Columns2,        roles: ["ADMIN","MANAGER","REP"], section: "main" },
+  { href: "/follow-ups", label: "Follow-ups",     icon: CalendarCheck,   roles: ["ADMIN","MANAGER","REP"], section: "main" },
+  { href: "/analytics",  label: "Analytics",      icon: BarChart2,       roles: ["ADMIN","MANAGER"],       section: "main" },
+  { href: "/missed",     label: "Missed Opps",    icon: AlertTriangle,   roles: ["ADMIN","MANAGER"],       section: "main" },
+  { href: "/notifications", label: "Notifications", icon: Bell,          roles: ["ADMIN","MANAGER","REP"], section: "main" },
+  { href: "/settings/team",      label: "Team",          icon: UserCog,  roles: ["ADMIN"],                 section: "settings" },
+  { href: "/settings/icp",       label: "ICP Settings",  icon: Target,   roles: ["ADMIN"],                 section: "settings" },
+  { href: "/settings/templates", label: "Templates",     icon: FileText, roles: ["ADMIN","MANAGER"],       section: "settings" },
 ]
 
-const ROLE_LABELS: Record<UserRole, string> = {
-  ADMIN:   "Admin",
-  MANAGER: "Manager",
-  REP:     "Rep",
+const ROLE_LABEL: Record<UserRole, string> = {
+  ADMIN: "Admin", MANAGER: "Manager", REP: "Sales Rep",
 }
 
 export function DashboardShell({
@@ -59,13 +58,15 @@ export function DashboardShell({
   const router   = useRouter()
   const { user, account } = session
 
-  const visibleItems = NAV_ITEMS.filter((item) => item.roles.includes(user.role))
+  const visible = NAV_ITEMS.filter((i) => i.roles.includes(user.role))
+  const mainNav     = visible.filter((i) => i.section === "main")
+  const settingsNav = visible.filter((i) => i.section === "settings")
 
   const initials = [user.firstName, user.lastName]
     .filter(Boolean)
     .map((n) => n![0].toUpperCase())
     .join("")
-    .slice(0, 2)
+    .slice(0, 2) || "U"
 
   async function handleLogout() {
     const supabase = getSupabaseBrowserClient()
@@ -74,75 +75,92 @@ export function DashboardShell({
     router.refresh()
   }
 
+  function NavLink({ item }: { item: NavItem }) {
+    const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
+    const Icon = item.icon
+
+    return (
+      <Link
+        href={item.href}
+        className={`
+          relative flex items-center gap-2.5 px-3 py-[7px] rounded-md text-[13px] font-medium
+          transition-colors duration-100 outline-none
+          ${isActive
+            ? "bg-blue-50 text-blue-700 before:absolute before:left-0 before:top-1 before:bottom-1 before:w-[3px] before:rounded-r-full before:bg-blue-600"
+            : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
+          }
+        `}
+      >
+        <Icon
+          className={`w-[15px] h-[15px] shrink-0 ${isActive ? "text-blue-600" : "text-slate-400"}`}
+          strokeWidth={isActive ? 2.5 : 2}
+        />
+        {item.label}
+      </Link>
+    )
+  }
+
   return (
     <TooltipProvider>
       <div className="flex min-h-screen bg-background">
 
-        {/* ── Sidebar ───────────────────────────────────────────────────── */}
-        <aside className="w-56 flex flex-col shrink-0 bg-sidebar border-r border-sidebar-border">
+        {/* ── Sidebar ─────────────────────────────────────────────────────── */}
+        <aside className="w-[220px] flex flex-col shrink-0 bg-white border-r border-slate-100">
 
           {/* Logo */}
-          <div className="px-4 py-5 border-b border-sidebar-border">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-indigo-500 flex items-center justify-center shrink-0">
-                <Zap className="w-4 h-4 text-white" strokeWidth={2.5} />
-              </div>
-              <span className="text-white font-semibold tracking-tight text-[15px]">Leadkaun</span>
+          <div className="flex items-center gap-2.5 px-4 h-14 border-b border-slate-100 shrink-0">
+            <div className="w-6 h-6 rounded-md bg-indigo-600 flex items-center justify-center shrink-0">
+              <Zap className="w-3.5 h-3.5 text-white" strokeWidth={2.5} />
             </div>
+            <span className="text-[15px] font-semibold text-slate-900 tracking-tight">Leadkaun</span>
           </div>
 
-          {/* Nav */}
-          <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
-            {visibleItems.map((item) => {
-              const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
-              const Icon = item.icon
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-[13.5px] font-medium transition-colors ${
-                    isActive
-                      ? "bg-indigo-600 text-white"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                  }`}
-                >
-                  <Icon className="w-4 h-4 shrink-0" strokeWidth={isActive ? 2.5 : 2} />
-                  {item.label}
-                </Link>
-              )
-            })}
+          {/* Main nav */}
+          <nav className="flex-1 px-2 pt-3 pb-2 space-y-0.5 overflow-y-auto">
+            {mainNav.map((item) => <NavLink key={item.href} item={item} />)}
+
+            {/* Settings section */}
+            {settingsNav.length > 0 && (
+              <>
+                <div className="pt-3 pb-1 px-3">
+                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                    Settings
+                  </span>
+                </div>
+                {settingsNav.map((item) => <NavLink key={item.href} item={item} />)}
+              </>
+            )}
           </nav>
 
           {/* User footer */}
-          <div className="px-3 py-4 border-t border-sidebar-border space-y-3">
-            <div className="text-[11px] font-medium text-sidebar-foreground/50 uppercase tracking-wider px-1">
-              {account.name}
-            </div>
+          <div className="px-3 py-3 border-t border-slate-100 space-y-2.5">
             <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-full bg-indigo-500 flex items-center justify-center shrink-0">
-                <span className="text-white text-[11px] font-bold">{initials}</span>
+              {/* Avatar */}
+              <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
+                <span className="text-[11px] font-bold text-indigo-700">{initials}</span>
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-medium text-white truncate leading-tight">
+                <p className="text-[13px] font-medium text-slate-800 truncate leading-tight">
                   {user.firstName} {user.lastName}
                 </p>
-                <p className="text-[11px] text-sidebar-foreground truncate leading-tight">
-                  {ROLE_LABELS[user.role]}
+                <p className="text-[11px] text-slate-400 truncate leading-tight">
+                  {account.name} · {ROLE_LABEL[user.role]}
                 </p>
               </div>
             </div>
             <button
               onClick={handleLogout}
-              className="text-[12px] text-sidebar-foreground/60 hover:text-red-400 transition-colors w-full text-left px-1"
+              className="text-[12px] text-slate-400 hover:text-red-500 transition-colors w-full text-left pl-0.5"
             >
               Sign out
             </button>
           </div>
+
         </aside>
 
-        {/* ── Main content ──────────────────────────────────────────────── */}
+        {/* ── Main content ────────────────────────────────────────────────── */}
         <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          <div className="flex-1 p-6 overflow-auto">{children}</div>
+          <div className="flex-1 p-6 md:p-8 overflow-auto">{children}</div>
         </main>
 
       </div>

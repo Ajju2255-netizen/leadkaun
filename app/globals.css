@@ -4,69 +4,68 @@
 
 /* ── Grade colour tokens ─────────────────────────────────────────────────── */
 :root {
-  --grade-a: #16a34a;
+  --grade-a: #059669;
   --grade-b: #2563eb;
   --grade-c: #d97706;
   --grade-d: #ea580c;
   --grade-e: #dc2626;
-  --grade-f: #6b7280;
+  --grade-f: #94a3b8;
 }
 
-/* ── Card shadow utility ─────────────────────────────────────────────────── */
 @layer utilities {
-  .text-balance {
-    text-wrap: balance;
+  .text-balance { text-wrap: balance; }
+
+  /* Subtle elevation — just enough to lift cards off the page bg */
+  .shadow-card {
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
   }
-  .card-shadow {
-    box-shadow: 0 1px 3px oklch(0 0 0 / 0.07), 0 1px 2px oklch(0 0 0 / 0.05);
-  }
-  .card-shadow-md {
-    box-shadow: 0 4px 6px oklch(0 0 0 / 0.07), 0 2px 4px oklch(0 0 0 / 0.05);
+  .shadow-card-hover {
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08), 0 2px 4px rgba(15, 23, 42, 0.05);
   }
 }
 
 @layer base {
   :root {
-    /* ── Page background — slightly off-white so cards pop ── */
-    --background:           oklch(0.975 0.003 264);
-    --foreground:           oklch(0.145 0 0);
+    /* ── Page: barely-off-white so white cards lift ── */
+    --background:           oklch(0.984 0.003 247);   /* slate-50 */
+    --foreground:           oklch(0.133 0.028 264);   /* slate-900 */
 
-    /* ── Cards stay pure white ── */
+    /* ── Cards: pure white ── */
     --card:                 oklch(1 0 0);
-    --card-foreground:      oklch(0.145 0 0);
+    --card-foreground:      oklch(0.133 0.028 264);
     --popover:              oklch(1 0 0);
-    --popover-foreground:   oklch(0.145 0 0);
+    --popover-foreground:   oklch(0.133 0.028 264);
 
-    /* ── Brand primary — indigo ── */
-    --primary:              oklch(0.5 0.2 264);
-    --primary-foreground:   oklch(0.985 0 0);
+    /* ── Brand: indigo — professional, distinct from grade colours ── */
+    --primary:              oklch(0.511 0.211 264);   /* indigo-600 */
+    --primary-foreground:   oklch(1 0 0);
 
-    --secondary:            oklch(0.97 0.005 264);
-    --secondary-foreground: oklch(0.205 0 0);
+    --secondary:            oklch(0.968 0.007 247);   /* slate-100 */
+    --secondary-foreground: oklch(0.372 0.030 259);   /* slate-700 */
 
-    --muted:                oklch(0.96 0.003 264);
-    --muted-foreground:     oklch(0.48 0.01 264);
+    --muted:                oklch(0.968 0.007 247);   /* slate-100 */
+    --muted-foreground:     oklch(0.554 0.023 256);   /* slate-500 */
 
-    --accent:               oklch(0.96 0.005 264);
-    --accent-foreground:    oklch(0.205 0 0);
+    --accent:               oklch(0.968 0.007 247);
+    --accent-foreground:    oklch(0.372 0.030 259);
 
     --destructive:          oklch(0.577 0.245 27.325);
-    --destructive-foreground: oklch(0.985 0 0);
+    --destructive-foreground: oklch(1 0 0);
 
-    --border:               oklch(0.91 0.005 264);
-    --input:                oklch(0.91 0.005 264);
-    --ring:                 oklch(0.5 0.2 264);
-    --radius:               0.5rem;
+    --border:               oklch(0.929 0.013 255);   /* slate-200 */
+    --input:                oklch(0.929 0.013 255);
+    --ring:                 oklch(0.511 0.211 264);   /* indigo-600 */
+    --radius:               0.5rem;                   /* 8px */
 
-    /* ── Dark sidebar ── */
-    --sidebar:                    oklch(0.14 0.025 264);
-    --sidebar-foreground:         oklch(0.78 0.01 264);
-    --sidebar-primary:            oklch(0.5 0.2 264);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent:             oklch(0.21 0.025 264);
-    --sidebar-accent-foreground:  oklch(0.92 0.005 264);
-    --sidebar-border:             oklch(0.23 0.025 264);
-    --sidebar-ring:               oklch(0.5 0.2 264);
+    /* ── Sidebar: white — Intercom-style ── */
+    --sidebar:                    oklch(1 0 0);
+    --sidebar-foreground:         oklch(0.554 0.023 256);  /* slate-500 */
+    --sidebar-primary:            oklch(0.546 0.195 252);  /* blue-600 active text */
+    --sidebar-primary-foreground: oklch(0.972 0.022 249);  /* blue-50 active bg */
+    --sidebar-accent:             oklch(0.984 0.003 247);  /* slate-50 hover bg */
+    --sidebar-accent-foreground:  oklch(0.372 0.030 259);  /* slate-700 hover text */
+    --sidebar-border:             oklch(0.968 0.007 247);  /* slate-100 right border */
+    --sidebar-ring:               oklch(0.511 0.211 264);
   }
 
   .dark {
@@ -89,25 +88,23 @@
     --border:               oklch(1 0 0 / 10%);
     --input:                oklch(1 0 0 / 15%);
     --ring:                 oklch(0.6 0.2 264);
-    --sidebar:              oklch(0.12 0.025 264);
-    --sidebar-foreground:   oklch(0.78 0.01 264);
-    --sidebar-primary:      oklch(0.5 0.2 264);
+    --sidebar:              oklch(0.145 0 0);
+    --sidebar-foreground:   oklch(0.708 0 0);
+    --sidebar-primary:      oklch(0.6 0.2 264);
     --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent:       oklch(0.2 0.025 264);
-    --sidebar-accent-foreground:  oklch(0.92 0.005 264);
-    --sidebar-border:       oklch(0.22 0.025 264);
-    --sidebar-ring:         oklch(0.5 0.2 264);
+    --sidebar-accent:       oklch(0.205 0 0);
+    --sidebar-accent-foreground: oklch(0.985 0 0);
+    --sidebar-border:       oklch(1 0 0 / 8%);
+    --sidebar-ring:         oklch(0.6 0.2 264);
   }
 
-  * {
-    @apply border-border;
-  }
+  * { @apply border-border; }
 
   body {
     @apply bg-background text-foreground;
-    font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 }
