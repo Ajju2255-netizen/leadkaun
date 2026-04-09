@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import { GradeBadge } from "@/components/shared/GradeBadge"
@@ -63,7 +63,7 @@ export default function LeadsPage() {
     staleTime: 30_000,
   })
 
-  const leads = data?.leads ?? []
+  const leads = useMemo(() => data?.leads ?? [], [data])
 
   const toggleSelect = useCallback((id: string) => {
     setSelected((prev) => {
