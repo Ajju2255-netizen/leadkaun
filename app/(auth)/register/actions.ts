@@ -33,7 +33,8 @@ export async function registerAction(input: RegisterInput): Promise<RegisterResu
 
   try {
     // 2. Create Account + User in a transaction
-    await prisma.$transaction(async (tx) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await prisma.$transaction(async (tx: any) => {
       const account = await tx.account.create({
         data: {
           name: orgName,
