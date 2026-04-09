@@ -1,6 +1,5 @@
 "use server"
 
-import { Prisma } from "@prisma/client"
 import { createSupabaseAdminClient } from "@/lib/supabase/admin"
 import { prisma } from "@/lib/prisma"
 
@@ -34,7 +33,7 @@ export async function registerAction(input: RegisterInput): Promise<RegisterResu
 
   try {
     // 2. Create Account + User in a transaction
-    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    await prisma.$transaction(async (tx) => {
       const account = await tx.account.create({
         data: {
           name: orgName,
