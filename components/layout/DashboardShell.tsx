@@ -14,6 +14,7 @@ type NavItem = {
 }
 
 const NAV_ITEMS: NavItem[] = [
+  { href: "/dashboard",          label: "Dashboard",             roles: ["ADMIN", "MANAGER", "REP"] },
   { href: "/queue",              label: "Priority Queue",        roles: ["ADMIN", "MANAGER", "REP"] },
   { href: "/leads",              label: "All Leads",             roles: ["ADMIN", "MANAGER", "REP"] },
   { href: "/pipeline",           label: "Pipeline",              roles: ["ADMIN", "MANAGER", "REP"] },
