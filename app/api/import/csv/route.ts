@@ -63,16 +63,27 @@ export async function POST(req: Request) {
     if (!source) return apiError("Lead source not found", "NOT_FOUND", 404)
     if (!stage)  return apiError("Pipeline stage not found", "NOT_FOUND", 404)
 
-    // Upload to Supabase Storage
+    // Upload to Supabase Storage (auto-create bucket if it doesn't exist)
     const admin      = createSupabaseAdminClient()
     const bucketPath = `${session.account.id}/${randomUUID()}.csv`
     const buffer     = Buffer.from(await file.arrayBuffer())
+
+    // Ensure the bucket exists — create it if not (idempotent)
+    const { error: bucketError } = await admin.storage.createBucket("csv-imports", {
+      public: false,
+      fileSizeLimit: 10 * 1024 * 1024, // 10 MB
+    })
+    // Ignore "already exists" error (code 409 / "Bucket already exists")
+    if (bucketError && !bucketError.message.includes("already exists") && bucketError.message !== "The resource already exists") {
+      console.error("Bucket create error:", bucketError)
+    }
 
     const { error: uploadError } = await admin.storage
       .from("csv-imports")
       .upload(bucketPath, buffer, { contentType: "text/csv", upsert: false })
 
     if (uploadError) {
+      console.error("Storage upload error:", uploadError)
       return apiError(`Storage upload failed: ${uploadError.message}`, "STORAGE_ERROR", 500)
     }
 
