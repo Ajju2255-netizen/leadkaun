@@ -2,10 +2,12 @@ import { prisma } from "@/lib/prisma"
 import { requireAuth } from "@/lib/auth/middleware"
 import { handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
-import { processSignalAndUpdateScores } from "@/lib/scoring/orchestrator"
 import { mapHeader } from "@/lib/import/column-map"
 import { validateRow } from "@/lib/import/validate-row"
 import { generateImportSignals } from "@/lib/import/generate-signals"
+import { computeFitScore } from "@/lib/scoring/fit-score"
+import { computeQualityScore } from "@/lib/scoring/quality-score"
+import { assignGrade } from "@/lib/scoring/grade"
 import Papa from "papaparse"
 
 // Vercel Pro max function duration — allows processing large CSVs inline
@@ -101,6 +103,20 @@ export async function POST(req: Request) {
       console.warn(`CSV parse warnings (${parsed.errors.length}):`, parsed.errors.slice(0, 5))
     }
 
+    // ── Fetch account ICP config once — used for fit score on every row ──────
+    const account = await prisma.account.findUniqueOrThrow({
+      where: { id: session.account.id },
+      select: {
+        icp_configured:    true,
+        icp_industries:    true,
+        icp_states:        true,
+        icp_business_types:true,
+        icp_roles:         true,
+        icp_budget_min:    true,
+        icp_budget_max:    true,
+      },
+    })
+
     // ── Create job record ────────────────────────────────────────────────────
     const job = await prisma.importJobStatus.create({
       data: {
@@ -158,88 +174,95 @@ export async function POST(req: Request) {
           continue
         }
 
-        // ── Create lead + SOURCE_BASELINE (atomic) ────────────────────────
-        let leadId!: string
-        try {
-          const lead = await prisma.$transaction(async (tx) => {
-            const newLead = await tx.lead.create({
-              data: {
-                account_id:     session.account.id,
-                first_name:     vr.first_name,
-                last_name:      vr.last_name,
-                phone:          vr.phone,
-                phone_raw:      vr.phone_raw,
-                email:          vr.email,
-                company_name:   vr.company_name,
-                designation:    vr.designation,
-                city:           vr.city,
-                state:          vr.state,
-                pincode:        vr.pincode,
-                source_id:      sourceId,
-                stage_id:       stageId,
-                inquiry_text:   vr.inquiry_text,
-                expected_value: vr.expected_value,
-              },
-            })
-
-            // SOURCE_BASELINE — always first; establishes intent floor
-            await tx.signal.create({
-              data: {
-                account_id:           session.account.id,
-                lead_id:              newLead.id,
-                signal_type:          "SOURCE_BASELINE",
-                signal_value:         source.intent_baseline,
-                raw_value:            { source_key: source.key, import_job_id: job.id },
-                lead_grade_at_signal: "E",
-                intent_score_before:  0,
-                intent_score_after:   source.intent_baseline,
-              },
-            })
-
-            return newLead
-          })
-          leadId = lead.id
-        } catch (rowErr) {
-          const reason = `Row ${rowIndex} ("${vr.first_name}" / ${vr.phone}): DB error — ${String(rowErr)}`
-          errors++
-          console.error(`[import:${job.id}] ERR ${reason}`)
-          if (errorLog.length < MAX_STORED_ERRORS) errorLog.push(reason)
-          continue
-        }
-
-        // ── Inferred signals (best-effort — skipped if DB enum not yet migrated) ──
+        // ── Compute scores from validated data (no DB round-trip needed) ────
         const inferredSignals = generateImportSignals({
           interest_level:    vr.interest_level,
           last_contact_days: vr.last_contact_days,
           notes:             vr.inquiry_text,
         })
 
-        if (inferredSignals.length > 0) {
-          try {
-            await prisma.signal.createMany({
-              data: inferredSignals.map((s) => ({
-                account_id:           session.account.id,
-                lead_id:              leadId,
-                signal_type:          s.signal_type,
-                signal_value:         s.signal_value,
-                raw_value:            { source: "csv_import", import_job_id: job.id },
-                lead_grade_at_signal: "E",
-                intent_score_before:  0,
-                intent_score_after:   0,
-              })),
-            })
-          } catch (sigErr) {
-            // Migration for new signal types may not yet be applied — skip inferred
-            // signals silently so lead creation is never blocked by this.
-            console.warn(`[import:${job.id}] Inferred signals skipped for row ${rowIndex} — ${String(sigErr)}`)
-          }
-        }
+        // Intent = source baseline + any inferred signal values
+        // (inferred signals are best-effort; if migration not run their values
+        //  are 0 via the fallback in generate-signals.ts, so this stays safe)
+        const intentScore = Math.min(
+          100,
+          Math.max(
+            source.intent_baseline,
+            source.intent_baseline + inferredSignals.reduce((acc, s) => acc + s.signal_value, 0),
+          ),
+        )
 
-        // ── Compute scores with all available signals ─────────────────────
+        const fitResult = computeFitScore({
+          lead: {
+            industry:       vr.company_name ?? undefined,
+            state:          vr.state ?? undefined,
+            city:           vr.city ?? undefined,
+            company_name:   vr.company_name ?? undefined,
+            designation:    vr.designation ?? undefined,
+            expected_value: vr.expected_value ?? undefined,
+          },
+          icp: account,
+        })
+
+        const qualityResult = computeQualityScore({
+          phone:              vr.phone,
+          email:              vr.email,
+          company_name:       vr.company_name,
+          inquiry_text:       vr.inquiry_text,
+          source_reliability: source.reliability_score,
+          junk_flags:         [],
+          is_junk:            false,
+        })
+
+        const grade = assignGrade(fitResult.total, intentScore, qualityResult.total)
+
+        // ── Create lead + SOURCE_BASELINE + initial scores (atomic) ──────────
         try {
-          await processSignalAndUpdateScores(leadId, session.account.id, prisma)
-        } catch (scoreErr) {
-          console.warn(`[import:${job.id}] Score update failed for row ${rowIndex} — ${String(scoreErr)}`)
+          await prisma.$transaction(async (tx) => {
+            await tx.lead.create({
+              data: {
+                account_id:              session.account.id,
+                first_name:              vr.first_name,
+                last_name:               vr.last_name,
+                phone:                   vr.phone,
+                phone_raw:               vr.phone_raw,
+                email:                   vr.email,
+                company_name:            vr.company_name,
+                designation:             vr.designation,
+                city:                    vr.city,
+                state:                   vr.state,
+                pincode:                 vr.pincode,
+                source_id:               sourceId,
+                stage_id:                stageId,
+                inquiry_text:            vr.inquiry_text,
+                expected_value:          vr.expected_value,
+                // Scores written at creation — no separate update needed
+                fit_score:               fitResult.total,
+                intent_score:            intentScore,
+                quality_score:           qualityResult.total,
+                grade,
+                fit_score_breakdown:     fitResult.breakdown as object,
+                quality_score_breakdown: qualityResult.breakdown as object,
+                signals: {
+                  create: {
+                    account_id:           session.account.id,
+                    signal_type:          "SOURCE_BASELINE",
+                    signal_value:         source.intent_baseline,
+                    raw_value:            { source_key: source.key, import_job_id: job.id },
+                    lead_grade_at_signal: grade,
+                    intent_score_before:  0,
+                    intent_score_after:   intentScore,
+                  },
+                },
+              },
+            })
+          })
+        } catch (rowErr) {
+          const reason = `Row ${rowIndex} ("${vr.first_name}" / ${vr.phone}): DB error — ${String(rowErr)}`
+          errors++
+          console.error(`[import:${job.id}] ERR ${reason}`)
+          if (errorLog.length < MAX_STORED_ERRORS) errorLog.push(reason)
+          continue
         }
 
         inserted++
