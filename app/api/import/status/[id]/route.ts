@@ -29,6 +29,7 @@ export async function GET(
         duplicates:   true,
         errors:       true,
         progress_pct: true,
+        error_detail: true,
         completed_at: true,
         created_at:   true,
       },

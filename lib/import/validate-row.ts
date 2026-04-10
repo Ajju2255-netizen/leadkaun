@@ -51,9 +51,10 @@ export function validateRow(
   const rawName = str(raw.first_name ?? raw.full_name ?? raw.name ?? raw.customer_name ?? raw.lead_name)
 
   if (!rawName) {
+    const foundCols = Object.keys(raw).filter((k) => raw[k]?.trim()).join(", ") || "(none)"
     return {
       ok: false,
-      reason: `Row ${rowIndex}: missing required field "name" — column not found or empty`,
+      reason: `Row ${rowIndex}: missing required field "name" — columns found: ${foundCols}`,
     }
   }
 
@@ -87,9 +88,10 @@ export function validateRow(
   )
 
   if (!rawPhone) {
+    const foundCols = Object.keys(raw).filter((k) => raw[k]?.trim()).join(", ") || "(none)"
     return {
       ok: false,
-      reason: `Row ${rowIndex} ("${firstName}"): missing required field "phone" — column not found or empty`,
+      reason: `Row ${rowIndex} ("${firstName}"): missing required field "phone" — columns found: ${foundCols}`,
     }
   }
 

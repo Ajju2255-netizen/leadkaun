@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import { toast } from "sonner"
-import { ChevronLeft, Upload, CheckCircle2, AlertCircle, Clock } from "lucide-react"
+import { ChevronLeft, Upload, CheckCircle2, AlertCircle, Clock, ChevronDown, ChevronUp } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
 
@@ -12,6 +12,13 @@ import { useCurrentUser } from "@/hooks/useCurrentUser"
 
 interface LeadSource    { id: string; name: string }
 interface PipelineStage { id: string; name: string; order: number }
+
+interface ErrorDetail {
+  total_errors: number
+  shown:        number
+  truncated:    boolean
+  rows:         string[]
+}
 
 interface ImportJob {
   id:           string
@@ -21,7 +28,7 @@ interface ImportJob {
   duplicates:   number
   errors:       number
   progress_pct: number
-  error_detail: string | null
+  error_detail: ErrorDetail | null
   created_at:   string
   completed_at: string | null
 }
@@ -67,7 +74,7 @@ function UploadSection({ onComplete }: { onComplete: () => void }) {
   const [sourceId,  setSourceId]  = useState<string>("")
   const [stageId,   setStageId]   = useState<string>("")
   const [progress,  setProgress]  = useState<number | null>(null)
-  const [result,    setResult]    = useState<{ inserted: number; duplicates: number; errors: number } | null>(null)
+  const [result,    setResult]    = useState<{ inserted: number; duplicates: number; errors: number; errorDetail: ErrorDetail | null } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   // Fetch sources + stages on mount
@@ -133,7 +140,12 @@ function UploadSection({ onComplete }: { onComplete: () => void }) {
       setProgress(100)
 
       if (job) {
-        setResult({ inserted: job.inserted, duplicates: job.duplicates, errors: job.errors })
+        setResult({
+          inserted:    job.inserted,
+          duplicates:  job.duplicates,
+          errors:      job.errors,
+          errorDetail: job.error_detail ?? null,
+        })
         if (job.inserted > 0) {
           toast.success(`Import complete — ${job.inserted} lead${job.inserted === 1 ? "" : "s"} added`)
         } else {
@@ -249,22 +261,99 @@ function UploadSection({ onComplete }: { onComplete: () => void }) {
 
       {/* Result summary */}
       {!uploading && result && (
-        <div className="rounded-lg bg-emerald-50 border border-emerald-100 px-4 py-3 grid grid-cols-3 gap-2 text-center">
-          <div>
-            <p className="text-[20px] font-bold text-emerald-700 tabular-nums">{result.inserted}</p>
-            <p className="text-[11px] text-emerald-600">Added</p>
+        <div className="space-y-3">
+          <div className="rounded-lg bg-emerald-50 border border-emerald-100 px-4 py-3 grid grid-cols-3 gap-2 text-center">
+            <div>
+              <p className="text-[20px] font-bold text-emerald-700 tabular-nums">{result.inserted}</p>
+              <p className="text-[11px] text-emerald-600">Added</p>
+            </div>
+            <div>
+              <p className="text-[20px] font-bold text-amber-600 tabular-nums">{result.duplicates}</p>
+              <p className="text-[11px] text-amber-600">Duplicates</p>
+            </div>
+            <div>
+              <p className="text-[20px] font-bold text-slate-500 tabular-nums">{result.errors}</p>
+              <p className="text-[11px] text-slate-400">Errors</p>
+            </div>
           </div>
-          <div>
-            <p className="text-[20px] font-bold text-amber-600 tabular-nums">{result.duplicates}</p>
-            <p className="text-[11px] text-amber-600">Duplicates</p>
-          </div>
-          <div>
-            <p className="text-[20px] font-bold text-slate-500 tabular-nums">{result.errors}</p>
-            <p className="text-[11px] text-slate-400">Errors</p>
-          </div>
+          {result.errors > 0 && result.errorDetail && (
+            <div className="rounded-lg bg-red-50 border border-red-100 p-3 space-y-1">
+              <p className="text-[11px] font-semibold text-red-600 uppercase tracking-wide mb-2">
+                {result.errorDetail.total_errors} row{result.errorDetail.total_errors === 1 ? "" : "s"} skipped
+                {result.errorDetail.truncated && ` (showing first ${result.errorDetail.shown})`}
+              </p>
+              {result.errorDetail.rows.map((msg, i) => (
+                <p key={i} className="text-[12px] text-red-700 font-mono leading-relaxed">
+                  {msg}
+                </p>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
+  )
+}
+
+// ── History row (with expandable error detail) ────────────────────────────────
+
+function HistoryRow({ job }: { job: ImportJob }) {
+  const [expanded, setExpanded] = useState(false)
+  const hasErrors = job.errors > 0 && job.error_detail != null
+
+  return (
+    <>
+      <tr className="border-b border-slate-50 last:border-0">
+        <td className="py-3 pr-4 text-[12px] text-slate-400 whitespace-nowrap">
+          {new Date(job.created_at).toLocaleString("en-IN", {
+            day: "2-digit", month: "short", year: "numeric",
+            hour: "2-digit", minute: "2-digit",
+          })}
+        </td>
+        <td className="py-3 pr-4">
+          <StatusBadge status={job.status} />
+        </td>
+        <td className="py-3 pr-4 text-right text-[13px] tabular-nums text-slate-600">
+          {job.total_rows ?? "—"}
+        </td>
+        <td className="py-3 pr-4 text-right text-[13px] tabular-nums font-semibold text-emerald-700">
+          {job.inserted}
+        </td>
+        <td className="py-3 pr-4 text-right text-[13px] tabular-nums text-amber-600">
+          {job.duplicates}
+        </td>
+        <td className="py-3 text-right text-[13px] tabular-nums">
+          {hasErrors ? (
+            <button
+              onClick={() => setExpanded((v) => !v)}
+              className="inline-flex items-center gap-1 text-red-600 hover:text-red-700 font-medium"
+            >
+              {job.errors}
+              {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            </button>
+          ) : (
+            <span className="text-slate-400">{job.errors}</span>
+          )}
+        </td>
+      </tr>
+      {expanded && job.error_detail && (
+        <tr className="border-b border-slate-50">
+          <td colSpan={6} className="pb-3 pt-0 px-0">
+            <div className="mx-0 rounded-lg bg-red-50 border border-red-100 p-3 space-y-1">
+              <p className="text-[11px] font-semibold text-red-600 uppercase tracking-wide mb-2">
+                {job.error_detail.total_errors} row{job.error_detail.total_errors === 1 ? "" : "s"} skipped
+                {job.error_detail.truncated && ` (showing first ${job.error_detail.shown})`}
+              </p>
+              {job.error_detail.rows.map((msg, i) => (
+                <p key={i} className="text-[12px] text-red-700 font-mono leading-relaxed">
+                  {msg}
+                </p>
+              ))}
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
   )
 }
 
@@ -309,29 +398,7 @@ function HistorySection({ refreshKey }: { refreshKey: number }) {
             </thead>
             <tbody>
               {jobs.map((job) => (
-                <tr key={job.id} className="border-b border-slate-50 last:border-0">
-                  <td className="py-3 pr-4 text-[12px] text-slate-400 whitespace-nowrap">
-                    {new Date(job.created_at).toLocaleString("en-IN", {
-                      day: "2-digit", month: "short", year: "numeric",
-                      hour: "2-digit", minute: "2-digit",
-                    })}
-                  </td>
-                  <td className="py-3 pr-4">
-                    <StatusBadge status={job.status} />
-                  </td>
-                  <td className="py-3 pr-4 text-right text-[13px] tabular-nums text-slate-600">
-                    {job.total_rows ?? "—"}
-                  </td>
-                  <td className="py-3 pr-4 text-right text-[13px] tabular-nums font-semibold text-emerald-700">
-                    {job.inserted}
-                  </td>
-                  <td className="py-3 pr-4 text-right text-[13px] tabular-nums text-amber-600">
-                    {job.duplicates}
-                  </td>
-                  <td className="py-3 text-right text-[13px] tabular-nums text-slate-400">
-                    {job.errors}
-                  </td>
-                </tr>
+                <HistoryRow key={job.id} job={job} />
               ))}
             </tbody>
           </table>

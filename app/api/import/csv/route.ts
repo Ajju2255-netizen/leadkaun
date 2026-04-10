@@ -93,6 +93,9 @@ export async function POST(req: Request) {
       return apiError("CSV file is empty or has no valid rows", "EMPTY_CSV", 422)
     }
 
+    // Log detected column keys so they appear in Vercel logs for debugging
+    console.log(`[import] Detected columns (${totalRows} rows):`, Object.keys(rows[0] ?? {}))
+
     // Log Papa parse warnings (mismatched column counts etc.) to server console
     if (parsed.errors.length > 0) {
       console.warn(`CSV parse warnings (${parsed.errors.length}):`, parsed.errors.slice(0, 5))
@@ -155,10 +158,11 @@ export async function POST(req: Request) {
           continue
         }
 
-        // ── Create lead + signals + score ─────────────────────────────────
+        // ── Create lead + SOURCE_BASELINE (atomic) ────────────────────────
+        let leadId!: string
         try {
-          await prisma.$transaction(async (tx) => {
-            const lead = await tx.lead.create({
+          const lead = await prisma.$transaction(async (tx) => {
+            const newLead = await tx.lead.create({
               data: {
                 account_id:     session.account.id,
                 first_name:     vr.first_name,
@@ -182,7 +186,7 @@ export async function POST(req: Request) {
             await tx.signal.create({
               data: {
                 account_id:           session.account.id,
-                lead_id:              lead.id,
+                lead_id:              newLead.id,
                 signal_type:          "SOURCE_BASELINE",
                 signal_value:         source.intent_baseline,
                 raw_value:            { source_key: source.key, import_job_id: job.id },
@@ -192,39 +196,53 @@ export async function POST(req: Request) {
               },
             })
 
-            // Import-inference signals from CSV field data
-            const inferredSignals = generateImportSignals({
-              interest_level:    vr.interest_level,
-              last_contact_days: vr.last_contact_days,
-              notes:             vr.inquiry_text,
-            })
-
-            if (inferredSignals.length > 0) {
-              await tx.signal.createMany({
-                data: inferredSignals.map((s) => ({
-                  account_id:           session.account.id,
-                  lead_id:              lead.id,
-                  signal_type:          s.signal_type,
-                  signal_value:         s.signal_value,
-                  raw_value:            { source: "csv_import", import_job_id: job.id },
-                  lead_grade_at_signal: "E",
-                  intent_score_before:  0,
-                  intent_score_after:   0,
-                })),
-              })
-            }
-
-            // Score with all signals in place
-            await processSignalAndUpdateScores(lead.id, session.account.id, tx)
+            return newLead
           })
-
-          inserted++
+          leadId = lead.id
         } catch (rowErr) {
           const reason = `Row ${rowIndex} ("${vr.first_name}" / ${vr.phone}): DB error — ${String(rowErr)}`
           errors++
           console.error(`[import:${job.id}] ERR ${reason}`)
           if (errorLog.length < MAX_STORED_ERRORS) errorLog.push(reason)
+          continue
         }
+
+        // ── Inferred signals (best-effort — skipped if DB enum not yet migrated) ──
+        const inferredSignals = generateImportSignals({
+          interest_level:    vr.interest_level,
+          last_contact_days: vr.last_contact_days,
+          notes:             vr.inquiry_text,
+        })
+
+        if (inferredSignals.length > 0) {
+          try {
+            await prisma.signal.createMany({
+              data: inferredSignals.map((s) => ({
+                account_id:           session.account.id,
+                lead_id:              leadId,
+                signal_type:          s.signal_type,
+                signal_value:         s.signal_value,
+                raw_value:            { source: "csv_import", import_job_id: job.id },
+                lead_grade_at_signal: "E",
+                intent_score_before:  0,
+                intent_score_after:   0,
+              })),
+            })
+          } catch (sigErr) {
+            // Migration for new signal types may not yet be applied — skip inferred
+            // signals silently so lead creation is never blocked by this.
+            console.warn(`[import:${job.id}] Inferred signals skipped for row ${rowIndex} — ${String(sigErr)}`)
+          }
+        }
+
+        // ── Compute scores with all available signals ─────────────────────
+        try {
+          await processSignalAndUpdateScores(leadId, session.account.id, prisma)
+        } catch (scoreErr) {
+          console.warn(`[import:${job.id}] Score update failed for row ${rowIndex} — ${String(scoreErr)}`)
+        }
+
+        inserted++
       }
 
       // Update progress counters after each batch
