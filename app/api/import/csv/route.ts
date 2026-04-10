@@ -3,7 +3,8 @@ import { requireAuth } from "@/lib/auth/middleware"
 import { handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
 import { processSignalAndUpdateScores } from "@/lib/scoring/orchestrator"
-import { normalisePhone } from "@/lib/import/phone-normalise"
+import { mapHeader } from "@/lib/import/column-map"
+import { validateRow } from "@/lib/import/validate-row"
 import { generateImportSignals } from "@/lib/import/generate-signals"
 import Papa from "papaparse"
 
@@ -13,65 +14,24 @@ export const maxDuration = 300
 // Max CSV file size: 10 MB
 const MAX_FILE_SIZE = 10 * 1024 * 1024
 
-// Column name aliases — maps common CSV headers to our field names
-const COLUMN_MAP: Record<string, string> = {
-  "first name":     "first_name",
-  "firstname":      "first_name",
-  "name":           "first_name",
-  "full name":      "first_name",
-  "last name":      "last_name",
-  "lastname":       "last_name",
-  "surname":        "last_name",
-  "mobile":         "phone",
-  "phone":          "phone",
-  "phone number":   "phone",
-  "mobile number":  "phone",
-  "contact":        "phone",
-  "contact number": "phone",
-  "email":          "email",
-  "email address":  "email",
-  "company":        "company_name",
-  "company name":   "company_name",
-  "organisation":   "company_name",
-  "organization":   "company_name",
-  "designation":    "designation",
-  "role":           "designation",
-  "job title":      "designation",
-  "city":           "city",
-  "state":          "state",
-  "pincode":        "pincode",
-  "zip":            "pincode",
-  "zip code":       "pincode",
-  "inquiry":        "inquiry_text",
-  "message":        "inquiry_text",
-  "remarks":        "inquiry_text",
-  "notes":          "inquiry_text",
-  "value":              "expected_value",
-  "deal value":         "expected_value",
-  "expected value":     "expected_value",
-  "budget":             "expected_value",
-  // import-inference fields
-  "interest level":     "interest_level",
-  "interest":           "interest_level",
-  "intent":             "interest_level",
-  "last contact":       "last_contact_days",
-  "last contact days":  "last_contact_days",
-  "days since contact": "last_contact_days",
-  "last contacted":     "last_contact_days",
-}
+// Store at most this many per-row error strings in error_detail JSON.
+// Keeps the payload small even for large broken CSVs.
+const MAX_STORED_ERRORS = 100
 
 /**
  * POST /api/import/csv
  *
- * Processes the CSV inline (no Inngest dependency).
- * Reads, parses, deduplicates and scores all rows in the same request.
- * export const maxDuration = 300 gives 5 minutes — enough for 10 MB CSVs.
+ * Validates, normalises and imports CSV rows inline (no Inngest dependency).
  *
- * Steps:
- * 1. Validate file
- * 2. Create ImportJobStatus (PROCESSING)
- * 3. Parse + process rows in batches of 50, updating progress after each batch
- * 4. Mark job COMPLETE and return { jobId }
+ * Validation rules:
+ *   REQUIRED:  name, phone (Indian mobile — with or without country code)
+ *   OPTIONAL:  everything else
+ *   SKIPPED:   duplicates (same phone in same account)
+ *
+ * Errors:
+ *   • Per-row errors are logged with row number + exact reason
+ *   • First MAX_STORED_ERRORS are persisted in ImportJobStatus.error_detail
+ *   • The job always reaches COMPLETE — errors never abort the whole import
  *
  * Admin/Manager only.
  */
@@ -111,16 +71,19 @@ export async function POST(req: Request) {
     if (!source) return apiError("Lead source not found", "NOT_FOUND", 404)
     if (!stage)  return apiError("Pipeline stage not found", "NOT_FOUND", 404)
 
-    // ── Parse CSV ────────────────────────────────────────────────────────────
+    // ── Decode CSV ───────────────────────────────────────────────────────────
     const buffer  = Buffer.from(await file.arrayBuffer())
-    const csvText = buffer.includes(0xFFFD)
+    // Detect encoding: if the utf-8 decode has replacement chars, try Windows-1252
+    const utf8Try = buffer.toString("utf-8")
+    const csvText = utf8Try.includes("\uFFFD")
       ? new TextDecoder("windows-1252").decode(buffer)
-      : buffer.toString("utf-8")
+      : utf8Try
 
+    // ── Parse with expanded header map ───────────────────────────────────────
     const parsed = Papa.parse<Record<string, string>>(csvText, {
       header:          true,
       skipEmptyLines:  true,
-      transformHeader: (h) => COLUMN_MAP[h.toLowerCase().trim()] ?? h.toLowerCase().trim().replace(/\s+/g, "_"),
+      transformHeader: mapHeader,  // uses COLUMN_MAP + fuzzy fallback
     })
 
     const rows      = parsed.data
@@ -128,6 +91,11 @@ export async function POST(req: Request) {
 
     if (totalRows === 0) {
       return apiError("CSV file is empty or has no valid rows", "EMPTY_CSV", 422)
+    }
+
+    // Log Papa parse warnings (mismatched column counts etc.) to server console
+    if (parsed.errors.length > 0) {
+      console.warn(`CSV parse warnings (${parsed.errors.length}):`, parsed.errors.slice(0, 5))
     }
 
     // ── Create job record ────────────────────────────────────────────────────
@@ -144,53 +112,73 @@ export async function POST(req: Request) {
       },
     })
 
-    // ── Process in batches of 50 ─────────────────────────────────────────────
-    const BATCH_SIZE = 50
-    let inserted   = 0
-    let duplicates = 0
-    let errors     = 0
+    // ── Process rows ─────────────────────────────────────────────────────────
+    const BATCH_SIZE  = 50
+    let inserted      = 0
+    let duplicates    = 0
+    let errors        = 0
+    const errorLog: string[] = []   // stored in error_detail at the end
 
     for (let i = 0; i < rows.length; i += BATCH_SIZE) {
       const batch = rows.slice(i, i + BATCH_SIZE)
 
-      for (const row of batch) {
+      for (let j = 0; j < batch.length; j++) {
+        const row      = batch[j]
+        const rowIndex = i + j + 2   // +2: 1-based + header row
+
+        // ── Validate + normalise ──────────────────────────────────────────
+        const validation = validateRow(row, rowIndex)
+
+        if (!validation.ok) {
+          errors++
+          console.error(`[import:${job.id}] SKIP ${validation.reason}`)
+          if (errorLog.length < MAX_STORED_ERRORS) errorLog.push(validation.reason)
+          continue
+        }
+
+        const vr = validation.data
+
+        // ── Duplicate check ───────────────────────────────────────────────
         try {
-          const phone = normalisePhone(row.phone ?? row.mobile ?? row.contact ?? "")
-          const firstName = (row.first_name ?? row.name ?? "").trim()
-
-          if (!phone || !firstName) { errors++; continue }
-
-          // Check for duplicate by phone within this account
           const exists = await prisma.lead.findUnique({
-            where: { account_id_phone: { account_id: session.account.id, phone } },
+            where: { account_id_phone: { account_id: session.account.id, phone: vr.phone } },
           })
-          if (exists) { duplicates++; continue }
+          if (exists) {
+            duplicates++
+            continue
+          }
+        } catch (dupErr) {
+          const reason = `Row ${rowIndex} ("${vr.first_name}"): duplicate check failed — ${String(dupErr)}`
+          errors++
+          console.error(`[import:${job.id}] ERR ${reason}`)
+          if (errorLog.length < MAX_STORED_ERRORS) errorLog.push(reason)
+          continue
+        }
 
-          // Create lead + all import signals + compute scores — all in one transaction
+        // ── Create lead + signals + score ─────────────────────────────────
+        try {
           await prisma.$transaction(async (tx) => {
             const lead = await tx.lead.create({
               data: {
                 account_id:     session.account.id,
-                first_name:     firstName,
-                last_name:      (row.last_name ?? "").trim() || null,
-                phone,
-                phone_raw:      row.phone ?? "",
-                email:          (row.email ?? "").trim() || null,
-                company_name:   (row.company_name ?? "").trim() || null,
-                designation:    (row.designation ?? "").trim() || null,
-                city:           (row.city ?? "").trim() || null,
-                state:          (row.state ?? "").trim() || null,
-                pincode:        (row.pincode ?? "").trim() || null,
+                first_name:     vr.first_name,
+                last_name:      vr.last_name,
+                phone:          vr.phone,
+                phone_raw:      vr.phone_raw,
+                email:          vr.email,
+                company_name:   vr.company_name,
+                designation:    vr.designation,
+                city:           vr.city,
+                state:          vr.state,
+                pincode:        vr.pincode,
                 source_id:      sourceId,
                 stage_id:       stageId,
-                inquiry_text:   (row.inquiry_text ?? "").trim() || null,
-                expected_value: row.expected_value
-                  ? parseInt(row.expected_value.replace(/[^0-9]/g, ""), 10) || null
-                  : null,
+                inquiry_text:   vr.inquiry_text,
+                expected_value: vr.expected_value,
               },
             })
 
-            // 1. SOURCE_BASELINE — always created; establishes intent floor
+            // SOURCE_BASELINE — always first; establishes intent floor
             await tx.signal.create({
               data: {
                 account_id:           session.account.id,
@@ -204,13 +192,11 @@ export async function POST(req: Request) {
               },
             })
 
-            // 2. Import-inference signals — generated from CSV fields
+            // Import-inference signals from CSV field data
             const inferredSignals = generateImportSignals({
-              interest_level:    row.interest_level ?? null,
-              last_contact_days: row.last_contact_days
-                ? parseInt(row.last_contact_days, 10) || null
-                : null,
-              notes: row.inquiry_text ?? row.notes ?? null,
+              interest_level:    vr.interest_level,
+              last_contact_days: vr.last_contact_days,
+              notes:             vr.inquiry_text,
             })
 
             if (inferredSignals.length > 0) {
@@ -221,25 +207,27 @@ export async function POST(req: Request) {
                   signal_type:          s.signal_type,
                   signal_value:         s.signal_value,
                   raw_value:            { source: "csv_import", import_job_id: job.id },
-                  lead_grade_at_signal: "E",   // will be updated by processSignalAndUpdateScores
+                  lead_grade_at_signal: "E",
                   intent_score_before:  0,
                   intent_score_after:   0,
                 })),
               })
             }
 
-            // 3. Re-score the lead with all signals now in place
+            // Score with all signals in place
             await processSignalAndUpdateScores(lead.id, session.account.id, tx)
           })
 
           inserted++
         } catch (rowErr) {
-          console.error("Row import error:", rowErr)
+          const reason = `Row ${rowIndex} ("${vr.first_name}" / ${vr.phone}): DB error — ${String(rowErr)}`
           errors++
+          console.error(`[import:${job.id}] ERR ${reason}`)
+          if (errorLog.length < MAX_STORED_ERRORS) errorLog.push(reason)
         }
       }
 
-      // Update progress after each batch
+      // Update progress counters after each batch
       const pct = Math.min(99, Math.round(((i + batch.length) / totalRows) * 100))
       await prisma.importJobStatus.update({
         where: { id: job.id },
@@ -257,6 +245,14 @@ export async function POST(req: Request) {
         errors,
         progress_pct: 100,
         completed_at: new Date(),
+        ...(errorLog.length > 0 && {
+          error_detail: {
+            total_errors: errors,
+            shown:        errorLog.length,
+            truncated:    errors > MAX_STORED_ERRORS,
+            rows:         errorLog,
+          },
+        }),
       },
     })
 
