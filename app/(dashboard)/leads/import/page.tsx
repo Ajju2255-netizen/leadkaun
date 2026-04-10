@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import { toast } from "sonner"
-import { ChevronLeft, Upload, CheckCircle2, AlertCircle, Clock, ChevronDown, ChevronUp } from "lucide-react"
+import { ChevronLeft, Upload, CheckCircle2, AlertCircle, Clock } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
 
@@ -298,9 +298,6 @@ function UploadSection({ onComplete }: { onComplete: () => void }) {
 // ── History row (with expandable error detail) ────────────────────────────────
 
 function HistoryRow({ job }: { job: ImportJob }) {
-  const [expanded, setExpanded] = useState(false)
-  const hasErrors = job.errors > 0 && job.error_detail != null
-
   return (
     <>
       <tr className="border-b border-slate-50 last:border-0">
@@ -322,37 +319,10 @@ function HistoryRow({ job }: { job: ImportJob }) {
         <td className="py-3 pr-4 text-right text-[13px] tabular-nums text-amber-600">
           {job.duplicates}
         </td>
-        <td className="py-3 text-right text-[13px] tabular-nums">
-          {hasErrors ? (
-            <button
-              onClick={() => setExpanded((v) => !v)}
-              className="inline-flex items-center gap-1 text-red-600 hover:text-red-700 font-medium"
-            >
-              {job.errors}
-              {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-            </button>
-          ) : (
-            <span className="text-slate-400">{job.errors}</span>
-          )}
+        <td className="py-3 text-right text-[13px] tabular-nums text-slate-400">
+          {job.errors}
         </td>
       </tr>
-      {expanded && job.error_detail && (
-        <tr className="border-b border-slate-50">
-          <td colSpan={6} className="pb-3 pt-0 px-0">
-            <div className="mx-0 rounded-lg bg-red-50 border border-red-100 p-3 space-y-1">
-              <p className="text-[11px] font-semibold text-red-600 uppercase tracking-wide mb-2">
-                {job.error_detail.total_errors} row{job.error_detail.total_errors === 1 ? "" : "s"} skipped
-                {job.error_detail.truncated && ` (showing first ${job.error_detail.shown})`}
-              </p>
-              {job.error_detail.rows.map((msg, i) => (
-                <p key={i} className="text-[12px] text-red-700 font-mono leading-relaxed">
-                  {msg}
-                </p>
-              ))}
-            </div>
-          </td>
-        </tr>
-      )}
     </>
   )
 }
