@@ -276,6 +276,54 @@ export async function POST(req: Request) {
       })
     }
 
+    // ── Regrade any stale E leads in this account (catches pre-fix imports) ──
+    try {
+      const staleLeads = await prisma.lead.findMany({
+        where: { account_id: session.account.id, grade: "E", is_junk: false },
+        select: { id: true },
+      })
+      for (const lead of staleLeads) {
+        const signals = await prisma.signal.findMany({
+          where: { lead_id: lead.id },
+          select: { signal_type: true, signal_value: true },
+        })
+        const leadData = await prisma.lead.findUniqueOrThrow({
+          where: { id: lead.id },
+          include: { source: true },
+        })
+        const intentScore = Math.min(
+          100,
+          signals.reduce((acc, s) => acc + s.signal_value, leadData.source.intent_baseline),
+        )
+        const fitResult     = computeFitScore({ lead: leadData, icp: account })
+        const qualityResult = computeQualityScore({
+          phone:              leadData.phone,
+          email:              leadData.email,
+          company_name:       leadData.company_name,
+          inquiry_text:       leadData.inquiry_text,
+          source_reliability: leadData.source.reliability_score,
+          junk_flags:         leadData.junk_flags,
+          is_junk:            leadData.is_junk,
+        })
+        const newGrade = assignGrade(fitResult.total, intentScore, qualityResult.total)
+        if (newGrade !== "E") {
+          await prisma.lead.update({
+            where: { id: lead.id },
+            data: {
+              grade:                   newGrade,
+              fit_score:               fitResult.total,
+              intent_score:            intentScore,
+              quality_score:           qualityResult.total,
+              fit_score_breakdown:     fitResult.breakdown as object,
+              quality_score_breakdown: qualityResult.breakdown as object,
+            },
+          })
+        }
+      }
+    } catch (regradeErr) {
+      console.warn("[import] Regrade sweep failed:", String(regradeErr))
+    }
+
     // ── Mark complete ────────────────────────────────────────────────────────
     await prisma.importJobStatus.update({
       where: { id: job.id },

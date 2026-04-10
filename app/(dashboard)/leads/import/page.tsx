@@ -400,6 +400,51 @@ function HistoryRow({ job }: { job: ImportJob }) {
   )
 }
 
+// ── Regrade section ──────────────────────────────────────────────────────────
+
+function RegradeButton() {
+  const [status, setStatus] = useState<"idle" | "loading" | "done">("idle")
+  const [result, setResult] = useState<{ updated: number; total: number } | null>(null)
+
+  async function handleRegrade() {
+    setStatus("loading")
+    try {
+      const res = await fetch("/api/admin/regrade", { method: "POST", credentials: "include" })
+      const data = await res.json()
+      setResult(data)
+      setStatus("done")
+    } catch {
+      setStatus("idle")
+      toast.error("Regrade failed. Please try again.")
+    }
+  }
+
+  return (
+    <div className={`rounded-xl bg-white ${CARD_SHADOW} px-5 py-4 flex items-center justify-between gap-4`}>
+      <div>
+        <p className="text-[13px] font-semibold text-slate-800">Regrade all leads</p>
+        <p className="text-[12px] text-slate-400 mt-0.5">
+          {status === "done" && result
+            ? `Updated ${result.updated} of ${result.total} leads`
+            : "Re-run scoring on every lead with the latest grade thresholds"}
+        </p>
+      </div>
+      <button
+        onClick={handleRegrade}
+        disabled={status === "loading"}
+        className={`
+          h-8 px-4 rounded-lg text-[12px] font-semibold transition-colors shrink-0
+          ${status === "done"
+            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+            : "bg-slate-100 hover:bg-slate-200 text-slate-700 disabled:opacity-50"}
+        `}
+      >
+        {status === "loading" ? "Regrading…" : status === "done" ? "Done" : "Run regrade"}
+      </button>
+    </div>
+  )
+}
+
 // ── History section ───────────────────────────────────────────────────────────
 
 function HistorySection({ refreshKey }: { refreshKey: number }) {
