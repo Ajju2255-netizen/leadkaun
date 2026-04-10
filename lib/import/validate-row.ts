@@ -98,19 +98,10 @@ export function validateRow(
   const phone = normalisePhone(rawPhone)
 
   if (!phone) {
-    // Give a specific reason based on what we found
     const digits = rawPhone.replace(/\D/g, "")
-    let hint: string
-
-    if (!digits) {
-      hint = "no digits found"
-    } else if (digits.length < 10) {
-      hint = `only ${digits.length} digits (need 10)`
-    } else if (digits.length === 10 && !/^[6-9]/.test(digits)) {
-      hint = `starts with "${digits[0]}" — Indian mobiles must start with 6–9`
-    } else {
-      hint = "unrecognised format"
-    }
+    const hint = !digits
+      ? "no digits found"
+      : `only ${digits.length} digit${digits.length === 1 ? "" : "s"} (need at least 5)`
 
     return {
       ok: false,
