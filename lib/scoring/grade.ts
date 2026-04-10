@@ -9,8 +9,10 @@ import type { LeadGrade } from "@prisma/client"
  * A  → fit ≥ 65 AND intent ≥ 60 AND quality ≥ 60
  * B  → fit ≥ 55 AND intent ≥ 40 AND quality ≥ 50
  * C  → fit ≥ 40 AND intent ≥ 55 AND quality ≥ 40  (high-intent, lower fit)
- * D  → fit ≥ 35 AND intent ≥ 25 AND quality ≥ 30
- * E  → everything else
+ * D  → fit ≥ 30 AND intent ≥ 15 AND quality ≥ 25
+ *      (reachable for fresh imports from any meaningful source — intent ≥ 15
+ *       means any source with baseline > 10 e.g. Cold Call Outbound at 20)
+ * E  → everything else (truly unknown / "Other" source with no data)
  */
 export function assignGrade(
   fit: number,
@@ -21,7 +23,7 @@ export function assignGrade(
   if (fit >= 65 && intent >= 60 && quality >= 60)        return "A"
   if (fit >= 55 && intent >= 40 && quality >= 50)        return "B"
   if (fit >= 40 && intent >= 55 && quality >= 40)        return "C"
-  if (fit >= 35 && intent >= 25 && quality >= 30)        return "D"
+  if (fit >= 30 && intent >= 15 && quality >= 25)        return "D"
   return "E"
 }
 
