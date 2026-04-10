@@ -7,7 +7,8 @@ import type { SignalType } from "@prisma/client"
  *
  * TAD ref: Section 4.3
  */
-export const SIGNAL_WEIGHTS: Record<SignalType, number> = {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const SIGNAL_WEIGHTS: Record<SignalType, number> & Record<string, number> = {
   // ── WhatsApp reply time ──────────────────────────────
   WA_REPLIED_1H:    15,   // replied within 1 hour — strong buying signal
   WA_REPLIED_4H:    10,   // replied within 4 hours
@@ -53,6 +54,16 @@ export const SIGNAL_WEIGHTS: Record<SignalType, number> = {
   // ── Rep overrides ────────────────────────────────────
   REP_VERY_INTERESTED:  25,  // rep marks as very interested (manual override)
   REP_NOT_INTERESTED:  -25,  // rep marks as not interested (manual override)
+
+  // ── Import inference (generated from CSV field data) ─
+  IMPORT_HIGH_INTENT:     40,   // interest_level = High
+  IMPORT_MEDIUM_INTENT:   20,   // interest_level = Medium
+  IMPORT_LOW_INTENT:       5,   // interest_level = Low
+  IMPORT_RECENT_CONTACT:  30,   // last_contact_days 0–1
+  IMPORT_WARM_CONTACT:    15,   // last_contact_days 2–3
+  IMPORT_STALE_CONTACT:  -20,   // last_contact_days > 5 (negative — was not followed up)
+  IMPORT_ACTIVE_INTEREST: 30,   // notes mention demo / call / callback
+  IMPORT_NEGATIVE_SIGNAL:-25,   // notes mention not interested / no response
 
   // ── System ───────────────────────────────────────────
   INTENT_DECAY: -3,  // applied per day by nightly cron (TAD 6.2)

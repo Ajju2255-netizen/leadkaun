@@ -146,6 +146,15 @@ enum SignalType {
   INQUIRY_MED_SPECIFICITY
   SOURCE_BASELINE
   RE_INQUIRY
+  // Import inference signals — generated from CSV field data at import time
+  IMPORT_HIGH_INTENT       // interest_level = High    (+40)
+  IMPORT_MEDIUM_INTENT     // interest_level = Medium  (+20)
+  IMPORT_LOW_INTENT        // interest_level = Low     (+5)
+  IMPORT_RECENT_CONTACT    // last_contact_days 0–1    (+30)
+  IMPORT_WARM_CONTACT      // last_contact_days 2–3    (+15)
+  IMPORT_STALE_CONTACT     // last_contact_days > 5    (-20)
+  IMPORT_ACTIVE_INTEREST   // notes: demo/call/callback (+30)
+  IMPORT_NEGATIVE_SIGNAL   // notes: not interested / no response (-25)
   // Behavioural signals
   INQUIRY_EVENING_WEEKEND
   STAGE_PROPOSAL_SENT
