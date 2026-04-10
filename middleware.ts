@@ -61,10 +61,10 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  // Authenticated user hitting an auth page → redirect to dashboard
+  // Authenticated user hitting an auth page → go straight to execution
   if (session && isAuthPath(pathname)) {
     const dashboardUrl = req.nextUrl.clone()
-    dashboardUrl.pathname = "/dashboard"
+    dashboardUrl.pathname = "/queue"
     dashboardUrl.search = ""
     return NextResponse.redirect(dashboardUrl)
   }

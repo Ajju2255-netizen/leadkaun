@@ -30,8 +30,8 @@ type NavItem = {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { href: "/dashboard",  label: "Dashboard",     icon: LayoutDashboard, roles: ["ADMIN","MANAGER","REP"], section: "main" },
   { href: "/queue",      label: "Priority Queue", icon: Zap,             roles: ["ADMIN","MANAGER","REP"], section: "main" },
+  { href: "/dashboard",  label: "Dashboard",     icon: LayoutDashboard, roles: ["ADMIN","MANAGER","REP"], section: "main" },
   { href: "/leads",      label: "All Leads",      icon: Users,           roles: ["ADMIN","MANAGER","REP"], section: "main" },
   { href: "/pipeline",   label: "Pipeline",       icon: Columns2,        roles: ["ADMIN","MANAGER","REP"], section: "main" },
   { href: "/follow-ups", label: "Follow-ups",     icon: CalendarCheck,   roles: ["ADMIN","MANAGER","REP"], section: "main" },

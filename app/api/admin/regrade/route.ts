@@ -24,9 +24,8 @@ export async function POST() {
     const leads = await prisma.lead.findMany({
       where: {
         account_id: session.account.id,
-        is_won:     false,
-        is_lost:    false,
         is_junk:    false,
+        stage: { is_won: false, is_lost: false },
       },
       select: { id: true },
     })

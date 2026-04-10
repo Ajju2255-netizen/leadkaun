@@ -3,8 +3,9 @@
 import { useState, useEffect, useRef } from "react"
 import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { ChevronLeft, Upload, CheckCircle2, AlertCircle, Clock } from "lucide-react"
+import { ChevronLeft, Upload, CheckCircle2, AlertCircle, Clock, Zap, ArrowRight } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
 
@@ -68,6 +69,7 @@ const CARD_SHADOW = "shadow-[0_1px_3px_rgba(15,23,42,0.06),0_1px_2px_rgba(15,23,
 // ── Upload section ────────────────────────────────────────────────────────────
 
 function UploadSection({ onComplete }: { onComplete: () => void }) {
+  const router = useRouter()
   const [uploading, setUploading] = useState(false)
   const [sources,   setSources]   = useState<LeadSource[]>([])
   const [stages,    setStages]    = useState<PipelineStage[]>([])
@@ -259,23 +261,94 @@ function UploadSection({ onComplete }: { onComplete: () => void }) {
         </div>
       )}
 
-      {/* Result summary */}
+      {/* Post-import action moment */}
       {!uploading && result && (
         <div className="space-y-3">
-          <div className="rounded-lg bg-emerald-50 border border-emerald-100 px-4 py-3 grid grid-cols-3 gap-2 text-center">
-            <div>
-              <p className="text-[20px] font-bold text-emerald-700 tabular-nums">{result.inserted}</p>
-              <p className="text-[11px] text-emerald-600">Added</p>
+
+          {result.inserted > 0 ? (
+            /* ── Leads were added — drive to queue ── */
+            <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-5 space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center shrink-0 mt-0.5">
+                  <Zap className="w-4.5 h-4.5 text-white" strokeWidth={2.5} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[14px] font-semibold text-indigo-900">
+                    {result.inserted} lead{result.inserted === 1 ? "" : "s"} imported and graded
+                  </p>
+                  <p className="text-[12px] text-indigo-700 mt-0.5 leading-relaxed">
+                    Leadkaun has ranked your leads by priority. Start with the highest-scored leads first — your queue is ready.
+                  </p>
+                </div>
+              </div>
+
+              {/* Stats row */}
+              <div className="flex gap-4 text-center">
+                <div className="flex-1 rounded-lg bg-white/70 py-2">
+                  <p className="text-[18px] font-bold text-emerald-700 tabular-nums">{result.inserted}</p>
+                  <p className="text-[11px] text-emerald-600">Added</p>
+                </div>
+                <div className="flex-1 rounded-lg bg-white/70 py-2">
+                  <p className="text-[18px] font-bold text-amber-600 tabular-nums">{result.duplicates}</p>
+                  <p className="text-[11px] text-amber-600">Duplicates</p>
+                </div>
+                <div className="flex-1 rounded-lg bg-white/70 py-2">
+                  <p className="text-[18px] font-bold text-slate-500 tabular-nums">{result.errors}</p>
+                  <p className="text-[11px] text-slate-400">Skipped</p>
+                </div>
+              </div>
+
+              {/* CTAs */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => router.push("/queue")}
+                  className="flex-1 h-9 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[13px] font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  Start executing <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+                <Link
+                  href="/leads"
+                  className="h-9 px-4 rounded-lg border border-indigo-200 bg-white/60 hover:bg-white text-indigo-700 text-[13px] font-medium flex items-center transition-colors"
+                >
+                  View leads
+                </Link>
+              </div>
+
+              {/* Reset link */}
+              <button
+                onClick={() => setResult(null)}
+                className="text-[11px] text-indigo-500 hover:text-indigo-700 w-full text-center"
+              >
+                Import another file
+              </button>
             </div>
-            <div>
-              <p className="text-[20px] font-bold text-amber-600 tabular-nums">{result.duplicates}</p>
-              <p className="text-[11px] text-amber-600">Duplicates</p>
+          ) : (
+            /* ── No new leads added ── */
+            <div className="space-y-3">
+              <div className="rounded-lg bg-slate-50 border border-slate-200 px-4 py-3 grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <p className="text-[18px] font-bold text-emerald-700 tabular-nums">{result.inserted}</p>
+                  <p className="text-[11px] text-emerald-600">Added</p>
+                </div>
+                <div>
+                  <p className="text-[18px] font-bold text-amber-600 tabular-nums">{result.duplicates}</p>
+                  <p className="text-[11px] text-amber-600">Duplicates</p>
+                </div>
+                <div>
+                  <p className="text-[18px] font-bold text-slate-500 tabular-nums">{result.errors}</p>
+                  <p className="text-[11px] text-slate-400">Skipped</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setResult(null)}
+                className="text-[12px] text-slate-400 hover:text-slate-600 w-full text-center"
+              >
+                Try a different file
+              </button>
             </div>
-            <div>
-              <p className="text-[20px] font-bold text-slate-500 tabular-nums">{result.errors}</p>
-              <p className="text-[11px] text-slate-400">Errors</p>
-            </div>
-          </div>
+          )}
+
+          {/* Error detail */}
           {result.errors > 0 && result.errorDetail && (
             <div className="rounded-lg bg-red-50 border border-red-100 p-3 space-y-1">
               <p className="text-[11px] font-semibold text-red-600 uppercase tracking-wide mb-2">

@@ -1,35 +1,21 @@
 "use client"
 
-/*
- * Dashboard page — command centre overview.
- *
- * Design intent:
- *   KPI cards follow Intercom's metric card pattern: clean white tile,
- *   small icon (muted colour, top-right), large bold number, label above.
- *   No coloured left borders — those add noise; the icon colour is enough
- *   to provide peripheral differentiation without visual clutter.
- *
- *   Grade distribution: Notion database-style chips + a proportional bar
- *   at the bottom. The bar is the visual summary; the chips are the detail.
- *   Both complement each other — neither is redundant.
- *
- *   Information hierarchy: KPIs → Grade distribution → Quick actions.
- *   The eye naturally flows top-to-bottom, big to small.
- */
-
 import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import {
   Users, TrendingUp, Star, DollarSign,
   Phone, Clock, Trophy, AlertCircle,
+  Zap, ArrowRight,
   type LucideIcon,
 } from "lucide-react"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
+import { useQueue } from "@/hooks/useQueue"
 import { GradeBadge } from "@/components/shared/GradeBadge"
 import { RupeeValue } from "@/components/shared/RupeeValue"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 interface DashboardData {
   kpis: {
@@ -58,23 +44,18 @@ async function fetchDashboard(): Promise<DashboardData & { icp_configured: boole
   }
 }
 
-/* Proportional bar fill colours — match GradeBadge semantics */
+// ── Constants ─────────────────────────────────────────────────────────────────
+
 const GRADE_COLORS: Record<string, string> = {
-  A: "bg-emerald-500",
-  B: "bg-blue-500",
-  C: "bg-amber-400",
-  D: "bg-orange-500",
-  E: "bg-red-500",
-  F: "bg-slate-300",
+  A: "bg-emerald-500", B: "bg-blue-500", C: "bg-amber-400",
+  D: "bg-orange-500",  E: "bg-red-500",  F: "bg-slate-300",
 }
 
+const CARD_SHADOW = "shadow-[0_1px_3px_rgba(15,23,42,0.06),0_1px_2px_rgba(15,23,42,0.04)]"
+
 interface KpiDef {
-  label:     string
-  key:       keyof DashboardData["kpis"]
-  rupee:     boolean
-  icon:      LucideIcon
-  iconBg:    string
-  iconColor: string
+  label: string; key: keyof DashboardData["kpis"]
+  rupee: boolean; icon: LucideIcon; iconBg: string; iconColor: string
 }
 
 const KPI_DEFS: KpiDef[] = [
@@ -88,7 +69,79 @@ const KPI_DEFS: KpiDef[] = [
   { label: "Stale Leads",        key: "stale_leads",       rupee: false, icon: AlertCircle, iconBg: "bg-slate-100",  iconColor: "text-slate-400"   },
 ]
 
-const CARD_SHADOW = "shadow-[0_1px_3px_rgba(15,23,42,0.06),0_1px_2px_rgba(15,23,42,0.04)]"
+// ── Queue preview strip ───────────────────────────────────────────────────────
+
+function QueuePreview() {
+  const { data, isLoading } = useQueue()
+  const leads = data?.leads ?? []
+  const total = data?.total ?? 0
+  const preview = leads.slice(0, 4)
+
+  return (
+    <div className={`rounded-xl bg-white ${CARD_SHADOW} overflow-hidden`}>
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100">
+        <div className="flex items-center gap-2.5">
+          <div className="w-6 h-6 rounded-md bg-indigo-100 flex items-center justify-center">
+            <Zap className="w-3.5 h-3.5 text-indigo-600" strokeWidth={2.5} />
+          </div>
+          <div>
+            <span className="text-[13px] font-semibold text-slate-800">Your queue today</span>
+            {!isLoading && total > 0 && (
+              <span className="ml-2 text-[12px] text-slate-400 tabular-nums">{total} lead{total === 1 ? "" : "s"} to contact</span>
+            )}
+          </div>
+        </div>
+        <Link href="/queue">
+          <Button size="sm" className="h-7 px-3 text-[12px] bg-indigo-600 hover:bg-indigo-700 text-white gap-1">
+            Open Queue <ArrowRight className="w-3 h-3" />
+          </Button>
+        </Link>
+      </div>
+
+      {/* Lead rows */}
+      {isLoading ? (
+        <div className="px-5 py-3 space-y-3">
+          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-8 w-full rounded-lg" />)}
+        </div>
+      ) : preview.length === 0 ? (
+        <div className="px-5 py-6 text-center">
+          <p className="text-[13px] font-medium text-slate-600">Queue is clear</p>
+          <p className="text-[12px] text-slate-400 mt-0.5">All leads have been actioned. Great work.</p>
+        </div>
+      ) : (
+        <div className="divide-y divide-slate-50">
+          {preview.map((lead) => (
+            <Link
+              key={lead.id}
+              href={`/leads/${lead.id}`}
+              className="flex items-center gap-3 px-5 py-2.5 hover:bg-slate-50 transition-colors"
+            >
+              <GradeBadge grade={lead.grade} size="sm" />
+              <span className="text-[13px] font-medium text-slate-800 min-w-0 truncate flex-1">
+                {lead.first_name} {lead.last_name ?? ""}
+              </span>
+              {lead.nba && (
+                <span className="text-[12px] text-slate-400 truncate max-w-[200px] shrink-0">
+                  {lead.nba.action}
+                </span>
+              )}
+            </Link>
+          ))}
+          {total > 4 && (
+            <div className="px-5 py-2.5">
+              <Link href="/queue" className="text-[12px] text-indigo-600 hover:underline font-medium">
+                + {total - 4} more in queue →
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
   const { data: session } = useCurrentUser()
@@ -104,13 +157,24 @@ export default function DashboardPage() {
   const gradeD = data?.grade_distribution ?? []
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="space-y-5 max-w-5xl">
+
+      {/* ── Page heading ─────────────────────────────────────────────────── */}
+      <div>
+        <h1 className="text-[22px] font-bold text-slate-900 tracking-tight">
+          Good {greeting()}, {session?.user.firstName}
+        </h1>
+        <p className="text-[13px] text-slate-400 mt-0.5">Here's where things stand today.</p>
+      </div>
+
+      {/* ── Queue preview — always first ──────────────────────────────────── */}
+      <QueuePreview />
 
       {/* ── ICP banner ───────────────────────────────────────────────────── */}
       {data && !data.icp_configured && isManager && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-center justify-between gap-4">
           <p className="text-[13px] text-amber-800 font-medium">
-            ICP not configured — leads are scored using industry defaults.
+            ICP not configured — leads are scored on industry defaults. Configure it to get accurate grades.
           </p>
           <Link href="/settings/icp">
             <Button size="sm" variant="outline" className="shrink-0 border-amber-300 text-amber-800 hover:bg-amber-100 text-[12px]">
@@ -120,19 +184,10 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ── Page heading ─────────────────────────────────────────────────── */}
-      <div>
-        <h1 className="text-[22px] font-bold text-slate-900 tracking-tight">Dashboard</h1>
-        <p className="text-[13px] text-slate-400 mt-0.5">
-          Welcome back, {session?.user.firstName}
-        </p>
-      </div>
-
       {/* ── KPI cards ────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {KPI_DEFS.map(({ label, key, rupee, icon: Icon, iconBg, iconColor }) => (
           <div key={label} className={`rounded-xl bg-white ${CARD_SHADOW} p-4`}>
-            {/* Label + icon row */}
             <div className="flex items-center justify-between mb-3">
               <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide leading-none">
                 {label}
@@ -141,8 +196,6 @@ export default function DashboardPage() {
                 <Icon className={`w-3.5 h-3.5 ${iconColor}`} strokeWidth={2} />
               </div>
             </div>
-
-            {/* Value */}
             {isLoading ? (
               <Skeleton className="h-8 w-20" />
             ) : rupee ? (
@@ -162,7 +215,6 @@ export default function DashboardPage() {
       {gradeD.length > 0 && (
         <div className={`rounded-xl bg-white ${CARD_SHADOW} p-5 space-y-4`}>
           <h2 className="text-[13px] font-semibold text-slate-700">Grade Distribution</h2>
-
           <div className="flex gap-4 flex-wrap">
             {gradeD.map(({ grade, count, pct }) => (
               <div key={grade} className="flex items-center gap-2">
@@ -172,8 +224,6 @@ export default function DashboardPage() {
               </div>
             ))}
           </div>
-
-          {/* Proportional bar */}
           <div className="flex h-2 rounded-full overflow-hidden gap-px bg-slate-100">
             {gradeD.map(({ grade, pct }) => (
               <div
@@ -187,33 +237,13 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ── Quick actions ────────────────────────────────────────────────── */}
-      <div className="flex gap-2.5 flex-wrap">
-        <Link href="/queue">
-          <Button className="bg-indigo-600 hover:bg-indigo-700 text-white text-[13px] h-9">
-            Open Queue
-          </Button>
-        </Link>
-        <Link href="/leads">
-          <Button variant="outline" className="text-[13px] h-9">All Leads</Button>
-        </Link>
-        {isManager && (
-          <Link href="/analytics">
-            <Button variant="outline" className="text-[13px] h-9">Analytics</Button>
-          </Link>
-        )}
-        {(kpis?.overdue_followups ?? 0) > 0 && (
-          <Link href="/follow-ups">
-            <Button variant="outline" className="border-red-200 text-red-600 hover:bg-red-50 text-[13px] h-9">
-              Follow-ups
-              <Badge variant="destructive" className="ml-2 text-[10px]">
-                {kpis!.overdue_followups}
-              </Badge>
-            </Button>
-          </Link>
-        )}
-      </div>
-
     </div>
   )
+}
+
+function greeting() {
+  const h = new Date().getHours()
+  if (h < 12) return "morning"
+  if (h < 17) return "afternoon"
+  return "evening"
 }
