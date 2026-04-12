@@ -194,7 +194,7 @@ export async function POST(req: Request) {
 
         const fitResult = computeFitScore({
           lead: {
-            industry:       vr.company_name ?? undefined,
+            industry:       undefined,  // not captured in CSV import — partial credit applied
             state:          vr.state ?? undefined,
             city:           vr.city ?? undefined,
             company_name:   vr.company_name ?? undefined,

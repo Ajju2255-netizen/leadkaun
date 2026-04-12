@@ -57,11 +57,11 @@ function scoreIndustry(
   leadIndustry: string | null | undefined,
   icpIndustries: string[]
 ): number {
-  if (!icpIndustries.length) return 20  // no ICP set for this dimension → partial credit
-  if (!leadIndustry) return 0
+  if (!icpIndustries.length) return 20  // no ICP set → partial credit
+  if (!leadIndustry) return 10          // ICP set but lead has no industry → unknown, not zero
   const lead = leadIndustry.toLowerCase().trim()
   const match = icpIndustries.some((i) => i.toLowerCase().trim() === lead)
-  return match ? 30 : 0
+  return match ? 30 : 5               // 5 = present but doesn't match ICP
 }
 
 function scoreGeography(
@@ -69,11 +69,11 @@ function scoreGeography(
   _leadCity: string | null | undefined,
   icpStates: string[]
 ): number {
-  if (!icpStates.length) return 12  // no geo ICP → partial credit
-  if (!leadState) return 0
+  if (!icpStates.length) return 12    // no geo ICP → partial credit
+  if (!leadState) return 8            // ICP set but lead has no state → unknown, not zero
   const lead = leadState.toLowerCase().trim()
   const match = icpStates.some((s) => s.toLowerCase().trim() === lead)
-  return match ? 20 : 0
+  return match ? 20 : 4              // 4 = present but out of target geo
 }
 
 function scoreBusinessType(
@@ -81,7 +81,7 @@ function scoreBusinessType(
   icpBusinessTypes: string[]
 ): number {
   if (!icpBusinessTypes.length) return 12  // no business type ICP → partial credit
-  if (!companyName) return 0
+  if (!companyName) return 8               // ICP set but no company data → unknown, not zero
   // Fuzzy keyword match against company name (simple heuristic)
   const name = companyName.toLowerCase()
   const match = icpBusinessTypes.some((bt) => name.includes(bt.toLowerCase().trim()))
@@ -92,11 +92,11 @@ function scoreRole(
   designation: string | null | undefined,
   icpRoles: string[]
 ): number {
-  if (!icpRoles.length) return 8  // no role ICP → partial credit
-  if (!designation) return 0
+  if (!icpRoles.length) return 8      // no role ICP → partial credit
+  if (!designation) return 5          // ICP set but lead has no designation → unknown, not zero
   const desig = designation.toLowerCase()
   const match = icpRoles.some((r) => desig.includes(r.toLowerCase().trim()))
-  return match ? 15 : 0
+  return match ? 15 : 3              // 3 = present but role doesn't match ICP
 }
 
 function scoreBudget(
@@ -105,7 +105,7 @@ function scoreBudget(
   budgetMax: number | null | undefined,
 ): number {
   if (budgetMin == null && budgetMax == null) return 8  // no budget ICP → partial credit
-  if (expectedValue == null || expectedValue <= 0) return 0
+  if (expectedValue == null || expectedValue <= 0) return 5  // budget ICP set but no lead data → unknown
 
   const min = budgetMin ?? 0
   const max = budgetMax ?? Infinity
