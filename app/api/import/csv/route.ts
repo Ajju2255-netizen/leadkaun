@@ -8,6 +8,7 @@ import { generateImportSignals } from "@/lib/import/generate-signals"
 import { computeFitScore } from "@/lib/scoring/fit-score"
 import { computeQualityScore } from "@/lib/scoring/quality-score"
 import { assignGrade } from "@/lib/scoring/grade"
+import { scoreNotesIntent } from "@/lib/scoring/notes-intent"
 import Papa from "papaparse"
 
 // Vercel Pro max function duration — allows processing large CSVs inline
@@ -181,15 +182,13 @@ export async function POST(req: Request) {
           notes:             vr.inquiry_text,
         })
 
-        // Intent = source baseline + any inferred signal values
-        // (inferred signals are best-effort; if migration not run their values
-        //  are 0 via the fallback in generate-signals.ts, so this stays safe)
-        const intentScore = Math.min(
+        // Intent = baseline + structured signal boosts + keyword boost from notes
+        // Floor at max(baseline, 10) — intent is never 0 for a real lead
+        const signalBoost    = inferredSignals.reduce((acc, s) => acc + s.signal_value, 0)
+        const notesBoost     = scoreNotesIntent(vr.inquiry_text)
+        const intentScore    = Math.min(
           100,
-          Math.max(
-            source.intent_baseline,
-            source.intent_baseline + inferredSignals.reduce((acc, s) => acc + s.signal_value, 0),
-          ),
+          Math.max(Math.max(source.intent_baseline, 10), source.intent_baseline + signalBoost + notesBoost),
         )
 
         const fitResult = computeFitScore({
@@ -214,7 +213,17 @@ export async function POST(req: Request) {
           is_junk:            false,
         })
 
-        const grade = assignGrade(fitResult.total, intentScore, qualityResult.total)
+        // Pre-execution: no calls logged yet — use fit+quality-primary thresholds
+        const grade = assignGrade(fitResult.total, intentScore, qualityResult.total, true)
+
+        console.log(`[scoring:row${rowIndex}]`, {
+          fit_score:     fitResult.total,
+          quality_score: qualityResult.total,
+          intent_score:  intentScore,
+          grade,
+          fit_breakdown:     fitResult.breakdown,
+          quality_breakdown: qualityResult.breakdown,
+        })
 
         // ── Create lead + SOURCE_BASELINE + initial scores (atomic) ──────────
         try {
@@ -291,10 +300,13 @@ export async function POST(req: Request) {
           where: { id: lead.id },
           include: { source: true },
         })
-        const intentScore = Math.min(
-          100,
-          signals.reduce((acc, s) => acc + s.signal_value, leadData.source.intent_baseline),
-        )
+
+        // Pre-execution: lead has only SOURCE_BASELINE (no calls or WA yet)
+        const hasActivity = signals.some((s) => s.signal_type !== "SOURCE_BASELINE")
+        const rawIntent   = signals.reduce((acc, s) => acc + s.signal_value, leadData.source.intent_baseline)
+          + scoreNotesIntent(leadData.inquiry_text)
+        const intentScore = Math.min(100, Math.max(Math.max(leadData.source.intent_baseline, 10), rawIntent))
+
         const fitResult     = computeFitScore({ lead: leadData, icp: account })
         const qualityResult = computeQualityScore({
           phone:              leadData.phone,
@@ -302,23 +314,32 @@ export async function POST(req: Request) {
           company_name:       leadData.company_name,
           inquiry_text:       leadData.inquiry_text,
           source_reliability: leadData.source.reliability_score,
-          junk_flags:         leadData.junk_flags,
+          junk_flags:         leadData.junk_flags as string[],
           is_junk:            leadData.is_junk,
         })
-        const newGrade = assignGrade(fitResult.total, intentScore, qualityResult.total)
-        if (newGrade !== "E") {
-          await prisma.lead.update({
-            where: { id: lead.id },
-            data: {
-              grade:                   newGrade,
-              fit_score:               fitResult.total,
-              intent_score:            intentScore,
-              quality_score:           qualityResult.total,
-              fit_score_breakdown:     fitResult.breakdown as object,
-              quality_score_breakdown: qualityResult.breakdown as object,
-            },
-          })
-        }
+
+        const newGrade = assignGrade(fitResult.total, intentScore, qualityResult.total, !hasActivity)
+
+        console.log(`[regrade:${lead.id}]`, {
+          fit_score:    fitResult.total,
+          quality_score: qualityResult.total,
+          intent_score:  intentScore,
+          pre_execution: !hasActivity,
+          grade:         newGrade,
+        })
+
+        // Always update — this sweep exists to fix stale E grades
+        await prisma.lead.update({
+          where: { id: lead.id },
+          data: {
+            grade:                   newGrade,
+            fit_score:               fitResult.total,
+            intent_score:            intentScore,
+            quality_score:           qualityResult.total,
+            fit_score_breakdown:     fitResult.breakdown as object,
+            quality_score_breakdown: qualityResult.breakdown as object,
+          },
+        })
       }
     } catch (regradeErr) {
       console.warn("[import] Regrade sweep failed:", String(regradeErr))

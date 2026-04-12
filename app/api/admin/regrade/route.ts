@@ -1,15 +1,18 @@
 import { prisma } from "@/lib/prisma"
 import { requireAuth, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
-import { processSignalAndUpdateScores } from "@/lib/scoring/orchestrator"
+import { computeFitScore } from "@/lib/scoring/fit-score"
+import { computeQualityScore } from "@/lib/scoring/quality-score"
+import { assignGrade } from "@/lib/scoring/grade"
+import { scoreNotesIntent } from "@/lib/scoring/notes-intent"
 
 export const maxDuration = 300
 
 /**
  * POST /api/admin/regrade
  *
- * Re-runs the scoring pipeline for every lead in the account.
- * Use after grade threshold changes or ICP updates.
+ * Re-runs the scoring pipeline for every active lead in the account.
+ * Uses pre-execution mode for leads with no call/WA activity.
  * Admin/Manager only.
  */
 export async function POST() {
@@ -20,14 +23,29 @@ export async function POST() {
       return apiError("Only Admins and Managers can regrade leads", "FORBIDDEN", 403)
     }
 
-    // Fetch all non-won/lost lead IDs for this account
+    const account = await prisma.account.findUniqueOrThrow({
+      where: { id: session.account.id },
+      select: {
+        icp_configured:     true,
+        icp_industries:     true,
+        icp_states:         true,
+        icp_business_types: true,
+        icp_roles:          true,
+        icp_budget_min:     true,
+        icp_budget_max:     true,
+      },
+    })
+
     const leads = await prisma.lead.findMany({
       where: {
         account_id: session.account.id,
         is_junk:    false,
         stage: { is_won: false, is_lost: false },
       },
-      select: { id: true },
+      include: {
+        source:  true,
+        signals: { select: { signal_type: true, signal_value: true } },
+      },
     })
 
     let updated = 0
@@ -35,7 +53,54 @@ export async function POST() {
 
     for (const lead of leads) {
       try {
-        await processSignalAndUpdateScores(lead.id, session.account.id, prisma)
+        const hasActivity = lead.signals.some((s) => s.signal_type !== "SOURCE_BASELINE")
+        const rawIntent   = lead.signals.reduce((acc, s) => acc + s.signal_value, lead.source.intent_baseline)
+          + scoreNotesIntent(lead.inquiry_text)
+        const intentScore = Math.min(100, Math.max(Math.max(lead.source.intent_baseline, 10), rawIntent))
+
+        const fitResult = computeFitScore({
+          lead: {
+            industry:       undefined,
+            state:          lead.state ?? undefined,
+            city:           lead.city ?? undefined,
+            company_name:   lead.company_name ?? undefined,
+            designation:    lead.designation ?? undefined,
+            expected_value: lead.expected_value ?? undefined,
+          },
+          icp: account,
+        })
+
+        const qualityResult = computeQualityScore({
+          phone:              lead.phone,
+          email:              lead.email,
+          company_name:       lead.company_name,
+          inquiry_text:       lead.inquiry_text,
+          source_reliability: lead.source.reliability_score,
+          junk_flags:         lead.junk_flags as string[],
+          is_junk:            lead.is_junk,
+        })
+
+        const grade = assignGrade(fitResult.total, intentScore, qualityResult.total, !hasActivity)
+
+        console.log(`[regrade:${lead.id}]`, {
+          fit_score:     fitResult.total,
+          quality_score: qualityResult.total,
+          intent_score:  intentScore,
+          pre_execution: !hasActivity,
+          grade,
+        })
+
+        await prisma.lead.update({
+          where: { id: lead.id },
+          data: {
+            grade,
+            fit_score:               fitResult.total,
+            intent_score:            intentScore,
+            quality_score:           qualityResult.total,
+            fit_score_breakdown:     fitResult.breakdown as object,
+            quality_score_breakdown: qualityResult.breakdown as object,
+          },
+        })
         updated++
       } catch {
         failed++
