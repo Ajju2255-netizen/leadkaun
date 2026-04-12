@@ -40,7 +40,6 @@ export async function POST() {
       where: {
         account_id: session.account.id,
         is_junk:    false,
-        stage: { is_won: false, is_lost: false },
       },
       include: {
         source:  true,
@@ -48,8 +47,11 @@ export async function POST() {
       },
     })
 
+    console.log(`[regrade] Found ${leads.length} leads to regrade for account ${session.account.id}`)
+
     let updated = 0
     let failed  = 0
+    const sample: object[] = []  // first 5 leads — returned for debugging
 
     for (const lead of leads) {
       try {
@@ -82,13 +84,19 @@ export async function POST() {
 
         const grade = assignGrade(fitResult.total, intentScore, qualityResult.total, !hasActivity)
 
-        console.log(`[regrade:${lead.id}]`, {
+        const scoreLog = {
+          id:            lead.id,
+          name:          `${lead.first_name} ${lead.last_name ?? ""}`.trim(),
+          phone:         lead.phone,
           fit_score:     fitResult.total,
           quality_score: qualityResult.total,
           intent_score:  intentScore,
           pre_execution: !hasActivity,
           grade,
-        })
+          fit_breakdown: fitResult.breakdown,
+        }
+        console.log(`[regrade:${lead.id}]`, scoreLog)
+        if (sample.length < 5) sample.push(scoreLog)
 
         await prisma.lead.update({
           where: { id: lead.id },
@@ -102,12 +110,13 @@ export async function POST() {
           },
         })
         updated++
-      } catch {
+      } catch (err) {
+        console.error(`[regrade] FAILED lead ${lead.id}:`, String(err))
         failed++
       }
     }
 
-    return apiSuccess({ updated, failed, total: leads.length })
+    return apiSuccess({ updated, failed, total: leads.length, sample })
   } catch (err) {
     const authResponse = handleAuthError(err)
     if (authResponse) return authResponse
