@@ -538,6 +538,9 @@ export default function ImportPage() {
       {/* Upload */}
       <UploadSection onComplete={() => setRefreshKey((k) => k + 1)} />
 
+      {/* Regrade */}
+      <RegradeButton />
+
       {/* History */}
       <HistorySection refreshKey={refreshKey} />
 
