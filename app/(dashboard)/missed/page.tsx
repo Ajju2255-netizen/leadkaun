@@ -41,7 +41,10 @@ interface MissedData {
 
 async function fetchMissed(): Promise<MissedData> {
   const res = await fetch("/api/analytics/missed", { credentials: "include" })
-  if (!res.ok) throw new Error("Failed to fetch missed opportunities")
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body?.error?.message ?? `HTTP ${res.status}`)
+  }
   return res.json().then((r) => r.data)
 }
 
@@ -234,7 +237,7 @@ export default function MissedPage() {
       {/* ── Error ─────────────────────────────────────────────────────────── */}
       {error && (
         <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-[13px] text-red-600">
-          Failed to load missed opportunities — please refresh.
+          Error: {error instanceof Error ? error.message : "Unknown error"}
         </div>
       )}
 
