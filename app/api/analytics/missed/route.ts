@@ -98,8 +98,7 @@ export async function GET(_req: Request) {
   } catch (err) {
     const authResponse = handleAuthError(err)
     if (authResponse) return authResponse
-    const msg = err instanceof Error ? err.message : String(err)
-    console.error("Missed analytics error:", msg)
-    return apiError(`Internal server error: ${msg}`, "INTERNAL_ERROR", 500)
+    console.error("Missed analytics error:", err)
+    return apiError("Internal server error", "INTERNAL_ERROR", 500)
   }
 }
