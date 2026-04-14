@@ -4,6 +4,7 @@ import { requireAuth } from "@/lib/auth/middleware"
 import { handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError, parseBody } from "@/lib/api/response"
 import { processSignalAndUpdateScores } from "@/lib/scoring/orchestrator"
+import { getNextAction } from "@/lib/scoring/next-action"
 
 const PAGE_SIZE = 100
 
@@ -55,10 +56,11 @@ export async function GET(req: Request) {
         : {}),
     }
 
-    const [leads, total] = await Promise.all([
+    const [rawLeads, total] = await Promise.all([
       prisma.lead.findMany({
         where,
-        orderBy: { imported_at: "desc" },
+        // Sort by grade priority (A first), then most-recent within same grade
+        orderBy: [{ grade: "asc" }, { imported_at: "desc" }],
         skip:  (page - 1) * PAGE_SIZE,
         take:  PAGE_SIZE,
         include: {
@@ -69,6 +71,12 @@ export async function GET(req: Request) {
       }),
       prisma.lead.count({ where }),
     ])
+
+    // Attach computed next action to each lead
+    const leads = rawLeads.map((lead) => ({
+      ...lead,
+      next_action: getNextAction(lead.grade),
+    }))
 
     return apiSuccess({ leads, total, page, pages: Math.ceil(total / PAGE_SIZE) })
   } catch (e) {

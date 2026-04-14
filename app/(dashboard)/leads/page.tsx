@@ -14,6 +14,13 @@ import { Badge } from "@/components/ui/badge"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
 import { timeAgo } from "@/lib/format"
 
+interface NextAction {
+  label:    string
+  priority: number
+  reason:   string
+  color:    string
+}
+
 interface Lead {
   id:            string
   first_name:    string
@@ -29,6 +36,7 @@ interface Lead {
   created_at:    string
   stage:         { name: string } | null
   source:        { name: string } | null
+  next_action:   NextAction
 }
 
 interface LeadsResponse {
@@ -252,6 +260,7 @@ export default function LeadsPage() {
               )}
               <th className="px-3 py-2 text-left font-medium">Lead</th>
               <th className="px-3 py-2 text-left font-medium">Grade</th>
+              <th className="px-3 py-2 text-left font-medium hidden sm:table-cell">Next Action</th>
               <th className="px-3 py-2 text-left font-medium hidden md:table-cell">Stage</th>
               <th className="px-3 py-2 text-left font-medium hidden lg:table-cell">Source</th>
               <th className="px-3 py-2 text-right font-medium hidden lg:table-cell">Value</th>
@@ -262,7 +271,7 @@ export default function LeadsPage() {
             {isLoading && (
               [...Array(10)].map((_, i) => (
                 <tr key={i}>
-                  <td colSpan={7} className="px-3 py-3">
+                  <td colSpan={8} className="px-3 py-3">
                     <Skeleton className="h-5 w-full" />
                   </td>
                 </tr>
@@ -297,6 +306,14 @@ export default function LeadsPage() {
                     <Badge variant="outline" className="ml-1 text-xs">Junk</Badge>
                   )}
                 </td>
+                <td className="px-3 py-2.5 hidden sm:table-cell">
+                  <span
+                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${lead.next_action.color}`}
+                    title={lead.next_action.reason}
+                  >
+                    {lead.next_action.label}
+                  </span>
+                </td>
                 <td className="px-3 py-2.5 hidden md:table-cell text-muted-foreground">
                   {lead.stage?.name ?? "—"}
                 </td>
@@ -313,7 +330,7 @@ export default function LeadsPage() {
             ))}
             {!isLoading && leads.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">
+                <td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">
                   No leads found matching your filters.
                 </td>
               </tr>
