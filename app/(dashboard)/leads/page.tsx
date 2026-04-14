@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback, useMemo } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { GradeBadge } from "@/components/shared/GradeBadge"
 import { RupeeValue } from "@/components/shared/RupeeValue"
@@ -46,12 +46,28 @@ async function fetchLeads(params: Record<string, string>): Promise<LeadsResponse
 
 export default function LeadsPage() {
   const { data: session } = useCurrentUser()
+  const queryClient = useQueryClient()
   const isManager = session?.user.role === "ADMIN" || session?.user.role === "MANAGER"
 
   const [search, setSearch] = useState("")
   const [grade, setGrade]   = useState("all")
   const [page, setPage]     = useState(1)
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [regrading, setRegrading] = useState(false)
+
+  async function handleRegrade() {
+    setRegrading(true)
+    try {
+      const res  = await fetch("/api/admin/regrade", { method: "POST", credentials: "include" })
+      const data = await res.json()
+      await queryClient.invalidateQueries({ queryKey: ["leads"] })
+      alert(`Regrade complete — ${data.updated ?? 0} leads updated`)
+    } catch {
+      alert("Regrade failed. Please try again.")
+    } finally {
+      setRegrading(false)
+    }
+  }
 
   const params: Record<string, string> = { page: String(page) }
   if (search) params.search = search
@@ -89,9 +105,19 @@ export default function LeadsPage() {
           </p>
         </div>
         {isManager && (
-          <Link href="/leads/import">
-            <Button size="sm">Import CSV</Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleRegrade}
+              disabled={regrading}
+            >
+              {regrading ? "Regrading…" : "Regrade All"}
+            </Button>
+            <Link href="/leads/import">
+              <Button size="sm">Import CSV</Button>
+            </Link>
+          </div>
         )}
       </div>
 
