@@ -121,9 +121,9 @@ function QueuePreview() {
               <span className="text-[13px] font-medium text-slate-800 min-w-0 truncate flex-1">
                 {lead.first_name} {lead.last_name ?? ""}
               </span>
-              {lead.nba && (
+              {lead.next_action && (
                 <span className="text-[12px] text-slate-400 truncate max-w-[200px] shrink-0">
-                  {lead.nba.action}
+                  {lead.next_action.label}
                 </span>
               )}
             </Link>

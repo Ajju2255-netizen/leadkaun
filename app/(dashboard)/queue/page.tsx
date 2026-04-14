@@ -80,7 +80,7 @@ interface SectionProps {
   defaultOpen: boolean
 }
 
-function GradeSection({ grade, label, emoji, description, bg, border, header, leads, totalValue, defaultOpen }: SectionProps) {
+function GradeSection({ grade: _grade, label, emoji, description, bg, border, header, leads, totalValue, defaultOpen }: SectionProps) {
   const [open, setOpen] = useState(defaultOpen)
 
   if (leads.length === 0) return null
