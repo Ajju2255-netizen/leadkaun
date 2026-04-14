@@ -5,6 +5,7 @@ import { computeFitScore } from "@/lib/scoring/fit-score"
 import { computeQualityScore } from "@/lib/scoring/quality-score"
 import { assignGrade } from "@/lib/scoring/grade"
 import { scoreNotesIntent } from "@/lib/scoring/notes-intent"
+import { mapCityToState, inferIndustry } from "@/lib/import/enrich-lead"
 
 export const maxDuration = 300
 
@@ -62,8 +63,8 @@ export async function POST() {
 
         const fitResult = computeFitScore({
           lead: {
-            industry:       undefined,
-            state:          lead.state ?? undefined,
+            industry:       inferIndustry(lead.company_name) ?? undefined,
+            state:          lead.state ?? mapCityToState(lead.city) ?? undefined,
             city:           lead.city ?? undefined,
             company_name:   lead.company_name ?? undefined,
             designation:    lead.designation ?? undefined,

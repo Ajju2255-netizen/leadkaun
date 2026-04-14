@@ -5,6 +5,7 @@ import { apiSuccess, apiError } from "@/lib/api/response"
 import { mapHeader } from "@/lib/import/column-map"
 import { validateRow } from "@/lib/import/validate-row"
 import { generateImportSignals } from "@/lib/import/generate-signals"
+import { mapCityToState, inferIndustry } from "@/lib/import/enrich-lead"
 import { computeFitScore } from "@/lib/scoring/fit-score"
 import { computeQualityScore } from "@/lib/scoring/quality-score"
 import { assignGrade } from "@/lib/scoring/grade"
@@ -191,10 +192,14 @@ export async function POST(req: Request) {
           Math.max(Math.max(source.intent_baseline, 10), source.intent_baseline + signalBoost + notesBoost),
         )
 
+        // Enrich: fill state from city if state column absent; infer industry from company name
+        const enrichedState    = vr.state ?? mapCityToState(vr.city)
+        const enrichedIndustry = inferIndustry(vr.company_name)
+
         const fitResult = computeFitScore({
           lead: {
-            industry:       undefined,  // not captured in CSV import — partial credit applied
-            state:          vr.state ?? undefined,
+            industry:       enrichedIndustry ?? undefined,
+            state:          enrichedState ?? undefined,
             city:           vr.city ?? undefined,
             company_name:   vr.company_name ?? undefined,
             designation:    vr.designation ?? undefined,
@@ -307,7 +312,17 @@ export async function POST(req: Request) {
           + scoreNotesIntent(leadData.inquiry_text)
         const intentScore = Math.min(100, Math.max(Math.max(leadData.source.intent_baseline, 10), rawIntent))
 
-        const fitResult     = computeFitScore({ lead: leadData, icp: account })
+        const fitResult     = computeFitScore({
+          lead: {
+            industry:       inferIndustry(leadData.company_name) ?? undefined,
+            state:          leadData.state ?? mapCityToState(leadData.city) ?? undefined,
+            city:           leadData.city ?? undefined,
+            company_name:   leadData.company_name ?? undefined,
+            designation:    leadData.designation ?? undefined,
+            expected_value: leadData.expected_value ?? undefined,
+          },
+          icp: account,
+        })
         const qualityResult = computeQualityScore({
           phone:              leadData.phone,
           email:              leadData.email,
