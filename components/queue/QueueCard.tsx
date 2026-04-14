@@ -21,11 +21,25 @@ const GRADE_BORDER: Record<string, string> = {
   F: "border-l-slate-200",
 }
 
+const RISK_TAGLINE: Record<string, string> = {
+  A: "High drop risk — leads go cold in 24–48h",
+  B: "Competitors may be calling — don't wait",
+  C: "Warm nurture window — send material today",
+}
+
 function formatValue(v: number): string {
   if (v >= 10_000_000) return `₹${(v / 10_000_000).toFixed(1)}Cr`
   if (v >= 100_000)    return `₹${(v / 100_000).toFixed(1)}L`
   if (v >= 1_000)      return `₹${(v / 1_000).toFixed(0)}K`
   return `₹${v.toLocaleString("en-IN")}`
+}
+
+function UrgencyBadge({ hours }: { hours: number | null }) {
+  if (hours === null) return null
+  if (hours < 2)   return <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">🔥 Fresh lead — act now</span>
+  if (hours < 8)   return <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">⏰ Warming up — contact today</span>
+  if (hours < 24)  return <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-orange-100 text-orange-800">📉 Cooling down</span>
+  return <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-800">❄️ Going cold</span>
 }
 
 export function QueueCard({ lead }: Props) {
@@ -35,6 +49,7 @@ export function QueueCard({ lead }: Props) {
   const fullName    = [lead.first_name, lead.last_name].filter(Boolean).join(" ")
   const borderColor = GRADE_BORDER[lead.grade] ?? GRADE_BORDER["F"]
   const isHot       = lead.grade === "A" || lead.grade === "B"
+  const riskTagline = RISK_TAGLINE[lead.grade]
 
   return (
     <>
@@ -73,18 +88,28 @@ export function QueueCard({ lead }: Props) {
           {/* Value pill */}
           {lead.expected_value ? (
             <div className="shrink-0 text-right">
-              <span className={`text-[13px] font-bold tabular-nums ${isHot ? "text-emerald-700" : "text-slate-600"}`}>
+              <span className={`text-[15px] font-bold tabular-nums ${isHot ? "text-emerald-700" : "text-slate-600"}`}>
                 {formatValue(lead.expected_value)}
               </span>
             </div>
           ) : null}
         </div>
 
+        {/* ── Urgency badge (A/B only) ──────────────────────────────────── */}
+        {isHot && (
+          <UrgencyBadge hours={lead.hours_since_import} />
+        )}
+
         {/* ── Action banner ────────────────────────────────────────────────── */}
         <div className={`rounded-lg px-3 py-2.5 border ${lead.next_action.color}`}>
           <p className="text-[12px] font-semibold leading-snug">{lead.next_action.label}</p>
           <p className="text-[11px] mt-0.5 leading-snug opacity-80">{lead.next_action.reason}</p>
         </div>
+
+        {/* ── Risk tagline ─────────────────────────────────────────────────── */}
+        {riskTagline && (
+          <p className="text-[11px] text-slate-400 font-medium">{riskTagline}</p>
+        )}
 
         {/* ── Actions ──────────────────────────────────────────────────────── */}
         <div className="flex items-center gap-2">
@@ -93,14 +118,14 @@ export function QueueCard({ lead }: Props) {
             className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-[12px] font-semibold py-2 transition-colors"
           >
             <Phone className="w-3.5 h-3.5" strokeWidth={2.5} />
-            Log Call
+            {isHot ? "📞 Call Now" : "Log Call"}
           </button>
           <button
             onClick={() => setWaOpen(true)}
             className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-[12px] font-semibold py-2 transition-colors"
           >
             <MessageCircle className="w-3.5 h-3.5" strokeWidth={2.5} />
-            Log WA
+            {isHot ? "💬 Message" : "Log WA"}
           </button>
           <Link
             href={`/leads/${lead.id}`}

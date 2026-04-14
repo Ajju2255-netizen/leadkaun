@@ -127,16 +127,21 @@ function GradeSection({ grade: _grade, label, emoji, description, bg, border, he
 export default function QueuePage() {
   const { data, isLoading, error } = useQueue()
 
-  const grouped    = data?.grouped ?? {}
-  const summary    = data?.summary ?? []
-  const totalLeads = data?.total ?? 0
+  const grouped        = data?.grouped ?? {}
+  const summary        = data?.summary ?? []
+  const totalLeads     = data?.total ?? 0
+  const contactedToday = data?.contacted_today ?? 0
 
-  // Hot leads = A + B for the execution score bar
-  const hotCount = (grouped["A"]?.length ?? 0) + (grouped["B"]?.length ?? 0)
-  const hotValue = [
+  // Hot leads = A + B
+  const hotLeads = [
     ...(grouped["A"] ?? []),
     ...(grouped["B"] ?? []),
-  ].reduce((s, l) => s + (l.expected_value ?? 0), 0)
+  ]
+  const hotCount = hotLeads.length
+  const hotValue = hotLeads.reduce((s, l) => s + (l.expected_value ?? 0), 0)
+
+  // Progress: contacted today vs hot count
+  const progressPct = hotCount > 0 ? Math.min(100, Math.round((contactedToday / hotCount) * 100)) : 0
 
   return (
     <div className="max-w-2xl mx-auto space-y-5">
@@ -151,22 +156,23 @@ export default function QueuePage() {
         </p>
       </div>
 
-      {/* ── Hot leads summary banner ───────────────────────────────────────── */}
+      {/* ── Urgency banner ────────────────────────────────────────────────── */}
       {!isLoading && hotCount > 0 && (
-        <div className="rounded-xl border-2 border-green-300 bg-green-50 px-4 py-3 flex items-center justify-between gap-4">
+        <div className="rounded-xl border-2 border-amber-300 bg-amber-50 px-4 py-3">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center shrink-0">
-              <Zap className="w-4 h-4 text-green-700" strokeWidth={2.5} />
+            <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
+              <span className="text-[16px]">⚠️</span>
             </div>
             <div>
-              <p className="text-[13px] font-bold text-green-800">
-                {hotCount} lead{hotCount > 1 ? "s" : ""} need your attention today
+              <p className="text-[13px] font-bold text-amber-900">
+                {hotValue > 0 ? `${formatValue(hotValue)} at risk today` : `${hotCount} hot lead${hotCount > 1 ? "s" : ""} need action`}
+                {hotValue > 0 ? ` · ${hotCount} hot lead${hotCount > 1 ? "s" : ""} not yet contacted` : ""}
               </p>
-              <p className="text-[12px] text-green-700 opacity-80">
-                {hotValue > 0 ? `${formatValue(hotValue)} at stake · ` : ""}
+              <p className="text-[12px] text-amber-700 opacity-80">
                 {grouped["A"]?.length ? `${grouped["A"].length} call now` : ""}
                 {grouped["A"]?.length && grouped["B"]?.length ? " · " : ""}
                 {grouped["B"]?.length ? `${grouped["B"].length} call today` : ""}
+                {" · Leads go cold in 24–48h"}
               </p>
             </div>
           </div>
@@ -186,6 +192,29 @@ export default function QueuePage() {
               <span className="font-bold">{s.count}</span>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* ── Progress tracker ──────────────────────────────────────────────── */}
+      {!isLoading && hotCount > 0 && (
+        <div className="rounded-xl bg-white border border-slate-100 shadow-sm px-4 py-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-[12px] font-semibold text-slate-600">
+              Contacted today
+            </p>
+            <p className="text-[12px] font-bold text-slate-800 tabular-nums">
+              {contactedToday} / {hotCount} high-priority
+            </p>
+          </div>
+          <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-indigo-500 transition-all duration-500"
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
+          {progressPct === 100 && (
+            <p className="text-[11px] text-emerald-600 font-semibold">All high-priority leads contacted today 🎉</p>
+          )}
         </div>
       )}
 

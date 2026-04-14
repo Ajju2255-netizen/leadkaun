@@ -25,7 +25,8 @@ export interface QueueLead {
   inquiry_text:   string | null
   next_action:    NextAction
   stage:          { id: string; name: string } | null
-  follow_up_actions: { due_date: string; status: string }[]
+  follow_up_actions:  { due_date: string; status: string }[]
+  hours_since_import: number | null
 }
 
 export interface GradeSummary {
@@ -36,10 +37,11 @@ export interface GradeSummary {
 }
 
 export interface QueueResponse {
-  leads:   QueueLead[]
-  grouped: Record<string, QueueLead[]>
-  summary: GradeSummary[]
-  total:   number
+  leads:           QueueLead[]
+  grouped:         Record<string, QueueLead[]>
+  summary:         GradeSummary[]
+  total:           number
+  contacted_today: number
 }
 
 async function fetchQueue(): Promise<QueueResponse> {

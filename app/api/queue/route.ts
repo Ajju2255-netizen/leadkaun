@@ -2,6 +2,18 @@ import { prisma } from "@/lib/prisma"
 import { requireAuth, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
 import { getNextAction, buildActionReason } from "@/lib/scoring/next-action"
+import type { SignalType } from "@prisma/client"
+
+const OUTREACH_SIGNAL_TYPES: SignalType[] = [
+  "CALL_ANSWERED_INTERESTED",
+  "CALL_ANSWERED_NOT_INTERESTED",
+  "CALL_ANSWERED_CALLBACK",
+  "CALL_ANSWERED_WRONG_NUMBER",
+  "CALL_NOT_ANSWERED",
+  "CALL_BUSY",
+  "CALL_INVALID",
+  "CALL_VOICEMAIL",
+]
 
 /**
  * GET /api/queue
@@ -56,7 +68,8 @@ export async function GET(req: Request) {
       },
     })
 
-    // Attach next_action with smart reason to each lead
+    // Attach next_action + hours_since_import to each lead
+    const now = Date.now()
     const enriched = leads.map((lead) => ({
       ...lead,
       next_action: {
@@ -69,7 +82,22 @@ export async function GET(req: Request) {
           inquiry_text:  lead.inquiry_text,
         }),
       },
+      hours_since_import: lead.imported_at
+        ? Math.floor((now - new Date(lead.imported_at).getTime()) / 3_600_000)
+        : null,
     }))
+
+    // Count outreach signals logged today (any call attempt = "contacted")
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+    const contactedToday = await prisma.signal.count({
+      where: {
+        account_id:  session.account.id,
+        created_at:  { gte: todayStart },
+        signal_type: { in: OUTREACH_SIGNAL_TYPES },
+        ...(session.user.role === "REP" ? { user_id: session.user.id } : {}),
+      },
+    })
 
     // Group by grade
     const grouped: Record<string, typeof enriched> = { A: [], B: [], C: [], D: [], E: [] }
@@ -86,10 +114,11 @@ export async function GET(req: Request) {
     }))
 
     return apiSuccess({
-      leads:   enriched,
+      leads:          enriched,
       grouped,
       summary,
-      total:   enriched.length,
+      total:          enriched.length,
+      contacted_today: contactedToday,
     })
   } catch (e) {
     return handleAuthError(e) ?? apiError("Internal server error", "SERVER_ERROR", 500)
