@@ -61,6 +61,18 @@ function useMissedCount(enabled: boolean) {
   return data?.count ?? 0
 }
 
+function useNotifCount() {
+  const { data } = useQuery({
+    queryKey:        ["notif-count"],
+    queryFn:         () =>
+      fetch("/api/notifications/count", { credentials: "include" })
+        .then((r) => r.ok ? r.json().then((d: { data: { count: number } }) => d.data) : { count: 0 }),
+    refetchInterval: 60_000,
+    staleTime:       55_000,
+  })
+  return data?.count ?? 0
+}
+
 export function DashboardShell({
   session,
   children,
@@ -72,8 +84,9 @@ export function DashboardShell({
   const router   = useRouter()
   const { user, account } = session
 
-  const isManager = user.role === "ADMIN" || user.role === "MANAGER"
+  const isManager   = user.role === "ADMIN" || user.role === "MANAGER"
   const missedCount = useMissedCount(isManager)
+  const notifCount  = useNotifCount()
 
   const visible     = NAV_ITEMS.filter((i) => i.roles.includes(user.role))
   const mainNav     = visible.filter((i) => i.section === "main")
@@ -93,9 +106,10 @@ export function DashboardShell({
   }
 
   function NavLink({ item }: { item: NavItem }) {
-    const isActive     = pathname === item.href || pathname.startsWith(item.href + "/")
-    const Icon         = item.icon
-    const showBadge    = item.href === "/missed" && missedCount > 0
+    const isActive      = pathname === item.href || pathname.startsWith(item.href + "/")
+    const Icon          = item.icon
+    const showMissed    = item.href === "/missed"         && missedCount > 0
+    const showNotif     = item.href === "/notifications"  && notifCount  > 0
 
     return (
       <Link
@@ -114,9 +128,14 @@ export function DashboardShell({
           strokeWidth={isActive ? 2.5 : 2}
         />
         {item.label}
-        {showBadge && (
+        {showMissed && (
           <span className="ml-auto inline-flex items-center justify-center text-[10px] font-bold bg-red-500 text-white rounded-full min-w-[18px] h-[18px] px-1">
             {missedCount > 99 ? "99+" : missedCount}
+          </span>
+        )}
+        {showNotif && (
+          <span className="ml-auto inline-flex items-center justify-center text-[10px] font-bold bg-blue-500 text-white rounded-full min-w-[18px] h-[18px] px-1">
+            {notifCount > 99 ? "99+" : notifCount}
           </span>
         )}
       </Link>

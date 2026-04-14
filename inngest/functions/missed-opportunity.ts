@@ -1,6 +1,14 @@
 import { inngest } from "@/inngest/client"
 import { prisma } from "@/lib/prisma"
 
+function fmtValue(v: number | null): string | null {
+  if (!v) return null
+  if (v >= 10_000_000) return `₹${(v / 10_000_000).toFixed(1)}Cr`
+  if (v >= 100_000)    return `₹${(v / 100_000).toFixed(1)}L`
+  if (v >= 1_000)      return `₹${(v / 1_000).toFixed(0)}K`
+  return `₹${v}`
+}
+
 /**
  * Missed opportunity checker.
  * Cron: hourly (0 * * * *)
@@ -98,6 +106,69 @@ export const missedOpportunityFn = inngest.createFunction(
         data:  { is_missed: true, missed_at: now },
       })
       return ids.length
+    })
+
+    // ── Create AT_RISK notifications for leads approaching threshold ──────────
+    await step.run("create-at-risk-notifications", async () => {
+      const threshold4h  = new Date(now.getTime() -  4 * 60 * 60 * 1000)
+      const threshold20h = new Date(now.getTime() - 20 * 60 * 60 * 1000)
+
+      // A leads in 4h–6h window; B leads in 20h–24h window (not yet missed)
+      const atRiskLeads = await prisma.lead.findMany({
+        where: {
+          is_missed: false, won_at: null, lost_at: null, is_junk: false,
+          OR: [
+            { grade: "A", last_action_at: { gte: threshold6h,  lt: threshold4h  } },
+            { grade: "A", last_action_at: null, imported_at: { gte: threshold6h,  lt: threshold4h  } },
+            { grade: "B", last_action_at: { gte: threshold24h, lt: threshold20h } },
+            { grade: "B", last_action_at: null, imported_at: { gte: threshold24h, lt: threshold20h } },
+          ],
+        },
+        select: { id: true, account_id: true, first_name: true, last_name: true, expected_value: true, grade: true },
+      })
+
+      for (const lead of atRiskLeads) {
+        const existing = await prisma.notification.findFirst({
+          where: { lead_id: lead.id, type: "AT_RISK", created_at: { gte: new Date(now.getTime() - 4 * 60 * 60 * 1000) } },
+        })
+        if (existing) continue
+
+        const val = fmtValue(lead.expected_value)
+        await prisma.notification.create({
+          data: {
+            account_id: lead.account_id,
+            lead_id:    lead.id,
+            type:       "AT_RISK",
+            title:      val ? `${val} lead going cold` : `Grade ${lead.grade} lead going cold`,
+            message:    `${lead.first_name} ${lead.last_name ?? ""} — no action taken, approaching missed threshold`.trim(),
+            priority:   lead.grade === "A" ? "high" : "medium",
+            action_url: "/queue",
+          },
+        })
+      }
+    })
+
+    // ── Create MISSED notifications ───────────────────────────────────────────
+    await step.run("create-missed-notifications", async () => {
+      for (const lead of allMissed) {
+        const existing = await prisma.notification.findFirst({
+          where: { lead_id: lead.id, type: "MISSED", created_at: { gte: new Date(now.getTime() - 24 * 60 * 60 * 1000) } },
+        })
+        if (existing) continue
+
+        const val = fmtValue(lead.expected_value)
+        await prisma.notification.create({
+          data: {
+            account_id: lead.account_id,
+            lead_id:    lead.id,
+            type:       "MISSED",
+            title:      val ? `❌ ${val} lead missed` : `❌ Grade ${lead.grade} lead missed`,
+            message:    `${lead.first_name} ${lead.last_name ?? ""} went cold — no action taken in time`.trim(),
+            priority:   lead.grade === "A" ? "high" : "medium",
+            action_url: "/missed",
+          },
+        })
+      }
     })
 
     // ── Group by account ──────────────────────────────────────────────────────

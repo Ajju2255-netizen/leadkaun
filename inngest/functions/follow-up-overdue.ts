@@ -31,6 +31,7 @@ export const followUpOverdueFn = inngest.createFunction(
               last_name:       true,
               grade:           true,
               assigned_rep_id: true,
+              expected_value:  true,
             },
           },
         },
@@ -52,6 +53,37 @@ export const followUpOverdueFn = inngest.createFunction(
         },
         data: { status: "OVERDUE", is_overdue: true, escalation_count: { increment: 1 } },
       })
+    })
+
+    // Create FOLLOW_UP_DUE notifications (one per lead per 6h, assigned to rep)
+    await step.run("create-followup-notifications", async () => {
+      const dedup6h = new Date(Date.now() - 6 * 3_600_000)
+      for (const action of overdueActions) {
+        if (!action.lead) continue
+
+        const existing = await prisma.notification.findFirst({
+          where: { lead_id: action.lead.id, type: "FOLLOW_UP_DUE", created_at: { gte: dedup6h } },
+        })
+        if (existing) continue
+
+        const v = action.lead.expected_value
+        const val = v
+          ? v >= 100_000 ? `₹${(v / 100_000).toFixed(1)}L` : `₹${(v / 1_000).toFixed(0)}K`
+          : null
+
+        await prisma.notification.create({
+          data: {
+            account_id: action.account_id,
+            user_id:    action.assigned_rep_id,
+            lead_id:    action.lead.id,
+            type:       "FOLLOW_UP_DUE",
+            title:      val ? `${val} follow-up overdue` : "Follow-up overdue",
+            message:    `${action.lead.first_name} ${action.lead.last_name ?? ""} — ${action.action_type.toLowerCase()} action past due`.trim(),
+            priority:   action.lead.grade === "A" ? "high" : action.lead.grade === "B" ? "medium" : "low",
+            action_url: "/follow-ups",
+          },
+        })
+      }
     })
 
     // Group by rep — one alert event per rep with their overdue count

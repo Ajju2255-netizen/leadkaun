@@ -157,6 +157,7 @@ enum SignalType {
   IMPORT_NEGATIVE_SIGNAL   // notes: not interested / no response (-25)
   // Behavioural signals
   INQUIRY_EVENING_WEEKEND
+
   STAGE_PROPOSAL_SENT
   EMAIL_OPENED
   EMAIL_CLICKED
@@ -165,6 +166,13 @@ enum SignalType {
   REP_NOT_INTERESTED
   // System signals
   INTENT_DECAY
+}
+
+enum NotifType {
+  AT_RISK       // lead approaching missed threshold
+  FOLLOW_UP_DUE // follow-up action went overdue
+  MISSED        // lead was marked missed
+  RECOVERY      // missed lead with recovery potential
 }
 
 // ─────────────────────────────────────────────
@@ -207,6 +215,7 @@ model Account {
   pipeline_stages   PipelineStage[]
   custom_fields     CustomField[]
   follow_up_configs FollowUpConfig[]
+  notifications     Notification[]
 
   @@map("accounts")
 }
@@ -328,6 +337,7 @@ model Lead {
   follow_up_actions FollowUpAction[]
   win_attributions  WinAttribution[]
   stage_history     StageHistory[]
+  notifications     Notification[]
 
   @@unique([account_id, phone])
   @@index([account_id])
@@ -543,4 +553,25 @@ model CustomField {
 
   @@unique([account_id, key])
   @@map("custom_fields")
+}
+
+model Notification {
+  id         String    @id @default(cuid())
+  account_id String
+  user_id    String?   // null = visible to all managers; set = specific rep
+  lead_id    String?
+  type       NotifType
+  title      String
+  message    String
+  priority   String    @default("medium")  // high | medium | low
+  action_url String?
+  is_read    Boolean   @default(false)
+  created_at DateTime  @default(now())
+
+  account Account @relation(fields: [account_id], references: [id])
+  lead    Lead?   @relation(fields: [lead_id], references: [id], onDelete: SetNull)
+
+  @@index([account_id, is_read, created_at])
+  @@index([user_id, is_read])
+  @@map("notifications")
 }
