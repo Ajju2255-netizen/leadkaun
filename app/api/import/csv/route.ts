@@ -9,7 +9,7 @@ import { mapCityToState, inferIndustry } from "@/lib/import/enrich-lead"
 import { computeFitScore } from "@/lib/scoring/fit-score"
 import { computeQualityScore } from "@/lib/scoring/quality-score"
 import { assignGrade } from "@/lib/scoring/grade"
-import { scoreNotesIntent } from "@/lib/scoring/notes-intent"
+import { scoreNotesIntent, getNotesGradeOverride } from "@/lib/scoring/notes-intent"
 import Papa from "papaparse"
 
 // Vercel Pro max function duration — allows processing large CSVs inline
@@ -200,10 +200,12 @@ export async function POST(req: Request) {
         // Floor at max(baseline, 10) — intent is never 0 for a real lead
         const signalBoost    = inferredSignals.reduce((acc, s) => acc + s.signal_value, 0)
         const notesBoost     = scoreNotesIntent(vr.inquiry_text)
-        const intentScore    = Math.min(
+        const baseIntent     = Math.min(
           100,
           Math.max(Math.max(source.intent_baseline, 10), source.intent_baseline + signalBoost + notesBoost),
         )
+        // 2× multiplier for leads with any real signal — widens the A–E spread
+        const intentScore    = baseIntent > 20 ? Math.min(100, baseIntent * 2) : baseIntent
 
         // Enrich: fill state from city if state column absent; infer industry from company name
         const enrichedState    = vr.state ?? mapCityToState(vr.city)
@@ -232,13 +234,18 @@ export async function POST(req: Request) {
         })
 
         // Pre-execution: no calls logged yet — use fit+quality-primary thresholds
-        const grade = assignGrade(fitResult.total, intentScore, qualityResult.total, true)
+        const computedGrade  = assignGrade(fitResult.total, intentScore, qualityResult.total, true)
+        // Hard override: notes keywords win over threshold math
+        const override       = getNotesGradeOverride(vr.inquiry_text)
+        const grade          = override?.grade       ?? computedGrade
+        const finalIntent    = override?.intentScore ?? intentScore
 
         console.log(`[scoring:row${rowIndex}]`, {
           fit_score:     fitResult.total,
           quality_score: qualityResult.total,
-          intent_score:  intentScore,
+          intent_score:  finalIntent,
           grade,
+          override:      override ?? null,
           fit_breakdown:     fitResult.breakdown,
           quality_breakdown: qualityResult.breakdown,
         })
@@ -266,7 +273,7 @@ export async function POST(req: Request) {
                 expected_value:          vr.expected_value,
                 // Scores written at creation — no separate update needed
                 fit_score:               fitResult.total,
-                intent_score:            intentScore,
+                intent_score:            finalIntent,
                 quality_score:           qualityResult.total,
                 grade,
                 fit_score_breakdown:     fitResult.breakdown as object,
@@ -324,10 +331,11 @@ export async function POST(req: Request) {
         })
 
         // Pre-execution: lead has only SOURCE_BASELINE (no calls or WA yet)
-        const hasActivity = signals.some((s) => s.signal_type !== "SOURCE_BASELINE")
-        const rawIntent   = signals.reduce((acc, s) => acc + s.signal_value, leadData.source.intent_baseline)
+        const hasActivity   = signals.some((s) => s.signal_type !== "SOURCE_BASELINE")
+        const rawIntent     = signals.reduce((acc, s) => acc + s.signal_value, leadData.source.intent_baseline)
           + scoreNotesIntent(leadData.inquiry_text)
-        const intentScore = Math.min(100, Math.max(Math.max(leadData.source.intent_baseline, 10), rawIntent))
+        const baseIntent    = Math.min(100, Math.max(Math.max(leadData.source.intent_baseline, 10), rawIntent))
+        const sweepIntent   = baseIntent > 20 ? Math.min(100, baseIntent * 2) : baseIntent
 
         const fitResult     = computeFitScore({
           lead: {
@@ -350,14 +358,18 @@ export async function POST(req: Request) {
           is_junk:            leadData.is_junk,
         })
 
-        const newGrade = assignGrade(fitResult.total, intentScore, qualityResult.total, !hasActivity)
+        const computedSweepGrade = assignGrade(fitResult.total, sweepIntent, qualityResult.total, !hasActivity)
+        const sweepOverride      = getNotesGradeOverride(leadData.inquiry_text)
+        const newGrade           = sweepOverride?.grade       ?? computedSweepGrade
+        const newIntent          = sweepOverride?.intentScore ?? sweepIntent
 
         console.log(`[regrade:${lead.id}]`, {
           fit_score:    fitResult.total,
           quality_score: qualityResult.total,
-          intent_score:  intentScore,
+          intent_score:  newIntent,
           pre_execution: !hasActivity,
           grade:         newGrade,
+          override:      sweepOverride ?? null,
         })
 
         // Always update — this sweep exists to fix stale E grades
@@ -366,7 +378,7 @@ export async function POST(req: Request) {
           data: {
             grade:                   newGrade,
             fit_score:               fitResult.total,
-            intent_score:            intentScore,
+            intent_score:            newIntent,
             quality_score:           qualityResult.total,
             fit_score_breakdown:     fitResult.breakdown as object,
             quality_score_breakdown: qualityResult.breakdown as object,

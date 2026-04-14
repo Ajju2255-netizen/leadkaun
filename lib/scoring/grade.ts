@@ -51,7 +51,7 @@ export function assignGrade(
   if (preExecution) {
     if (fit >= 70 && quality >= 65 && intent >= 15) return "A"
     if (fit >= 55 && quality >= 55 && intent >= 10) return "B"
-    if (fit >= 40 && quality >= 35)                 return "C"
+    if ((fit >= 35 && quality >= 35) || (fit >= 25 && quality >= 60)) return "C"
     if (fit >= 20 && quality >= 20)                 return "D"
     return "E"
   }

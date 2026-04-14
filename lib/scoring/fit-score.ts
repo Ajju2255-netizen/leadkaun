@@ -5,11 +5,11 @@ import type { FitScoreInput, FitScoreResult, FitScoreBreakdown } from "./types"
 // criteria to evaluate fit, so we cannot reward high scores.
 // Configuring ICP is what unlocks B/A territory.
 const ICP_NOT_CONFIGURED_DEFAULTS: FitScoreBreakdown = {
-  industry:      8,
-  geography:     6,
-  business_type: 6,
-  role:          5,
-  budget:        5,
+  industry:      10,
+  geography:     8,
+  business_type: 8,
+  role:          6,
+  budget:        6,
 }
 
 /**
