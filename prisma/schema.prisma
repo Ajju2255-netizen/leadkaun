@@ -286,6 +286,7 @@ model Lead {
   // Pipeline
   stage_id         String
   stage_entered_at DateTime @default(now())
+  stage_reason     String?  // why the stage last changed (auto-set by system)
 
   // Flags
   is_junk               Boolean  @default(false)

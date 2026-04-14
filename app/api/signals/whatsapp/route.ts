@@ -4,6 +4,7 @@ import { requireAuth, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError, parseBody, NOT_FOUND } from "@/lib/api/response"
 import { processSignalAndUpdateScores } from "@/lib/scoring/orchestrator"
 import { SIGNAL_WEIGHTS } from "@/lib/scoring/signal-weights"
+import { applyAutoStage } from "@/lib/pipeline/auto-stage"
 import type { SignalType, WaStage } from "@prisma/client"
 
 const WA_SIGNAL_TYPES = [
@@ -52,6 +53,7 @@ export async function POST(req: Request) {
           ? { assigned_rep_id: session.user.id }
           : {}),
       },
+      include: { stage: true },
     })
     if (!lead) return NOT_FOUND("Lead")
 
@@ -143,6 +145,9 @@ export async function POST(req: Request) {
         where: { id: data.lead_id },
         data:  { last_action_at: new Date(), is_missed: false },
       })
+
+      // Auto-advance pipeline stage based on WA signal
+      await applyAutoStage(lead, signalType, session.account.id, session.user.id, tx)
 
       return processSignalAndUpdateScores(data.lead_id, session.account.id, tx)
     })
