@@ -96,6 +96,12 @@ export async function POST(req: Request) {
         })
       }
 
+      // Always track last action + clear missed flag (recovery path)
+      await tx.lead.update({
+        where: { id: data.lead_id },
+        data:  { last_action_at: new Date(), is_missed: false },
+      })
+
       // Fatigue check: 5+ non-positive call signals with no positive response → flag fatigued
       const NEGATIVE_CALL_TYPES: SignalType[] = [
         "CALL_NOT_ANSWERED", "CALL_BUSY", "CALL_ANSWERED_NOT_INTERESTED",

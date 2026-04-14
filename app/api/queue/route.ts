@@ -46,6 +46,7 @@ export async function GET(req: Request) {
         account_id: session.account.id,
         is_junk:    false,
         is_fatigued: false,
+        is_missed:  false,
         won_at:     null,
         lost_at:    null,
         ...repFilter,

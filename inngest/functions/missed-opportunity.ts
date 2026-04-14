@@ -5,12 +5,13 @@ import { prisma } from "@/lib/prisma"
  * Missed opportunity checker.
  * Cron: hourly (0 * * * *)
  *
- * Finds leads that have slipped through the cracks:
- * - Grade A: not contacted (first_contact_at is null) for 48+ hours
- * - Grade B: not contacted for 72+ hours
+ * Finds A/B leads where last_action_at (or imported_at if never actioned)
+ * exceeds the threshold:
+ *   Grade A: 6 hours
+ *   Grade B: 24 hours
  *
- * For each account, sends uncalled-A-grade alert to all Managers/Admins.
- * Fires per-rep alert events for rep notification (picked up by Realtime).
+ * Marks each lead is_missed=true, missed_at=now.
+ * Fires alert events for managers and reps.
  *
  * TAD ref: Section 6.5 (M09 Missed Opportunity)
  */
@@ -19,19 +20,22 @@ export const missedOpportunityFn = inngest.createFunction(
   async ({ step, logger }) => {
     const now = new Date()
 
-    const threshold48h = new Date(now.getTime() - 48 * 60 * 60 * 1000)
-    const threshold72h = new Date(now.getTime() - 72 * 60 * 60 * 1000)
+    const threshold6h  = new Date(now.getTime() - 6  * 60 * 60 * 1000)
+    const threshold24h = new Date(now.getTime() - 24 * 60 * 60 * 1000)
 
-    // ── Find all missed Grade A leads (48h no contact) ────────────────────────
+    // ── Find Grade A leads not actioned in 6h ────────────────────────────────
     const missedALeads = await step.run("find-missed-a-grade", async () => {
       return prisma.lead.findMany({
         where: {
-          grade:            "A",
-          first_contact_at: null,
-          is_junk:          false,
-          won_at:           null,
-          lost_at:          null,
-          imported_at:      { lte: threshold48h },
+          grade:     "A",
+          is_junk:   false,
+          is_missed: false,
+          won_at:    null,
+          lost_at:   null,
+          OR: [
+            { last_action_at: null,                 imported_at:     { lte: threshold6h  } },
+            { last_action_at: { lte: threshold6h  }                                        },
+          ],
         },
         select: {
           id:              true,
@@ -41,21 +45,25 @@ export const missedOpportunityFn = inngest.createFunction(
           assigned_rep_id: true,
           expected_value:  true,
           imported_at:     true,
+          last_action_at:  true,
           grade:           true,
         },
       })
     })
 
-    // ── Find all missed Grade B leads (72h no contact) ────────────────────────
+    // ── Find Grade B leads not actioned in 24h ───────────────────────────────
     const missedBLeads = await step.run("find-missed-b-grade", async () => {
       return prisma.lead.findMany({
         where: {
-          grade:            "B",
-          first_contact_at: null,
-          is_junk:          false,
-          won_at:           null,
-          lost_at:          null,
-          imported_at:      { lte: threshold72h },
+          grade:     "B",
+          is_junk:   false,
+          is_missed: false,
+          won_at:    null,
+          lost_at:   null,
+          OR: [
+            { last_action_at: null,                 imported_at:     { lte: threshold24h } },
+            { last_action_at: { lte: threshold24h }                                        },
+          ],
         },
         select: {
           id:              true,
@@ -65,6 +73,7 @@ export const missedOpportunityFn = inngest.createFunction(
           assigned_rep_id: true,
           expected_value:  true,
           imported_at:     true,
+          last_action_at:  true,
           grade:           true,
         },
       })
@@ -81,6 +90,16 @@ export const missedOpportunityFn = inngest.createFunction(
       `Missed opportunities: ${missedALeads.length} Grade A, ${missedBLeads.length} Grade B`,
     )
 
+    // ── Mark leads as missed in DB ────────────────────────────────────────────
+    await step.run("mark-missed", async () => {
+      const ids = allMissed.map((l) => l.id)
+      await prisma.lead.updateMany({
+        where: { id: { in: ids } },
+        data:  { is_missed: true, missed_at: now },
+      })
+      return ids.length
+    })
+
     // ── Group by account ──────────────────────────────────────────────────────
     const accountMap = new Map<string, typeof allMissed>()
     for (const lead of allMissed) {
@@ -92,7 +111,6 @@ export const missedOpportunityFn = inngest.createFunction(
     await step.run("fire-account-alerts", async () => {
       const accountIds = Array.from(accountMap.keys())
 
-      // Load managers/admins for all affected accounts
       const managers = await prisma.user.findMany({
         where: {
           account_id: { in: accountIds },
@@ -108,39 +126,34 @@ export const missedOpportunityFn = inngest.createFunction(
       })
 
       const events = managers.map((manager) => {
-        const accountLeads = accountMap.get(manager.account_id) ?? []
-        const aGradeLeads  = accountLeads.filter((l) => l.grade === "A")
-        const bGradeLeads  = accountLeads.filter((l) => l.grade === "B")
-
+        const accountLeads     = accountMap.get(manager.account_id) ?? []
+        const aGradeLeads      = accountLeads.filter((l) => l.grade === "A")
+        const bGradeLeads      = accountLeads.filter((l) => l.grade === "B")
         const totalValueAtRisk = accountLeads.reduce(
-          (sum, l) => sum + (l.expected_value ?? 0),
-          0,
+          (sum, l) => sum + (l.expected_value ?? 0), 0,
         )
 
         return {
           name: "alerts/missed-opportunity",
           data: {
-            manager_id:        manager.id,
-            email:             manager.email,
-            first_name:        manager.first_name,
-            account_id:        manager.account_id,
-            missed_a_count:    aGradeLeads.length,
-            missed_b_count:    bGradeLeads.length,
-            total_missed:      accountLeads.length,
-            value_at_risk:     totalValueAtRisk,
-            lead_ids:          aGradeLeads.map((l) => l.id),  // A-grade only for alert
+            manager_id:     manager.id,
+            email:          manager.email,
+            first_name:     manager.first_name,
+            account_id:     manager.account_id,
+            missed_a_count: aGradeLeads.length,
+            missed_b_count: bGradeLeads.length,
+            total_missed:   accountLeads.length,
+            value_at_risk:  totalValueAtRisk,
+            lead_ids:       aGradeLeads.map((l) => l.id),
           },
         }
       })
 
-      if (events.length > 0) {
-        await inngest.send(events)
-      }
-
+      if (events.length > 0) await inngest.send(events)
       return events.length
     })
 
-    // ── Fire per-rep alerts for their own missed leads ────────────────────────
+    // ── Fire per-rep alerts ───────────────────────────────────────────────────
     await step.run("fire-rep-alerts", async () => {
       const repMap = new Map<string, typeof allMissed>()
       for (const lead of allMissed) {
@@ -159,10 +172,7 @@ export const missedOpportunityFn = inngest.createFunction(
         },
       }))
 
-      if (repEvents.length > 0) {
-        await inngest.send(repEvents)
-      }
-
+      if (repEvents.length > 0) await inngest.send(repEvents)
       return repEvents.length
     })
 

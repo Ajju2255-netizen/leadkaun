@@ -294,6 +294,11 @@ model Lead {
   fatigue_contact_count Int      @default(0)
   is_duplicate          Boolean  @default(false)
 
+  // Missed opportunity tracking
+  last_action_at  DateTime?            // when rep last called or messaged
+  is_missed       Boolean  @default(false)
+  missed_at       DateTime?            // when Inngest marked it missed
+
   // WhatsApp conversation tracking
   wa_conversation_stage WaStage @default(INQUIRY)
 

@@ -6,11 +6,8 @@ import { apiSuccess, apiError } from "@/lib/api/response"
 /**
  * GET /api/analytics/missed
  *
- * Returns missed opportunity data:
- * - Total value at risk (A/B grade leads not contacted within thresholds)
- * - Recovered value this week (A/B grade leads won in past 7 days)
- * - Per-rep breakdown sorted by missed_value desc
- * - Lead list sorted by hours_overdue desc
+ * Returns all leads currently marked is_missed=true for the account.
+ * Includes per-rep breakdown and total value at risk.
  *
  * Admin/Manager only.
  */
@@ -19,41 +16,31 @@ export async function GET(_req: Request) {
     const session = await requireRole("ADMIN", "MANAGER")
     const accountId = session.account.id
 
-    const now             = new Date()
-    const gradeAThreshold = new Date(now.getTime() - 48 * 60 * 60 * 1000)
-    const gradeBThreshold = new Date(now.getTime() - 72 * 60 * 60 * 1000)
-    const weekAgo         = new Date(now.getTime() - 7  * 24 * 60 * 60 * 1000)
+    const now    = new Date()
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
 
-    const selectFields = {
-      id: true, first_name: true, last_name: true, company_name: true, grade: true,
-      expected_value: true, first_contact_at: true,
-      assigned_rep: { select: { id: true, first_name: true, last_name: true } },
-    } as const
-
-    // Grade A leads not contacted in 48h
-    const gradeALeads = await prisma.lead.findMany({
+    // All currently missed leads
+    const missedLeads = await prisma.lead.findMany({
       where: {
-        account_id:       accountId,
-        grade:            "A",
-        is_junk:          false,
-        won_at:           null,
-        lost_at:          null,
-        first_contact_at: { lt: gradeAThreshold },
+        account_id: accountId,
+        is_missed:  true,
+        won_at:     null,
+        lost_at:    null,
       },
-      select: selectFields,
-    })
-
-    // Grade B leads not contacted in 72h
-    const gradeBLeads = await prisma.lead.findMany({
-      where: {
-        account_id:       accountId,
-        grade:            "B",
-        is_junk:          false,
-        won_at:           null,
-        lost_at:          null,
-        first_contact_at: { lt: gradeBThreshold },
+      select: {
+        id:             true,
+        first_name:     true,
+        last_name:      true,
+        company_name:   true,
+        city:           true,
+        grade:          true,
+        expected_value: true,
+        missed_at:      true,
+        last_action_at: true,
+        imported_at:    true,
+        assigned_rep:   { select: { id: true, first_name: true, last_name: true } },
       },
-      select: selectFields,
+      orderBy: { missed_at: "asc" },   // longest-missed first
     })
 
     // Value recovered this week: A/B grade leads won in past 7 days
@@ -66,23 +53,21 @@ export async function GET(_req: Request) {
       _sum: { won_value: true },
     })
 
-    // Compute hours_overdue for each
-    const withOverdue = <T extends { grade: string; first_contact_at: Date | null }>(lead: T) => {
-      const threshold = lead.grade === "A" ? gradeAThreshold : gradeBThreshold
-      const contactTime = lead.first_contact_at ?? threshold
-      const hoursOverdue = (threshold.getTime() - contactTime.getTime()) / (60 * 60 * 1000)
-      return { ...lead, hours_overdue: Math.max(0, hoursOverdue) }
-    }
-
-    const leadsWithOverdue = [
-      ...gradeALeads.map(withOverdue),
-      ...gradeBLeads.map(withOverdue),
-    ]
+    // Enrich with hours_since_missed
+    const enriched = missedLeads.map((lead) => ({
+      ...lead,
+      hours_since_missed: lead.missed_at
+        ? Math.floor((now.getTime() - new Date(lead.missed_at).getTime()) / 3_600_000)
+        : null,
+    }))
 
     // Group by rep
-    type RepEntry = { rep_id: string; first_name: string; last_name: string; missed_count: number; missed_value: number }
+    type RepEntry = {
+      rep_id: string; first_name: string; last_name: string
+      missed_count: number; missed_value: number
+    }
     const byRepMap = new Map<string, RepEntry>()
-    for (const lead of leadsWithOverdue) {
+    for (const lead of enriched) {
       if (!lead.assigned_rep) continue
       const rep = lead.assigned_rep
       const existing = byRepMap.get(rep.id)
@@ -92,23 +77,23 @@ export async function GET(_req: Request) {
         existing.missed_value += value
       } else {
         byRepMap.set(rep.id, {
-          rep_id: rep.id,
-          first_name: rep.first_name,
-          last_name:  rep.last_name,
+          rep_id:       rep.id,
+          first_name:   rep.first_name,
+          last_name:    rep.last_name,
           missed_count: 1,
           missed_value: value,
         })
       }
     }
 
-    const totalValue = leadsWithOverdue.reduce((s, l) => s + (l.expected_value ?? 0), 0)
+    const totalValue = enriched.reduce((s, l) => s + (l.expected_value ?? 0), 0)
 
     return apiSuccess({
-      total_count:          leadsWithOverdue.length,
-      total_value:          totalValue,
-      recovered_this_week:  recoveredThisWeek._sum.won_value ?? 0,
-      leads:                leadsWithOverdue,
-      by_rep:               Array.from(byRepMap.values()),
+      total_count:         enriched.length,
+      total_value:         totalValue,
+      recovered_this_week: recoveredThisWeek._sum.won_value ?? 0,
+      leads:               enriched,
+      by_rep:              Array.from(byRepMap.values()),
     })
   } catch (err) {
     const authResponse = handleAuthError(err)

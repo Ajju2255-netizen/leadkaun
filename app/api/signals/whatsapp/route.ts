@@ -138,6 +138,12 @@ export async function POST(req: Request) {
         })
       }
 
+      // Always track last action + clear missed flag (recovery path)
+      await tx.lead.update({
+        where: { id: data.lead_id },
+        data:  { last_action_at: new Date(), is_missed: false },
+      })
+
       return processSignalAndUpdateScores(data.lead_id, session.account.id, tx)
     })
 

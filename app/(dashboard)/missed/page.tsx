@@ -1,189 +1,284 @@
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
+import { useState } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Skeleton } from "@/components/ui/skeleton"
+import { ExternalLink, MapPin, Phone } from "lucide-react"
 import { GradeBadge } from "@/components/shared/GradeBadge"
-import { formatRupee } from "@/lib/format"
+import { Skeleton } from "@/components/ui/skeleton"
+import { LogCallModal } from "@/components/queue/LogCallModal"
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 interface MissedLead {
-  id: string
-  first_name: string
-  last_name: string | null
-  company_name: string | null
-  grade: string
-  expected_value: number | null
-  first_contact_at: string | null
-  assigned_rep: { id: string; first_name: string; last_name: string } | null
-  hours_overdue: number
+  id:                 string
+  first_name:         string
+  last_name:          string | null
+  company_name:       string | null
+  city:               string | null
+  grade:              string
+  expected_value:     number | null
+  missed_at:          string | null
+  hours_since_missed: number | null
+  assigned_rep:       { id: string; first_name: string; last_name: string } | null
 }
 
 interface RepMissed {
-  rep_id: string
-  first_name: string
-  last_name: string
+  rep_id:       string
+  first_name:   string
+  last_name:    string
   missed_count: number
   missed_value: number
 }
 
 interface MissedData {
-  total_count: number
-  total_value: number
+  total_count:         number
+  total_value:         number
   recovered_this_week: number
-  leads: MissedLead[]
-  by_rep: RepMissed[]
+  leads:               MissedLead[]
+  by_rep:              RepMissed[]
 }
 
 async function fetchMissed(): Promise<MissedData> {
-  const res = await fetch("/api/analytics/missed")
+  const res = await fetch("/api/analytics/missed", { credentials: "include" })
   if (!res.ok) throw new Error("Failed to fetch missed opportunities")
   return res.json().then((r) => r.data)
 }
 
-function hoursLabel(h: number) {
-  if (h < 24) return `${Math.round(h)}h overdue`
-  return `${Math.round(h / 24)}d overdue`
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function formatValue(v: number): string {
+  if (v >= 10_000_000) return `₹${(v / 10_000_000).toFixed(1)}Cr`
+  if (v >= 100_000)    return `₹${(v / 100_000).toFixed(1)}L`
+  if (v >= 1_000)      return `₹${(v / 1_000).toFixed(0)}K`
+  return `₹${v.toLocaleString("en-IN")}`
 }
 
+function missedLabel(hours: number | null): string {
+  if (hours === null) return "Missed"
+  if (hours < 1)  return "Just now"
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
+}
+
+// ── Missed Lead Card ──────────────────────────────────────────────────────────
+
+function MissedCard({ lead }: { lead: MissedLead }) {
+  const [callOpen, setCallOpen] = useState(false)
+  const queryClient = useQueryClient()
+  const fullName    = [lead.first_name, lead.last_name].filter(Boolean).join(" ")
+
+  function onCallClose() {
+    setCallOpen(false)
+    // Refresh missed list and queue after action
+    queryClient.invalidateQueries({ queryKey: ["missed-opportunities"] })
+    queryClient.invalidateQueries({ queryKey: ["missed-count"] })
+    queryClient.invalidateQueries({ queryKey: ["queue"] })
+  }
+
+  return (
+    <>
+      <div className="rounded-xl bg-white border border-red-100 border-l-[3px] border-l-red-500 shadow-[0_1px_3px_rgba(15,23,42,0.06)] p-4 space-y-3">
+
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-2.5 min-w-0">
+            <GradeBadge grade={lead.grade as "A" | "B" | "C" | "D" | "E" | "F"} size="md" />
+            <div className="min-w-0 flex-1">
+              <Link
+                href={`/leads/${lead.id}`}
+                className="text-[13px] font-semibold text-slate-800 hover:text-blue-600 transition-colors truncate block"
+              >
+                {fullName}
+              </Link>
+              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                {lead.company_name && (
+                  <p className="text-[12px] text-slate-400 truncate">{lead.company_name}</p>
+                )}
+                {lead.city && (
+                  <span className="inline-flex items-center gap-0.5 text-[11px] text-slate-400">
+                    <MapPin className="w-2.5 h-2.5" />
+                    {lead.city}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          {lead.expected_value ? (
+            <span className="text-[15px] font-bold text-red-700 tabular-nums shrink-0">
+              {formatValue(lead.expected_value)}
+            </span>
+          ) : null}
+        </div>
+
+        {/* Missed reason */}
+        <div className="rounded-lg px-3 py-2.5 bg-red-50 border border-red-200">
+          <p className="text-[12px] font-semibold text-red-800">
+            ❌ Missed {missedLabel(lead.hours_since_missed)} — no action taken in {lead.grade === "A" ? "6h" : "24h"}
+          </p>
+          <p className="text-[11px] text-red-700 opacity-80 mt-0.5">
+            Lead went cold · {lead.assigned_rep
+              ? `Assigned to ${lead.assigned_rep.first_name} ${lead.assigned_rep.last_name}`
+              : "Unassigned"}
+          </p>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setCallOpen(true)}
+            className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[12px] font-semibold py-2 transition-colors"
+          >
+            <Phone className="w-3.5 h-3.5" strokeWidth={2.5} />
+            📞 Call Anyway
+          </button>
+          <Link
+            href={`/leads/${lead.id}`}
+            className="flex items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-slate-400 hover:text-slate-600 transition-colors p-2"
+            title="View full lead"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+      </div>
+
+      <LogCallModal
+        open={callOpen}
+        onClose={onCallClose}
+        leadId={lead.id}
+        leadName={fullName}
+      />
+    </>
+  )
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+
 export default function MissedPage() {
-  const { data, isLoading } = useQuery<MissedData>({
-    queryKey: ["missed-opportunities"],
-    queryFn: fetchMissed,
+  const { data, isLoading, error } = useQuery<MissedData>({
+    queryKey:        ["missed-opportunities"],
+    queryFn:         fetchMissed,
     refetchInterval: 60_000,
   })
 
+  const leads    = data?.leads ?? []
+  const byRep    = data?.by_rep ?? []
+  const total    = data?.total_count ?? 0
+  const value    = data?.total_value ?? 0
+  const recovered = data?.recovered_this_week ?? 0
+
   return (
-    <div className="max-w-5xl mx-auto py-8 px-4 space-y-8">
+    <div className="max-w-2xl mx-auto space-y-5">
+
+      {/* ── Heading ───────────────────────────────────────────────────────── */}
       <div>
-        <h1 className="text-2xl font-semibold">Missed Opportunity Engine</h1>
-        <p className="text-muted-foreground mt-1">High-grade leads that haven&apos;t been contacted in time.</p>
+        <h1 className="text-[22px] font-bold text-slate-900 tracking-tight">Missed Opportunities</h1>
+        <p className="text-[13px] text-slate-400 mt-0.5">
+          {isLoading ? "Loading…" : `High-value leads that went cold without action`}
+        </p>
       </div>
 
-      {/* Header Metrics */}
-      {isLoading ? (
-        <div className="grid grid-cols-3 gap-4">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-28 rounded-xl" />
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-3 gap-4">
-          <div className="border rounded-xl p-5 space-y-1">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide">Total at Risk</p>
-            <p className="text-4xl font-bold tabular-nums tracking-tight">
-              {formatRupee(data?.total_value ?? 0)}
-            </p>
-            <p className="text-sm text-muted-foreground">{data?.total_count ?? 0} leads</p>
-          </div>
-          <div className="border rounded-xl p-5 space-y-1">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide">Recovered This Week</p>
-            <p className="text-4xl font-bold tabular-nums tracking-tight text-green-600">
-              {formatRupee(data?.recovered_this_week ?? 0)}
-            </p>
-          </div>
-          <div className="border rounded-xl p-5 space-y-1">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide">Leads Overdue</p>
-            <p className="text-4xl font-bold tabular-nums tracking-tight text-destructive">
-              {data?.total_count ?? 0}
-            </p>
-            <p className="text-sm text-muted-foreground">A &amp; B grade combined</p>
+      {/* ── Loss banner ───────────────────────────────────────────────────── */}
+      {!isLoading && total > 0 && (
+        <div className="rounded-xl border-2 border-red-300 bg-red-50 px-4 py-3">
+          <div className="flex items-start gap-3">
+            <span className="text-[18px] mt-0.5">❌</span>
+            <div>
+              <p className="text-[14px] font-bold text-red-900">
+                {total} lead{total > 1 ? "s" : ""} went cold
+                {value > 0 ? ` · ${formatValue(value)} potential lost` : ""}
+              </p>
+              <p className="text-[12px] text-red-700 opacity-80">
+                Grade A not contacted in 6h · Grade B not contacted in 24h · Call anyway to recover
+              </p>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Per-Rep Cards */}
-      {!isLoading && (data?.by_rep?.length ?? 0) > 0 && (
+      {/* ── Metrics row ───────────────────────────────────────────────────── */}
+      {!isLoading && (
+        <div className="grid grid-cols-3 gap-3">
+          <div className="rounded-xl bg-white border border-slate-100 shadow-sm p-4">
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">At Risk</p>
+            <p className="text-[20px] font-bold text-red-700 tabular-nums mt-1">
+              {value > 0 ? formatValue(value) : "—"}
+            </p>
+            <p className="text-[11px] text-slate-400">{total} leads</p>
+          </div>
+          <div className="rounded-xl bg-white border border-slate-100 shadow-sm p-4">
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Recovered (7d)</p>
+            <p className="text-[20px] font-bold text-emerald-600 tabular-nums mt-1">
+              {recovered > 0 ? formatValue(recovered) : "—"}
+            </p>
+            <p className="text-[11px] text-slate-400">Won from A/B</p>
+          </div>
+          <div className="rounded-xl bg-white border border-slate-100 shadow-sm p-4">
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Leads Overdue</p>
+            <p className="text-[20px] font-bold text-slate-900 tabular-nums mt-1">{total}</p>
+            <p className="text-[11px] text-slate-400">A &amp; B combined</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Loading ───────────────────────────────────────────────────────── */}
+      {isLoading && (
+        <div className="space-y-3">
+          {[...Array(3)].map((_, i) => (
+            <Skeleton key={i} className="h-[160px] w-full rounded-xl" />
+          ))}
+        </div>
+      )}
+
+      {/* ── Error ─────────────────────────────────────────────────────────── */}
+      {error && (
+        <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-[13px] text-red-600">
+          Failed to load missed opportunities — please refresh.
+        </div>
+      )}
+
+      {/* ── Empty state ───────────────────────────────────────────────────── */}
+      {!isLoading && total === 0 && !error && (
+        <div className="rounded-xl bg-white border border-slate-100 shadow-sm px-6 py-12 text-center">
+          <div className="text-[32px] mb-3">✅</div>
+          <p className="text-[14px] font-semibold text-slate-700">No missed leads</p>
+          <p className="text-[12px] text-slate-400 mt-1">Keep the queue moving.</p>
+        </div>
+      )}
+
+      {/* ── Missed lead cards ─────────────────────────────────────────────── */}
+      {!isLoading && leads.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-[13px] font-semibold text-slate-700">Overdue Leads</h2>
+          {leads.map((lead) => (
+            <MissedCard key={lead.id} lead={lead} />
+          ))}
+        </div>
+      )}
+
+      {/* ── By rep breakdown ──────────────────────────────────────────────── */}
+      {!isLoading && byRep.length > 0 && (
         <div>
-          <h2 className="text-base font-semibold mb-3">By Rep</h2>
+          <h2 className="text-[13px] font-semibold text-slate-700 mb-3">By Rep</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {(data?.by_rep ?? [])
+            {[...byRep]
               .sort((a, b) => b.missed_value - a.missed_value)
               .map((rep) => (
-                <div key={rep.rep_id} className="border rounded-lg p-4 space-y-1">
-                  <p className="font-medium text-sm">
+                <div key={rep.rep_id} className="rounded-xl bg-white border border-slate-100 shadow-sm p-4 space-y-1">
+                  <p className="text-[13px] font-semibold text-slate-800">
                     {rep.first_name} {rep.last_name}
                   </p>
-                  <p className="text-2xl font-bold tabular-nums text-destructive">
-                    {formatRupee(rep.missed_value)}
+                  <p className="text-[18px] font-bold text-red-700 tabular-nums">
+                    {formatValue(rep.missed_value)}
                   </p>
-                  <p className="text-xs text-muted-foreground">{rep.missed_count} overdue leads</p>
+                  <p className="text-[11px] text-slate-400">{rep.missed_count} overdue leads</p>
                 </div>
               ))}
           </div>
         </div>
       )}
 
-      {/* Lead List */}
-      <div>
-        <h2 className="text-base font-semibold mb-3">Overdue Leads</h2>
-        {isLoading ? (
-          <div className="space-y-2">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-16 rounded-lg" />
-            ))}
-          </div>
-        ) : (data?.leads?.length ?? 0) === 0 ? (
-          <div className="border rounded-lg p-8 text-center text-muted-foreground">
-            No missed opportunities right now. Keep up the good work!
-          </div>
-        ) : (
-          <div className="border rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50">
-                <tr>
-                  <th className="px-4 py-3 text-left font-medium">Lead</th>
-                  <th className="px-4 py-3 text-left font-medium">Grade</th>
-                  <th className="px-4 py-3 text-left font-medium">Value</th>
-                  <th className="px-4 py-3 text-left font-medium">Overdue</th>
-                  <th className="px-4 py-3 text-left font-medium">Assigned To</th>
-                  <th className="px-4 py-3 text-right font-medium">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {(data?.leads ?? [])
-                  .sort((a, b) => b.hours_overdue - a.hours_overdue)
-                  .map((lead) => (
-                    <tr key={lead.id} className="hover:bg-muted/20">
-                      <td className="px-4 py-3">
-                        <div className="font-medium">
-                          {lead.first_name} {lead.last_name ?? ""}
-                        </div>
-                        {lead.company_name && (
-                          <div className="text-xs text-muted-foreground">{lead.company_name}</div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <GradeBadge grade={lead.grade as "A" | "B" | "C" | "D" | "E" | "F"} />
-                      </td>
-                      <td className="px-4 py-3 font-medium tabular-nums">
-                        {lead.expected_value ? formatRupee(lead.expected_value) : "—"}
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge variant="destructive" className="text-xs">
-                          {hoursLabel(lead.hours_overdue)}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {lead.assigned_rep
-                          ? `${lead.assigned_rep.first_name} ${lead.assigned_rep.last_name}`
-                          : "Unassigned"}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <Link href={`/leads/${lead.id}`}>
-                          <Button size="sm" variant="outline">
-                            View Lead
-                          </Button>
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
     </div>
   )
 }

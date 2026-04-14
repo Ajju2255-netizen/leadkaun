@@ -16,6 +16,7 @@ import {
   FileText,
   type LucideIcon,
 } from "lucide-react"
+import { useQuery } from "@tanstack/react-query"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import type { AuthSession } from "@/lib/auth/session"
@@ -47,6 +48,19 @@ const ROLE_LABEL: Record<UserRole, string> = {
   ADMIN: "Admin", MANAGER: "Manager", REP: "Sales Rep",
 }
 
+function useMissedCount(enabled: boolean) {
+  const { data } = useQuery({
+    queryKey:        ["missed-count"],
+    queryFn:         () =>
+      fetch("/api/analytics/missed/count", { credentials: "include" })
+        .then((r) => r.ok ? r.json().then((d: { data: { count: number } }) => d.data) : { count: 0 }),
+    refetchInterval: 60_000,
+    staleTime:       55_000,
+    enabled,
+  })
+  return data?.count ?? 0
+}
+
 export function DashboardShell({
   session,
   children,
@@ -58,7 +72,10 @@ export function DashboardShell({
   const router   = useRouter()
   const { user, account } = session
 
-  const visible = NAV_ITEMS.filter((i) => i.roles.includes(user.role))
+  const isManager = user.role === "ADMIN" || user.role === "MANAGER"
+  const missedCount = useMissedCount(isManager)
+
+  const visible     = NAV_ITEMS.filter((i) => i.roles.includes(user.role))
   const mainNav     = visible.filter((i) => i.section === "main")
   const settingsNav = visible.filter((i) => i.section === "settings")
 
@@ -76,8 +93,9 @@ export function DashboardShell({
   }
 
   function NavLink({ item }: { item: NavItem }) {
-    const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
-    const Icon = item.icon
+    const isActive     = pathname === item.href || pathname.startsWith(item.href + "/")
+    const Icon         = item.icon
+    const showBadge    = item.href === "/missed" && missedCount > 0
 
     return (
       <Link
@@ -96,6 +114,11 @@ export function DashboardShell({
           strokeWidth={isActive ? 2.5 : 2}
         />
         {item.label}
+        {showBadge && (
+          <span className="ml-auto inline-flex items-center justify-center text-[10px] font-bold bg-red-500 text-white rounded-full min-w-[18px] h-[18px] px-1">
+            {missedCount > 99 ? "99+" : missedCount}
+          </span>
+        )}
       </Link>
     )
   }
