@@ -1,18 +1,29 @@
 import type { FitScoreInput, FitScoreResult, FitScoreBreakdown } from "./types"
 
-// Default scores used when ICP is not configured.
-// Based on industry median conversion benchmarks (TAD 4.2.1).
+// Baseline fit scores when ICP is not configured at all.
+// Kept low (~30 total) so leads default to D — the system literally has no
+// criteria to evaluate fit, so we cannot reward high scores.
+// Configuring ICP is what unlocks B/A territory.
 const ICP_NOT_CONFIGURED_DEFAULTS: FitScoreBreakdown = {
-  industry:      15,  // mid-range until account tells us what they care about
-  geography:     10,
-  business_type: 10,
-  role:           8,
-  budget:         7,
+  industry:      8,
+  geography:     6,
+  business_type: 6,
+  role:          5,
+  budget:        5,
 }
 
 /**
  * Computes the Fit Score (0–100) by comparing the lead's profile against
  * the account's ICP configuration.
+ *
+ * Scoring philosophy:
+ *   MATCH    → full points  (the lead proves it fits)
+ *   MISMATCH → 0 points     (no penalty — just no reward)
+ *   UNKNOWN  → small credit  (dimension configured in ICP but lead has no data)
+ *   NOT SET  → tiny baseline (dimension not part of this account's ICP)
+ *
+ * This prevents "everything is A" when ICP dimensions aren't configured
+ * while still rewarding leads that clearly match the configured criteria.
  *
  * Components:
  *   industry      0–30
@@ -21,7 +32,6 @@ const ICP_NOT_CONFIGURED_DEFAULTS: FitScoreBreakdown = {
  *   role          0–15
  *   budget        0–15
  *
- * When ICP is not configured, returns benchmark defaults (total ≈ 50).
  * TAD ref: Section 4.2
  */
 export function computeFitScore(input: FitScoreInput): FitScoreResult {
@@ -55,48 +65,47 @@ export function computeFitScore(input: FitScoreInput): FitScoreResult {
 
 function scoreIndustry(
   leadIndustry: string | null | undefined,
-  icpIndustries: string[]
+  icpIndustries: string[],
 ): number {
-  if (!icpIndustries.length) return 20  // no ICP set → partial credit
-  if (!leadIndustry) return 10          // ICP set but lead has no industry → unknown, not zero
+  if (!icpIndustries.length) return 6   // dimension not in ICP → small baseline
+  if (!leadIndustry) return 3           // ICP set, but lead has no industry data
   const lead = leadIndustry.toLowerCase().trim()
   const match = icpIndustries.some((i) => i.toLowerCase().trim() === lead)
-  return match ? 30 : 5               // 5 = present but doesn't match ICP
+  return match ? 30 : 0                 // mismatch = no reward, no penalty
 }
 
 function scoreGeography(
   leadState: string | null | undefined,
   _leadCity: string | null | undefined,
-  icpStates: string[]
+  icpStates: string[],
 ): number {
-  if (!icpStates.length) return 12    // no geo ICP → partial credit
-  if (!leadState) return 8            // ICP set but lead has no state → unknown, not zero
+  if (!icpStates.length) return 5       // dimension not in ICP → small baseline
+  if (!leadState) return 3              // ICP set, but lead has no state data
   const lead = leadState.toLowerCase().trim()
   const match = icpStates.some((s) => s.toLowerCase().trim() === lead)
-  return match ? 20 : 4              // 4 = present but out of target geo
+  return match ? 20 : 0                 // mismatch = 0
 }
 
 function scoreBusinessType(
   companyName: string | null | undefined,
-  icpBusinessTypes: string[]
+  icpBusinessTypes: string[],
 ): number {
-  if (!icpBusinessTypes.length) return 12  // no business type ICP → partial credit
-  if (!companyName) return 8               // ICP set but no company data → unknown, not zero
-  // Fuzzy keyword match against company name (simple heuristic)
+  if (!icpBusinessTypes.length) return 5  // dimension not in ICP → small baseline
+  if (!companyName) return 3              // ICP set, but no company data
   const name = companyName.toLowerCase()
   const match = icpBusinessTypes.some((bt) => name.includes(bt.toLowerCase().trim()))
-  return match ? 20 : 5  // partial credit if company present but type doesn't match
+  return match ? 20 : 0
 }
 
 function scoreRole(
   designation: string | null | undefined,
-  icpRoles: string[]
+  icpRoles: string[],
 ): number {
-  if (!icpRoles.length) return 8      // no role ICP → partial credit
-  if (!designation) return 5          // ICP set but lead has no designation → unknown, not zero
+  if (!icpRoles.length) return 4        // dimension not in ICP → small baseline
+  if (!designation) return 2            // ICP set, but lead has no designation
   const desig = designation.toLowerCase()
   const match = icpRoles.some((r) => desig.includes(r.toLowerCase().trim()))
-  return match ? 15 : 3              // 3 = present but role doesn't match ICP
+  return match ? 15 : 0
 }
 
 function scoreBudget(
@@ -104,14 +113,14 @@ function scoreBudget(
   budgetMin: number | null | undefined,
   budgetMax: number | null | undefined,
 ): number {
-  if (budgetMin == null && budgetMax == null) return 8  // no budget ICP → partial credit
-  if (expectedValue == null || expectedValue <= 0) return 5  // budget ICP set but no lead data → unknown
+  if (budgetMin == null && budgetMax == null) return 5  // dimension not in ICP
+  if (expectedValue == null || expectedValue <= 0) return 2  // ICP set, no lead data
 
   const min = budgetMin ?? 0
   const max = budgetMax ?? Infinity
 
-  if (expectedValue >= min && expectedValue <= max) return 15  // perfect fit
-  if (expectedValue >= min * 0.7 && expectedValue <= max * 1.3) return 8  // within 30% of range
+  if (expectedValue >= min && expectedValue <= max) return 15      // perfect range
+  if (expectedValue >= min * 0.7 && expectedValue <= max * 1.3) return 8  // within 30%
   return 0
 }
 
