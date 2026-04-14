@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useMemo } from "react"
+import { useState, useCallback, useMemo, useEffect, useRef } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { GradeBadge } from "@/components/shared/GradeBadge"
@@ -54,6 +54,20 @@ export default function LeadsPage() {
   const [page, setPage]     = useState(1)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [regrading, setRegrading] = useState(false)
+  const autoRegradeRef = useRef(false)
+
+  useEffect(() => {
+    if (!isManager || autoRegradeRef.current) return
+    autoRegradeRef.current = true
+    fetch("/api/admin/regrade", { method: "POST", credentials: "include" })
+      .then((r) => r.json())
+      .then((d) => {
+        if ((d.updated ?? 0) > 0) {
+          queryClient.invalidateQueries({ queryKey: ["leads"] })
+        }
+      })
+      .catch(() => {})
+  }, [isManager, queryClient])
 
   async function handleRegrade() {
     setRegrading(true)
