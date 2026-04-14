@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { GradeBadge } from "@/components/shared/GradeBadge"
@@ -42,10 +42,29 @@ const SIGNAL_LABELS: Record<string, { label: string; positive: boolean }> = {
   WA_TAG_NOT_INTERESTED:        { label: "WA — Not interested",         positive: false },
   SOURCE_BASELINE:              { label: "Source baseline",             positive: true  },
   INTENT_DECAY:                 { label: "Intent decay",                positive: false },
+  IMPORT_HIGH_INTENT:           { label: "Import — High intent",        positive: true  },
+  IMPORT_MEDIUM_INTENT:         { label: "Import — Medium intent",      positive: true  },
+  IMPORT_LOW_INTENT:            { label: "Import — Low intent",         positive: true  },
+  IMPORT_RECENT_CONTACT:        { label: "Import — Recent contact",     positive: true  },
+  IMPORT_WARM_CONTACT:          { label: "Import — Warm contact",       positive: true  },
+  IMPORT_STALE_CONTACT:         { label: "Import — Stale contact",      positive: false },
+  IMPORT_ACTIVE_INTEREST:       { label: "Import — Active interest",    positive: true  },
+  IMPORT_NEGATIVE_SIGNAL:       { label: "Import — Negative signal",    positive: false },
+}
+
+// Grade-keyed action banner styles
+const ACTION_STYLES: Record<string, { bg: string; border: string; text: string; icon: string }> = {
+  A: { bg: "bg-green-50",  border: "border-green-300",  text: "text-green-800",  icon: "🔥" },
+  B: { bg: "bg-blue-50",   border: "border-blue-300",   text: "text-blue-800",   icon: "📞" },
+  C: { bg: "bg-amber-50",  border: "border-amber-300",  text: "text-amber-800",  icon: "📩" },
+  D: { bg: "bg-gray-50",   border: "border-gray-300",   text: "text-gray-700",   icon: "⏳" },
+  E: { bg: "bg-red-50",    border: "border-red-200",    text: "text-red-700",    icon: "❌" },
+  F: { bg: "bg-red-50",    border: "border-red-200",    text: "text-red-500",    icon: "🗑" },
 }
 
 export default function LeadRecordPage() {
   const params      = useParams()
+  const router      = useRouter()
   const leadId      = params.id as string
   const queryClient = useQueryClient()
 
@@ -72,23 +91,39 @@ export default function LeadRecordPage() {
 
   if (isLoading) return (
     <div className="space-y-4 max-w-3xl">
-      <Skeleton className="h-8 w-48" />
-      <Skeleton className="h-32 w-full" />
+      <Skeleton className="h-8 w-32" />
+      <Skeleton className="h-28 w-full" />
+      <Skeleton className="h-20 w-full" />
       <Skeleton className="h-48 w-full" />
     </div>
   )
 
   if (error || !lead) return (
-    <div className="text-destructive">Lead not found.</div>
+    <div className="space-y-3">
+      <Button variant="ghost" size="sm" onClick={() => router.back()}>← Back</Button>
+      <div className="text-destructive">Lead not found.</div>
+    </div>
   )
 
-  const fullName = [lead.first_name, lead.last_name].filter(Boolean).join(" ")
+  const fullName    = [lead.first_name, lead.last_name].filter(Boolean).join(" ")
+  const actionStyle = ACTION_STYLES[lead.grade] ?? ACTION_STYLES["D"]
+  const action      = lead.next_action
 
   return (
     <>
       <LeadRealtimeListener leadId={leadId} />
 
-      <div className="max-w-3xl space-y-6">
+      <div className="max-w-3xl space-y-5">
+
+        {/* ── Back button ──────────────────────────────────────────── */}
+        <button
+          onClick={() => router.back()}
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <span>←</span>
+          <span>Back to leads</span>
+        </button>
+
         {/* ── Header ────────────────────────────────────────────────── */}
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -97,75 +132,104 @@ export default function LeadRecordPage() {
               <h1 className="text-2xl font-semibold">{fullName}</h1>
               <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
                 {lead.company_name && <span>{lead.company_name}</span>}
-                {lead.city && <span>{lead.city}</span>}
-                {lead.is_junk && <Badge variant="destructive">Junk</Badge>}
-                {lead.is_sql && <Badge className="bg-green-600">SQL</Badge>}
+                {lead.city && <span>· {lead.city}</span>}
+                {lead.designation && <span>· {lead.designation}</span>}
+                {lead.is_junk && <Badge variant="destructive" className="text-xs">Junk</Badge>}
+                {lead.is_sql && <Badge className="bg-green-600 text-xs">SQL</Badge>}
               </div>
             </div>
           </div>
-          <div className="text-right text-sm text-muted-foreground shrink-0">
-            <RupeeValue amount={lead.expected_value} className="text-base font-semibold text-foreground" />
-            {lead.stage && <p className="text-xs">{lead.stage.name}</p>}
+          <div className="text-right shrink-0">
+            {lead.expected_value ? (
+              <div>
+                <p className="text-xs text-muted-foreground">Potential deal</p>
+                <RupeeValue amount={lead.expected_value} className="text-lg font-bold text-foreground" />
+              </div>
+            ) : (
+              lead.stage && <p className="text-xs text-muted-foreground">{lead.stage.name}</p>
+            )}
           </div>
         </div>
 
+        {/* ── Next Action Card ──────────────────────────────────────── */}
+        {action && (
+          <div className={`rounded-xl border-2 px-5 py-4 flex items-start justify-between gap-4 ${actionStyle.bg} ${actionStyle.border}`}>
+            <div className="space-y-0.5">
+              <p className={`text-base font-bold ${actionStyle.text}`}>{action.label}</p>
+              <p className={`text-sm ${actionStyle.text} opacity-80`}>{action.reason}</p>
+            </div>
+            {(lead.grade === "A" || lead.grade === "B") && (
+              <Button
+                size="sm"
+                className="shrink-0"
+                onClick={() => setCallOpen(true)}
+              >
+                Log Call
+              </Button>
+            )}
+          </div>
+        )}
+
         {/* ── Score bars ────────────────────────────────────────────── */}
         <div className="rounded-lg border bg-card p-4 grid grid-cols-3 gap-4">
-          <ScoreBar value={lead.fit_score}     label="Fit Score"     type="fit"     showValue />
-          <ScoreBar value={lead.intent_score}  label="Intent Score"  type="intent"  showValue />
-          <ScoreBar value={lead.quality_score} label="Quality Score" type="quality" showValue />
+          <ScoreBar value={lead.fit_score}     label="Fit"     type="fit"     showValue />
+          <ScoreBar value={lead.intent_score}  label="Intent"  type="intent"  showValue />
+          <ScoreBar value={lead.quality_score} label="Quality" type="quality" showValue />
         </div>
 
-        {/* ── Meta ──────────────────────────────────────────────────── */}
-        <div className="rounded-lg border bg-card p-4 grid grid-cols-2 gap-3 text-sm">
+        {/* ── Contact info ──────────────────────────────────────────── */}
+        <div className="rounded-lg border bg-card p-4 grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
           <div>
-            <p className="text-muted-foreground text-xs">Phone</p>
+            <p className="text-xs text-muted-foreground">Phone</p>
             <p className="font-medium">{lead.phone}</p>
           </div>
           {lead.email && (
             <div>
-              <p className="text-muted-foreground text-xs">Email</p>
+              <p className="text-xs text-muted-foreground">Email</p>
               <p className="font-medium truncate">{lead.email}</p>
             </div>
           )}
           {lead.source && (
             <div>
-              <p className="text-muted-foreground text-xs">Source</p>
+              <p className="text-xs text-muted-foreground">Source</p>
               <p className="font-medium">{lead.source.name}</p>
+            </div>
+          )}
+          {lead.stage && (
+            <div>
+              <p className="text-xs text-muted-foreground">Stage</p>
+              <p className="font-medium">{lead.stage.name}</p>
+            </div>
+          )}
+          {lead.state && (
+            <div>
+              <p className="text-xs text-muted-foreground">State</p>
+              <p className="font-medium">{lead.state}</p>
             </div>
           )}
           {lead.speed_to_lead_hours != null && (
             <div>
-              <p className="text-muted-foreground text-xs">Speed to Lead</p>
+              <p className="text-xs text-muted-foreground">Speed to lead</p>
               <p className="font-medium">{formatDuration(lead.speed_to_lead_hours)}</p>
             </div>
           )}
           <div>
-            <p className="text-muted-foreground text-xs">Added</p>
+            <p className="text-xs text-muted-foreground">Added</p>
             <p className="font-medium">{timeAgo(lead.imported_at ?? lead.created_at)}</p>
           </div>
           {lead.first_contact_at && (
             <div>
-              <p className="text-muted-foreground text-xs">First Contact</p>
+              <p className="text-xs text-muted-foreground">First contact</p>
               <p className="font-medium">{timeAgo(lead.first_contact_at)}</p>
             </div>
           )}
         </div>
 
-        {/* ── NBA Banner ────────────────────────────────────────────── */}
-        {lead.nba && (
-          <div className="rounded-lg border-l-4 border-primary bg-primary/5 px-4 py-3">
-            <p className="text-sm font-semibold">Next Best Action</p>
-            <p className="text-sm">{lead.nba.action}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">{lead.nba.reason}</p>
-          </div>
-        )}
-
         {/* ── Inquiry text ──────────────────────────────────────────── */}
         {lead.inquiry_text && (
-          <div className="rounded-lg border bg-card p-4">
-            <p className="text-xs text-muted-foreground mb-1">Inquiry</p>
-            <p className="text-sm">{lead.inquiry_text}</p>
+          <div className="rounded-lg border bg-card px-4 py-3">
+            <p className="text-xs text-muted-foreground mb-1.5">Inquiry / Notes</p>
+            <p className="text-sm leading-relaxed">{lead.inquiry_text}</p>
           </div>
         )}
 
@@ -175,61 +239,55 @@ export default function LeadRecordPage() {
           <Button variant="outline" onClick={() => setWaOpen(true)}>Log WhatsApp</Button>
           <Button variant="outline" onClick={() => setMarkingWon(true)}>Mark Won</Button>
           <Button variant="outline" onClick={() => setMarkingLost(true)}>Mark Lost</Button>
-          <Button variant="ghost" onClick={handleMarkJunk}>Mark Junk</Button>
+          <Button variant="ghost" size="sm" onClick={handleMarkJunk}>Mark Junk</Button>
         </div>
 
-        {/* ── Activity Timeline + WhatsApp Tabs ────────────────────── */}
+        {/* ── Activity Timeline ─────────────────────────────────────── */}
         <div className="space-y-3">
           <div className="flex gap-4 border-b">
-            {["timeline", "whatsapp"].map((tab) => (
+            {(["timeline", "whatsapp"] as const).map((tab) => (
               <button
                 key={tab}
-                onClick={() => setActiveTab(tab as "timeline" | "whatsapp")}
+                onClick={() => setActiveTab(tab)}
                 className={`pb-2 text-sm font-medium border-b-2 transition-colors ${
                   activeTab === tab
                     ? "border-foreground text-foreground"
                     : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {tab === "timeline" ? "Activity Timeline" : "WhatsApp"}
+                {tab === "timeline" ? "Activity" : "WhatsApp"}
               </button>
             ))}
           </div>
 
           {activeTab === "timeline" && (
-            <>
-              {lead.signals && lead.signals.length > 0 ? (
-                <div className="space-y-2">
-                  {lead.signals.map((signal: {
-                    id: string
-                    signal_type: string
-                    signal_value: number
-                    intent_score_before: number
-                    intent_score_after: number
-                    created_at: string
-                  }) => {
-                    const meta = SIGNAL_LABELS[signal.signal_type] ?? { label: signal.signal_type, positive: signal.signal_value > 0 }
-                    const delta = signal.intent_score_after - signal.intent_score_before
-                    return (
-                      <div key={signal.id} className="flex items-start gap-3 text-sm">
-                        <div className={`mt-0.5 h-2 w-2 rounded-full shrink-0 ${meta.positive ? "bg-green-500" : "bg-red-400"}`} />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium leading-snug">{meta.label}</p>
-                          <p className="text-xs text-muted-foreground">{timeAgo(signal.created_at)}</p>
-                        </div>
-                        {delta !== 0 && (
-                          <span className={`text-xs font-medium shrink-0 tabular-nums ${delta > 0 ? "text-green-600" : "text-red-500"}`}>
-                            {delta > 0 ? "+" : ""}{delta}
-                          </span>
-                        )}
+            lead.signals && lead.signals.length > 0 ? (
+              <div className="space-y-2">
+                {lead.signals.map((signal: {
+                  id: string; signal_type: string; signal_value: number
+                  intent_score_before: number; intent_score_after: number; created_at: string
+                }) => {
+                  const meta  = SIGNAL_LABELS[signal.signal_type] ?? { label: signal.signal_type, positive: signal.signal_value > 0 }
+                  const delta = signal.intent_score_after - signal.intent_score_before
+                  return (
+                    <div key={signal.id} className="flex items-start gap-3 text-sm">
+                      <div className={`mt-1 h-2 w-2 rounded-full shrink-0 ${meta.positive ? "bg-green-500" : "bg-red-400"}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium leading-snug">{meta.label}</p>
+                        <p className="text-xs text-muted-foreground">{timeAgo(signal.created_at)}</p>
                       </div>
-                    )
-                  })}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">No activity logged yet.</p>
-              )}
-            </>
+                      {delta !== 0 && (
+                        <span className={`text-xs font-medium shrink-0 tabular-nums ${delta > 0 ? "text-green-600" : "text-red-500"}`}>
+                          {delta > 0 ? "+" : ""}{delta}
+                        </span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No activity logged yet.</p>
+            )
           )}
 
           {activeTab === "whatsapp" && (
@@ -237,27 +295,30 @@ export default function LeadRecordPage() {
           )}
         </div>
 
-        <Separator />
-
         {/* ── Notes ─────────────────────────────────────────────────── */}
         {lead.notes && lead.notes.length > 0 && (
-          <div className="space-y-2">
-            <h2 className="text-base font-semibold">Notes</h2>
-            {lead.notes.map((note: { id: string; content: string; created_at: string }) => (
-              <div key={note.id} className="rounded-md border bg-card px-4 py-3 text-sm">
-                <p>{note.content}</p>
-                <p className="text-xs text-muted-foreground mt-1">{timeAgo(note.created_at)}</p>
-              </div>
-            ))}
-          </div>
+          <>
+            <Separator />
+            <div className="space-y-2">
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Rep Notes</h2>
+              {lead.notes.map((note: { id: string; content: string; created_at: string; user?: { first_name: string; last_name: string } }) => (
+                <div key={note.id} className="rounded-md border bg-card px-4 py-3 text-sm">
+                  <p className="leading-relaxed">{note.content}</p>
+                  <p className="text-xs text-muted-foreground mt-1.5">
+                    {note.user ? `${note.user.first_name} ${note.user.last_name ?? ""}`.trim() + " · " : ""}
+                    {timeAgo(note.created_at)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
 
       {/* Modals */}
-      <LogCallModal    open={callOpen} onClose={() => setCallOpen(false)} leadId={leadId} leadName={fullName} />
-      <LogWhatsAppModal open={waOpen}  onClose={() => setWaOpen(false)}   leadId={leadId} leadName={fullName} />
+      <LogCallModal     open={callOpen} onClose={() => setCallOpen(false)} leadId={leadId} leadName={fullName} />
+      <LogWhatsAppModal open={waOpen}   onClose={() => setWaOpen(false)}   leadId={leadId} leadName={fullName} />
 
-      {/* Won / Lost inline — simplified (full modal in Phase 9) */}
       {markingWon && (
         <WonModal leadId={leadId} onClose={() => setMarkingWon(false)}
           onSuccess={() => { queryClient.invalidateQueries({ queryKey: ["lead", leadId] }); setMarkingWon(false) }}
@@ -272,7 +333,91 @@ export default function LeadRecordPage() {
   )
 }
 
-// ── Inline Won Modal ──────────────────────────────────────────────────────
+// ── WhatsApp Tab ──────────────────────────────────────────────────────────────
+
+const WA_SIGNAL_TYPES = [
+  "WA_REPLIED_1H", "WA_REPLIED_SAME_DAY", "WA_REPLIED_NEXT_DAY",
+  "WA_NO_REPLY_24H", "WA_NO_REPLY_48H", "WA_BLOCKED",
+  "WA_TAG_NEGOTIATING", "WA_TAG_SITE_VISIT", "WA_TAG_COMPARING", "WA_TAG_NOT_INTERESTED",
+]
+
+const WA_STAGE_LABELS: Record<string, string> = {
+  NOT_STARTED: "Not started",
+  INITIATED:   "Message sent",
+  REPLIED:     "Replied",
+  NEGOTIATING: "Negotiating",
+  SITE_VISIT:  "Site visit requested",
+  COMPARING:   "Comparing options",
+  CLOSED:      "Closed",
+}
+
+function WhatsAppTab({ signals, onLog }: {
+  signals: { id: string; signal_type: string; signal_value: number; intent_score_before: number; intent_score_after: number; created_at: string }[]
+  onLog: () => void
+}) {
+  const waSignals = signals.filter((s) => WA_SIGNAL_TYPES.includes(s.signal_type))
+
+  let waStage = "NOT_STARTED"
+  for (const s of [...waSignals].reverse()) {
+    if (s.signal_type === "WA_TAG_NEGOTIATING")   { waStage = "NEGOTIATING"; break }
+    if (s.signal_type === "WA_TAG_SITE_VISIT")    { waStage = "SITE_VISIT";  break }
+    if (s.signal_type === "WA_TAG_COMPARING")     { waStage = "COMPARING";   break }
+    if (s.signal_type === "WA_TAG_NOT_INTERESTED"){ waStage = "CLOSED";      break }
+    if (s.signal_type.startsWith("WA_REPLIED"))   { waStage = "REPLIED";     break }
+    if (s.signal_type.startsWith("WA_NO_REPLY") || s.signal_type === "WA_BLOCKED") {
+      if (waStage === "NOT_STARTED") waStage = "INITIATED"
+    }
+  }
+  if (waSignals.length > 0 && waStage === "NOT_STARTED") waStage = "INITIATED"
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <span className="text-xs text-muted-foreground">WA Stage</span>
+        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+          ["REPLIED","NEGOTIATING","SITE_VISIT"].includes(waStage) ? "bg-green-100 text-green-800"
+          : waStage === "CLOSED"    ? "bg-red-100 text-red-800"
+          : waStage === "COMPARING" ? "bg-yellow-100 text-yellow-800"
+          : "bg-muted text-muted-foreground"
+        }`}>
+          {WA_STAGE_LABELS[waStage] ?? waStage}
+        </span>
+      </div>
+
+      {waSignals.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No WhatsApp interactions logged yet.</p>
+      ) : (
+        <div className="space-y-2">
+          {waSignals.map((s) => {
+            const meta  = SIGNAL_LABELS[s.signal_type] ?? { label: s.signal_type, positive: s.signal_value > 0 }
+            const delta = s.intent_score_after - s.intent_score_before
+            return (
+              <div key={s.id} className="flex items-start gap-3 text-sm rounded-lg bg-muted/30 px-3 py-2">
+                <div className={`mt-1 h-2 w-2 rounded-full shrink-0 ${meta.positive ? "bg-green-500" : "bg-red-400"}`} />
+                <div className="flex-1">
+                  <p className="font-medium">{meta.label}</p>
+                  <p className="text-xs text-muted-foreground">{timeAgo(s.created_at)}</p>
+                </div>
+                {delta !== 0 && (
+                  <span className={`text-xs font-medium tabular-nums ${delta > 0 ? "text-green-600" : "text-red-500"}`}>
+                    {delta > 0 ? "+" : ""}{delta}
+                  </span>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      <button onClick={onLog} className="text-sm text-primary hover:underline">
+        + Log WhatsApp interaction
+      </button>
+    </div>
+  )
+}
+
+// ── Won Modal ─────────────────────────────────────────────────────────────────
+
 function WonModal({ leadId, onClose, onSuccess }: { leadId: string; onClose: () => void; onSuccess: () => void }) {
   const [value, setValue]   = useState("")
   const [reason, setReason] = useState("")
@@ -282,9 +427,9 @@ function WonModal({ leadId, onClose, onSuccess }: { leadId: string; onClose: () 
     if (!value || !reason) { toast.error("Deal value and win reason are required"); return }
     setSaving(true)
     const res = await fetch(`/api/leads/${leadId}/won`, {
-      method: "POST",
+      method:  "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ won_value: parseInt(value), win_reason: reason }),
+      body:    JSON.stringify({ won_value: parseInt(value), win_reason: reason }),
     })
     setSaving(false)
     if (res.ok) { toast.success("Lead marked as Won!"); onSuccess() }
@@ -321,101 +466,8 @@ function WonModal({ leadId, onClose, onSuccess }: { leadId: string; onClose: () 
   )
 }
 
-// ── WhatsApp Tab ──────────────────────────────────────────────────────────
-const WA_SIGNAL_TYPES = [
-  "WA_REPLIED_1H", "WA_REPLIED_SAME_DAY", "WA_REPLIED_NEXT_DAY",
-  "WA_NO_REPLY_24H", "WA_NO_REPLY_48H", "WA_BLOCKED",
-  "WA_TAG_NEGOTIATING", "WA_TAG_SITE_VISIT", "WA_TAG_COMPARING", "WA_TAG_NOT_INTERESTED",
-]
+// ── Lost Modal ────────────────────────────────────────────────────────────────
 
-const WA_STAGE_LABELS: Record<string, string> = {
-  NOT_STARTED:  "Not started",
-  INITIATED:    "Message sent",
-  REPLIED:      "Replied",
-  NEGOTIATING:  "Negotiating",
-  SITE_VISIT:   "Site visit requested",
-  COMPARING:    "Comparing options",
-  CLOSED:       "Closed",
-}
-
-function WhatsAppTab({
-  signals,
-  onLog,
-}: {
-  signals: { id: string; signal_type: string; signal_value: number; intent_score_before: number; intent_score_after: number; created_at: string }[]
-  onLog: () => void
-}) {
-  const waSignals = signals.filter((s) => WA_SIGNAL_TYPES.includes(s.signal_type))
-
-  // Derive WA stage from signal history
-  let waStage = "NOT_STARTED"
-  for (const s of [...waSignals].reverse()) {
-    if (s.signal_type === "WA_TAG_NEGOTIATING")    { waStage = "NEGOTIATING";  break }
-    if (s.signal_type === "WA_TAG_SITE_VISIT")      { waStage = "SITE_VISIT";   break }
-    if (s.signal_type === "WA_TAG_COMPARING")       { waStage = "COMPARING";    break }
-    if (s.signal_type === "WA_TAG_NOT_INTERESTED")  { waStage = "CLOSED";       break }
-    if (s.signal_type.startsWith("WA_REPLIED"))     { waStage = "REPLIED";      break }
-    if (s.signal_type.startsWith("WA_NO_REPLY") || s.signal_type === "WA_BLOCKED") {
-      if (waStage === "NOT_STARTED") waStage = "INITIATED"
-    }
-  }
-  if (waSignals.length > 0 && waStage === "NOT_STARTED") waStage = "INITIATED"
-
-  return (
-    <div className="space-y-4">
-      {/* Stage pill */}
-      <div className="flex items-center gap-3">
-        <span className="text-xs text-muted-foreground">WA Stage</span>
-        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-          waStage === "REPLIED" || waStage === "NEGOTIATING" || waStage === "SITE_VISIT"
-            ? "bg-green-100 text-green-800"
-            : waStage === "CLOSED"
-            ? "bg-red-100 text-red-800"
-            : waStage === "COMPARING"
-            ? "bg-yellow-100 text-yellow-800"
-            : "bg-muted text-muted-foreground"
-        }`}>
-          {WA_STAGE_LABELS[waStage] ?? waStage}
-        </span>
-      </div>
-
-      {/* Conversation log */}
-      {waSignals.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No WhatsApp interactions logged yet.</p>
-      ) : (
-        <div className="space-y-2">
-          {waSignals.map((s) => {
-            const meta    = SIGNAL_LABELS[s.signal_type] ?? { label: s.signal_type, positive: s.signal_value > 0 }
-            const delta   = s.intent_score_after - s.intent_score_before
-            return (
-              <div key={s.id} className="flex items-start gap-3 text-sm rounded-lg bg-muted/30 px-3 py-2">
-                <div className={`mt-1 h-2 w-2 rounded-full shrink-0 ${meta.positive ? "bg-green-500" : "bg-red-400"}`} />
-                <div className="flex-1">
-                  <p className="font-medium">{meta.label}</p>
-                  <p className="text-xs text-muted-foreground">{timeAgo(s.created_at)}</p>
-                </div>
-                {delta !== 0 && (
-                  <span className={`text-xs font-medium tabular-nums ${delta > 0 ? "text-green-600" : "text-red-500"}`}>
-                    {delta > 0 ? "+" : ""}{delta}
-                  </span>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      <button
-        onClick={onLog}
-        className="text-sm text-primary hover:underline"
-      >
-        + Log WhatsApp interaction
-      </button>
-    </div>
-  )
-}
-
-// ── Inline Lost Modal ─────────────────────────────────────────────────────
 function LostModal({ leadId, onClose, onSuccess }: { leadId: string; onClose: () => void; onSuccess: () => void }) {
   const [reason, setReason] = useState("")
   const [saving, setSaving] = useState(false)
@@ -424,9 +476,9 @@ function LostModal({ leadId, onClose, onSuccess }: { leadId: string; onClose: ()
     if (!reason) { toast.error("Loss reason is required"); return }
     setSaving(true)
     const res = await fetch(`/api/leads/${leadId}/lost`, {
-      method: "POST",
+      method:  "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ loss_reason: reason }),
+      body:    JSON.stringify({ loss_reason: reason }),
     })
     setSaving(false)
     if (res.ok) { toast.success("Lead marked as Lost"); onSuccess() }

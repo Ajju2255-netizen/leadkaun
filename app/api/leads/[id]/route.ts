@@ -2,6 +2,7 @@ import { z } from "zod"
 import { prisma } from "@/lib/prisma"
 import { requireAuth, requireRole, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError, parseBody, NOT_FOUND } from "@/lib/api/response"
+import { getNextAction, buildActionReason } from "@/lib/scoring/next-action"
 
 type Params = { params: { id: string } }
 
@@ -47,7 +48,21 @@ export async function GET(_req: Request, { params }: Params) {
     })
 
     if (!lead) return NOT_FOUND("Lead")
-    return apiSuccess(lead)
+
+    const action = getNextAction(lead.grade)
+    return apiSuccess({
+      ...lead,
+      next_action: {
+        ...action,
+        reason: buildActionReason({
+          grade:        lead.grade,
+          fit_score:    lead.fit_score,
+          intent_score: lead.intent_score,
+          quality_score: lead.quality_score,
+          inquiry_text: lead.inquiry_text,
+        }),
+      },
+    })
   } catch (e) {
     return handleAuthError(e) ?? apiError("Internal server error", "SERVER_ERROR", 500)
   }

@@ -137,7 +137,12 @@ export default function LeadsPage() {
   })
   const batches = useMemo(() => batchData?.jobs ?? [], [batchData])
 
-  const leads = useMemo(() => data?.leads ?? [], [data])
+  const leads     = useMemo(() => data?.leads ?? [], [data])
+  const hotLeads  = useMemo(() => leads.filter((l) => l.grade === "A"), [leads])
+  const hotValue  = useMemo(
+    () => hotLeads.reduce((sum, l) => sum + (l.expected_value ?? 0), 0),
+    [hotLeads],
+  )
 
   const toggleSelect = useCallback((id: string) => {
     setSelected((prev) => {
@@ -194,6 +199,37 @@ export default function LeadsPage() {
           </div>
         )}
       </div>
+
+      {/* Priority strip — visible when hot leads exist in current view */}
+      {hotLeads.length > 0 && grade === "all" && (
+        <div className="rounded-xl border-2 border-green-300 bg-green-50 px-4 py-3 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="text-lg">🔥</span>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-green-800">
+                {hotLeads.length} lead{hotLeads.length > 1 ? "s" : ""} need immediate attention
+              </p>
+              <p className="text-xs text-green-700 truncate">
+                {hotLeads.slice(0, 3).map((l) => `${l.first_name} ${l.last_name ?? ""}`.trim()).join(" · ")}
+                {hotLeads.length > 3 && ` +${hotLeads.length - 3} more`}
+                {hotValue > 0 && (
+                  <span className="ml-1 font-medium">
+                    · ₹{hotValue >= 100000
+                      ? `${(hotValue / 100000).toFixed(1)}L`
+                      : hotValue.toLocaleString("en-IN")} at stake
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setGrade("A")}
+            className="shrink-0 text-xs font-medium text-green-700 hover:text-green-900 underline"
+          >
+            Show only →
+          </button>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex items-center gap-3 flex-wrap">
