@@ -17,13 +17,14 @@ export async function GET(req: Request) {
     const session = await requireAuth()
     const { searchParams } = new URL(req.url)
 
-    const grade    = searchParams.get("grade") ?? undefined
-    const stageId  = searchParams.get("stage") ?? undefined
-    const sourceId = searchParams.get("source") ?? undefined
-    const repId    = searchParams.get("rep") ?? undefined
-    const search   = searchParams.get("search") ?? undefined
-    const page     = Math.max(1, parseInt(searchParams.get("page") ?? "1"))
-    const isJunk   = searchParams.get("junk") === "true"
+    const grade       = searchParams.get("grade") ?? undefined
+    const stageId     = searchParams.get("stage") ?? undefined
+    const sourceId    = searchParams.get("source") ?? undefined
+    const repId       = searchParams.get("rep") ?? undefined
+    const search      = searchParams.get("search") ?? undefined
+    const importJobId = searchParams.get("batch") ?? undefined
+    const page        = Math.max(1, parseInt(searchParams.get("page") ?? "1"))
+    const isJunk      = searchParams.get("junk") === "true"
 
     // REP can only see their own leads
     const assignedFilter =
@@ -36,9 +37,10 @@ export async function GET(req: Request) {
     const where = {
       account_id: session.account.id,
       ...assignedFilter,
-      ...(grade    ? { grade: grade as "A" | "B" | "C" | "D" | "E" | "F" } : {}),
-      ...(stageId  ? { stage_id: stageId }      : {}),
-      ...(sourceId ? { source_id: sourceId }    : {}),
+      ...(grade       ? { grade: grade as "A" | "B" | "C" | "D" | "E" | "F" } : {}),
+      ...(stageId     ? { stage_id: stageId }         : {}),
+      ...(sourceId    ? { source_id: sourceId }        : {}),
+      ...(importJobId ? { import_job_id: importJobId } : {}),
       is_junk: isJunk,
       ...(search
         ? {

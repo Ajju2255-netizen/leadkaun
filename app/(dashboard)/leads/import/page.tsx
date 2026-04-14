@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { ChevronLeft, Upload, CheckCircle2, AlertCircle, Clock, Zap, ArrowRight } from "lucide-react"
+import { ChevronLeft, Upload, CheckCircle2, AlertCircle, Clock, Zap, ArrowRight, Star, IndianRupee } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
 
@@ -22,16 +22,21 @@ interface ErrorDetail {
 }
 
 interface ImportJob {
-  id:           string
-  status:       "PENDING" | "PROCESSING" | "COMPLETE" | "FAILED"
-  total_rows:   number | null
-  inserted:     number
-  duplicates:   number
-  errors:       number
-  progress_pct: number
-  error_detail: ErrorDetail | null
-  created_at:   string
-  completed_at: string | null
+  id:                string
+  status:            "PENDING" | "PROCESSING" | "COMPLETE" | "FAILED"
+  name:              string | null
+  file_name:         string | null
+  source_name:       string | null
+  total_rows:        number | null
+  inserted:          number
+  duplicates:        number
+  errors:            number
+  progress_pct:      number
+  high_intent_count: number
+  total_value:       number
+  error_detail:      ErrorDetail | null
+  created_at:        string
+  completed_at:      string | null
 }
 
 // ── History fetch ─────────────────────────────────────────────────────────────
@@ -68,15 +73,24 @@ const CARD_SHADOW = "shadow-[0_1px_3px_rgba(15,23,42,0.06),0_1px_2px_rgba(15,23,
 
 // ── Upload section ────────────────────────────────────────────────────────────
 
-function UploadSection({ onComplete }: { onComplete: () => void }) {
+function UploadSection({ onComplete }: { onComplete: (jobId: string) => void }) {
   const router = useRouter()
-  const [uploading, setUploading] = useState(false)
-  const [sources,   setSources]   = useState<LeadSource[]>([])
-  const [stages,    setStages]    = useState<PipelineStage[]>([])
-  const [sourceId,  setSourceId]  = useState<string>("")
-  const [stageId,   setStageId]   = useState<string>("")
-  const [progress,  setProgress]  = useState<number | null>(null)
-  const [result,    setResult]    = useState<{ inserted: number; duplicates: number; errors: number; errorDetail: ErrorDetail | null } | null>(null)
+  const [uploading,    setUploading]    = useState(false)
+  const [sources,      setSources]      = useState<LeadSource[]>([])
+  const [stages,       setStages]       = useState<PipelineStage[]>([])
+  const [sourceId,     setSourceId]     = useState<string>("")
+  const [stageId,      setStageId]      = useState<string>("")
+  const [sessionName,  setSessionName]  = useState<string>("")
+  const [progress,     setProgress]     = useState<number | null>(null)
+  const [result,       setResult]       = useState<{
+    jobId:            string
+    inserted:         number
+    duplicates:       number
+    errors:           number
+    high_intent_count: number
+    total_value:      number
+    errorDetail:      ErrorDetail | null
+  } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   // Fetch sources + stages on mount
@@ -120,6 +134,7 @@ function UploadSection({ onComplete }: { onComplete: () => void }) {
       form.append("file",      file)
       form.append("source_id", sourceId)
       form.append("stage_id",  stageId)
+      if (sessionName.trim()) form.append("name", sessionName.trim())
 
       const res = await fetch("/api/import/csv", { method: "POST", body: form, credentials: "include" })
 
@@ -143,10 +158,13 @@ function UploadSection({ onComplete }: { onComplete: () => void }) {
 
       if (job) {
         setResult({
-          inserted:    job.inserted,
-          duplicates:  job.duplicates,
-          errors:      job.errors,
-          errorDetail: job.error_detail ?? null,
+          jobId:             jobId,
+          inserted:          job.inserted,
+          duplicates:        job.duplicates,
+          errors:            job.errors,
+          high_intent_count: job.high_intent_count ?? 0,
+          total_value:       job.total_value ?? 0,
+          errorDetail:       job.error_detail ?? null,
         })
         if (job.inserted > 0) {
           toast.success(`Import complete — ${job.inserted} lead${job.inserted === 1 ? "" : "s"} added`)
@@ -155,7 +173,7 @@ function UploadSection({ onComplete }: { onComplete: () => void }) {
         }
       }
 
-      onComplete()
+      onComplete(jobId)
     } catch {
       clearInterval(ticker)
       toast.error("Unexpected error. Please try again.")
@@ -180,6 +198,26 @@ function UploadSection({ onComplete }: { onComplete: () => void }) {
           Required columns: <strong className="text-slate-600">Name</strong> and{" "}
           <strong className="text-slate-600">Phone</strong>. All other fields are optional.
         </p>
+      </div>
+
+      {/* Session name */}
+      <div className="space-y-1.5">
+        <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide block">
+          Batch Name <span className="font-normal text-slate-400 normal-case">(optional)</span>
+        </label>
+        <input
+          type="text"
+          value={sessionName}
+          onChange={(e) => setSessionName(e.target.value)}
+          placeholder="e.g. MagicBricks April, Cold Outreach W15…"
+          disabled={uploading}
+          className={`
+            w-full h-9 px-3 rounded-lg border border-slate-200 bg-white
+            text-[13px] text-slate-800 placeholder:text-slate-400
+            outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100
+            transition-colors disabled:opacity-50 disabled:cursor-not-allowed
+          `}
+        />
       </div>
 
       {/* Source + Stage */}
@@ -282,19 +320,39 @@ function UploadSection({ onComplete }: { onComplete: () => void }) {
                 </div>
               </div>
 
-              {/* Stats row */}
-              <div className="flex gap-4 text-center">
-                <div className="flex-1 rounded-lg bg-white/70 py-2">
-                  <p className="text-[18px] font-bold text-emerald-700 tabular-nums">{result.inserted}</p>
-                  <p className="text-[11px] text-emerald-600">Added</p>
+              {/* Stats row — 5 cells */}
+              <div className="grid grid-cols-5 gap-2 text-center">
+                <div className="rounded-lg bg-white/70 py-2">
+                  <p className="text-[17px] font-bold text-emerald-700 tabular-nums">{result.inserted}</p>
+                  <p className="text-[10px] text-emerald-600">Added</p>
                 </div>
-                <div className="flex-1 rounded-lg bg-white/70 py-2">
-                  <p className="text-[18px] font-bold text-amber-600 tabular-nums">{result.duplicates}</p>
-                  <p className="text-[11px] text-amber-600">Duplicates</p>
+                <div className="rounded-lg bg-white/70 py-2">
+                  <p className="text-[17px] font-bold text-amber-600 tabular-nums">{result.duplicates}</p>
+                  <p className="text-[10px] text-amber-600">Dupes</p>
                 </div>
-                <div className="flex-1 rounded-lg bg-white/70 py-2">
-                  <p className="text-[18px] font-bold text-slate-500 tabular-nums">{result.errors}</p>
-                  <p className="text-[11px] text-slate-400">Skipped</p>
+                <div className="rounded-lg bg-white/70 py-2">
+                  <p className="text-[17px] font-bold text-slate-500 tabular-nums">{result.errors}</p>
+                  <p className="text-[10px] text-slate-400">Skipped</p>
+                </div>
+                <div className="rounded-lg bg-white/70 py-2 flex flex-col items-center">
+                  <span className="flex items-center gap-0.5">
+                    <Star className="w-3 h-3 text-indigo-500 fill-indigo-500" />
+                    <p className="text-[17px] font-bold text-indigo-700 tabular-nums">{result.high_intent_count}</p>
+                  </span>
+                  <p className="text-[10px] text-indigo-600">Hot leads</p>
+                </div>
+                <div className="rounded-lg bg-white/70 py-2 flex flex-col items-center">
+                  <span className="flex items-center gap-0.5">
+                    <IndianRupee className="w-3 h-3 text-teal-600" />
+                    <p className="text-[17px] font-bold text-teal-700 tabular-nums">
+                      {result.total_value >= 100000
+                        ? `${(result.total_value / 100000).toFixed(1)}L`
+                        : result.total_value >= 1000
+                        ? `${(result.total_value / 1000).toFixed(0)}K`
+                        : result.total_value || "—"}
+                    </p>
+                  </span>
+                  <p className="text-[10px] text-teal-600">Pipeline</p>
                 </div>
               </div>
 
@@ -307,10 +365,10 @@ function UploadSection({ onComplete }: { onComplete: () => void }) {
                   Start executing <ArrowRight className="w-3.5 h-3.5" />
                 </button>
                 <Link
-                  href="/leads"
+                  href={`/leads?batch=${result.jobId}`}
                   className="h-9 px-4 rounded-lg border border-indigo-200 bg-white/60 hover:bg-white text-indigo-700 text-[13px] font-medium flex items-center transition-colors"
                 >
-                  View leads
+                  View this batch
                 </Link>
               </div>
 
@@ -368,35 +426,49 @@ function UploadSection({ onComplete }: { onComplete: () => void }) {
   )
 }
 
-// ── History row (with expandable error detail) ────────────────────────────────
+// ── History row ────────────────────────────────────────────────────────────────
 
 function HistoryRow({ job }: { job: ImportJob }) {
+  const valueLabel = job.total_value >= 100000
+    ? `₹${(job.total_value / 100000).toFixed(1)}L`
+    : job.total_value >= 1000
+    ? `₹${(job.total_value / 1000).toFixed(0)}K`
+    : job.total_value > 0 ? `₹${job.total_value}` : "—"
+
   return (
-    <>
-      <tr className="border-b border-slate-50 last:border-0">
-        <td className="py-3 pr-4 text-[12px] text-slate-400 whitespace-nowrap">
-          {new Date(job.created_at).toLocaleString("en-IN", {
-            day: "2-digit", month: "short", year: "numeric",
-            hour: "2-digit", minute: "2-digit",
-          })}
-        </td>
-        <td className="py-3 pr-4">
-          <StatusBadge status={job.status} />
-        </td>
-        <td className="py-3 pr-4 text-right text-[13px] tabular-nums text-slate-600">
-          {job.total_rows ?? "—"}
-        </td>
-        <td className="py-3 pr-4 text-right text-[13px] tabular-nums font-semibold text-emerald-700">
-          {job.inserted}
-        </td>
-        <td className="py-3 pr-4 text-right text-[13px] tabular-nums text-amber-600">
-          {job.duplicates}
-        </td>
-        <td className="py-3 text-right text-[13px] tabular-nums text-slate-400">
-          {job.errors}
-        </td>
-      </tr>
-    </>
+    <tr className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors">
+      <td className="py-3 pr-4">
+        <Link href={`/leads?batch=${job.id}`} className="group">
+          <p className="text-[13px] font-semibold text-slate-800 group-hover:text-indigo-600 transition-colors">
+            {job.name ?? "Unnamed import"}
+          </p>
+          {job.file_name && (
+            <p className="text-[11px] text-slate-400 mt-0.5">{job.file_name}</p>
+          )}
+        </Link>
+      </td>
+      <td className="py-3 pr-4 text-[12px] text-slate-400 whitespace-nowrap">
+        {new Date(job.created_at).toLocaleString("en-IN", {
+          day: "2-digit", month: "short",
+          hour: "2-digit", minute: "2-digit",
+        })}
+      </td>
+      <td className="py-3 pr-4">
+        <StatusBadge status={job.status} />
+      </td>
+      <td className="py-3 pr-4 text-right text-[13px] tabular-nums font-semibold text-emerald-700">
+        {job.inserted}
+      </td>
+      <td className="py-3 pr-4 text-right text-[13px] tabular-nums text-indigo-600 font-semibold">
+        {job.high_intent_count > 0 ? job.high_intent_count : "—"}
+      </td>
+      <td className="py-3 pr-4 text-right text-[13px] tabular-nums text-teal-700">
+        {valueLabel}
+      </td>
+      <td className="py-3 text-right text-[13px] tabular-nums text-amber-600">
+        {job.duplicates > 0 ? job.duplicates : "—"}
+      </td>
+    </tr>
   )
 }
 
@@ -476,12 +548,13 @@ function HistorySection({ refreshKey }: { refreshKey: number }) {
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-100">
+                <th className="text-left py-2 pr-4 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Batch</th>
                 <th className="text-left py-2 pr-4 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Date</th>
                 <th className="text-left py-2 pr-4 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Status</th>
-                <th className="text-right py-2 pr-4 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Total</th>
                 <th className="text-right py-2 pr-4 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Added</th>
-                <th className="text-right py-2 pr-4 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Dupes</th>
-                <th className="text-right py-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Errors</th>
+                <th className="text-right py-2 pr-4 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Hot</th>
+                <th className="text-right py-2 pr-4 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Value</th>
+                <th className="text-right py-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Dupes</th>
               </tr>
             </thead>
             <tbody>
@@ -536,7 +609,7 @@ export default function ImportPage() {
       </div>
 
       {/* Upload */}
-      <UploadSection onComplete={() => setRefreshKey((k) => k + 1)} />
+      <UploadSection onComplete={(_jobId) => setRefreshKey((k) => k + 1)} />
 
       {/* Regrade */}
       <RegradeButton />

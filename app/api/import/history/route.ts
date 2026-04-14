@@ -6,6 +6,8 @@ import { apiSuccess, apiError } from "@/lib/api/response"
  * GET /api/import/history
  *
  * Returns the last 50 import jobs for the current account, most recent first.
+ * Includes session identity fields (name, file_name, source name)
+ * and post-import insight counts (high_intent_count, total_value).
  */
 export async function GET() {
   try {
@@ -16,20 +18,40 @@ export async function GET() {
       orderBy: { created_at: "desc" },
       take:    50,
       select: {
-        id:           true,
-        status:       true,
-        total_rows:   true,
-        inserted:     true,
-        duplicates:   true,
-        errors:       true,
-        progress_pct: true,
-        error_detail: true,
-        created_at:   true,
-        completed_at: true,
+        id:                true,
+        status:            true,
+        name:              true,
+        file_name:         true,
+        source_id:         true,
+        total_rows:        true,
+        inserted:          true,
+        duplicates:        true,
+        errors:            true,
+        progress_pct:      true,
+        high_intent_count: true,
+        total_value:       true,
+        error_detail:      true,
+        created_at:        true,
+        completed_at:      true,
       },
     })
 
-    return apiSuccess({ jobs })
+    // Attach source names in one query
+    const sourceIds = Array.from(new Set(jobs.map((j) => j.source_id).filter(Boolean))) as string[]
+    const sources   = sourceIds.length
+      ? await prisma.leadSource.findMany({
+          where:  { id: { in: sourceIds }, account_id: session.account.id },
+          select: { id: true, name: true },
+        })
+      : []
+    const sourceMap = Object.fromEntries(sources.map((s) => [s.id, s.name]))
+
+    const enriched = jobs.map((j) => ({
+      ...j,
+      source_name: j.source_id ? (sourceMap[j.source_id] ?? null) : null,
+    }))
+
+    return apiSuccess({ jobs: enriched })
   } catch (err) {
     const authResponse = handleAuthError(err)
     if (authResponse) return authResponse

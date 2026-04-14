@@ -52,6 +52,8 @@ export async function POST(req: Request) {
     const sourceId = formData.get("source_id") as string | null
     const stageId  = formData.get("stage_id") as string | null
 
+    const nameParam = (formData.get("name") as string | null)?.trim() || null
+
     if (!file)     return apiError("No file provided", "MISSING_FILE", 422)
     if (!sourceId) return apiError("source_id is required", "MISSING_SOURCE", 422)
     if (!stageId)  return apiError("stage_id is required", "MISSING_STAGE", 422)
@@ -119,6 +121,12 @@ export async function POST(req: Request) {
       },
     })
 
+    // ── Auto-generate session name if not provided ──────────────────────────
+    const dateStr = new Date().toLocaleDateString("en-IN", {
+      day: "2-digit", month: "short", year: "numeric",
+    })
+    const sessionName = nameParam ?? `Import · ${dateStr} · ${source.name}`
+
     // ── Create job record ────────────────────────────────────────────────────
     const job = await prisma.importJobStatus.create({
       data: {
@@ -130,14 +138,19 @@ export async function POST(req: Request) {
         inserted:     0,
         duplicates:   0,
         errors:       0,
+        name:         sessionName,
+        file_name:    file.name,
+        source_id:    sourceId,
       },
     })
 
     // ── Process rows ─────────────────────────────────────────────────────────
-    const BATCH_SIZE  = 50
-    let inserted      = 0
-    let duplicates    = 0
-    let errors        = 0
+    const BATCH_SIZE     = 50
+    let inserted         = 0
+    let duplicates       = 0
+    let errors           = 0
+    let highIntentCount  = 0   // leads graded A or B
+    let totalValue       = 0   // sum of expected_value
     const errorLog: string[] = []   // stored in error_detail at the end
 
     for (let i = 0; i < rows.length; i += BATCH_SIZE) {
@@ -248,6 +261,7 @@ export async function POST(req: Request) {
                 pincode:                 vr.pincode,
                 source_id:               sourceId,
                 stage_id:                stageId,
+                import_job_id:           job.id,
                 inquiry_text:            vr.inquiry_text,
                 expected_value:          vr.expected_value,
                 // Scores written at creation — no separate update needed
@@ -271,6 +285,9 @@ export async function POST(req: Request) {
               },
             })
           })
+          // Track high-intent leads and total value
+          if (grade === "A" || grade === "B") highIntentCount++
+          if (vr.expected_value) totalValue += vr.expected_value
         } catch (rowErr) {
           const reason = `Row ${rowIndex} ("${vr.first_name}" / ${vr.phone}): DB error — ${String(rowErr)}`
           errors++
@@ -364,12 +381,14 @@ export async function POST(req: Request) {
     await prisma.importJobStatus.update({
       where: { id: job.id },
       data: {
-        status:       "COMPLETE",
+        status:            "COMPLETE",
         inserted,
         duplicates,
         errors,
-        progress_pct: 100,
-        completed_at: new Date(),
+        progress_pct:      100,
+        completed_at:      new Date(),
+        high_intent_count: highIntentCount,
+        total_value:       totalValue,
         ...(errorLog.length > 0 && {
           error_detail: {
             total_errors: errors,

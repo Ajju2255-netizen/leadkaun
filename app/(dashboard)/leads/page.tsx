@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo, useEffect, useRef } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { GradeBadge } from "@/components/shared/GradeBadge"
 import { RupeeValue } from "@/components/shared/RupeeValue"
@@ -37,6 +38,13 @@ interface LeadsResponse {
   pages: number
 }
 
+interface ImportBatch {
+  id:   string
+  name: string | null
+  file_name: string | null
+  created_at: string
+}
+
 async function fetchLeads(params: Record<string, string>): Promise<LeadsResponse> {
   const qs  = new URLSearchParams(params).toString()
   const res = await fetch(`/api/leads?${qs}`, { credentials: "include" })
@@ -44,17 +52,35 @@ async function fetchLeads(params: Record<string, string>): Promise<LeadsResponse
   return res.json()
 }
 
+async function fetchBatches(): Promise<{ jobs: ImportBatch[] }> {
+  const res = await fetch("/api/import/history", { credentials: "include" })
+  if (!res.ok) return { jobs: [] }
+  return res.json()
+}
+
 export default function LeadsPage() {
   const { data: session } = useCurrentUser()
   const queryClient = useQueryClient()
+  const searchParams = useSearchParams()
+  const router = useRouter()
   const isManager = session?.user.role === "ADMIN" || session?.user.role === "MANAGER"
 
+  // Initialise batch filter from URL ?batch=
   const [search, setSearch] = useState("")
   const [grade, setGrade]   = useState("all")
+  const [batch, setBatch]   = useState(searchParams.get("batch") ?? "all")
   const [page, setPage]     = useState(1)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [regrading, setRegrading] = useState(false)
   const autoRegradeRef = useRef(false)
+
+  // Clear ?batch from URL once we've read it (keeps URL clean on filter changes)
+  useEffect(() => {
+    if (searchParams.get("batch")) {
+      router.replace("/leads", { scroll: false })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     if (!isManager || autoRegradeRef.current) return
@@ -86,12 +112,22 @@ export default function LeadsPage() {
   const params: Record<string, string> = { page: String(page) }
   if (search) params.search = search
   if (grade !== "all") params.grade = grade
+  if (batch !== "all") params.batch = batch
 
   const { data, isLoading } = useQuery<LeadsResponse>({
     queryKey:  ["leads", params],
     queryFn:   () => fetchLeads(params),
     staleTime: 30_000,
   })
+
+  // Only fetch batches for managers
+  const { data: batchData } = useQuery<{ jobs: ImportBatch[] }>({
+    queryKey:  ["import-history"],
+    queryFn:   fetchBatches,
+    staleTime: 60_000,
+    enabled:   !!isManager,
+  })
+  const batches = useMemo(() => batchData?.jobs ?? [], [batchData])
 
   const leads = useMemo(() => data?.leads ?? [], [data])
 
@@ -109,6 +145,13 @@ export default function LeadsPage() {
     )
   }, [leads])
 
+  // Label for active batch filter
+  const activeBatchLabel = useMemo(() => {
+    if (batch === "all") return null
+    const found = batches.find((b) => b.id === batch)
+    return found?.name ?? found?.file_name ?? "Import batch"
+  }, [batch, batches])
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -116,6 +159,15 @@ export default function LeadsPage() {
           <h1 className="text-2xl font-semibold">All Leads</h1>
           <p className="text-sm text-muted-foreground">
             {data ? `${data.total.toLocaleString()} total` : "Loading…"}
+            {activeBatchLabel && (
+              <span className="ml-2 inline-flex items-center gap-1 text-xs font-medium text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full">
+                {activeBatchLabel}
+                <button
+                  onClick={() => { setBatch("all"); setPage(1) }}
+                  className="ml-0.5 hover:text-indigo-900"
+                >✕</button>
+              </span>
+            )}
           </p>
         </div>
         {isManager && (
@@ -154,6 +206,21 @@ export default function LeadsPage() {
             ))}
           </SelectContent>
         </Select>
+        {isManager && batches.length > 0 && (
+          <Select value={batch} onValueChange={(v) => { setBatch(v ?? "all"); setPage(1) }}>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="All batches" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All batches</SelectItem>
+              {batches.map((b) => (
+                <SelectItem key={b.id} value={b.id}>
+                  {b.name ?? b.file_name ?? new Date(b.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* Bulk action bar */}

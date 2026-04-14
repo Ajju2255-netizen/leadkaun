@@ -164,7 +164,7 @@ export default function DashboardPage() {
         <h1 className="text-[22px] font-bold text-slate-900 tracking-tight">
           Good {greeting()}, {session?.user.firstName}
         </h1>
-        <p className="text-[13px] text-slate-400 mt-0.5">Here's where things stand today.</p>
+        <p className="text-[13px] text-slate-400 mt-0.5">Here&apos;s where things stand today.</p>
       </div>
 
       {/* ── Queue preview — always first ──────────────────────────────────── */}

@@ -256,6 +256,7 @@ model Lead {
 
   // Source & Import
   source_id      String
+  import_job_id  String?
   imported_at    DateTime @default(now())
   inquiry_text   String?
   expected_value Int?     // INR
@@ -311,10 +312,11 @@ model Lead {
   updated_at DateTime @updatedAt
 
   // Relations
-  account           Account         @relation(fields: [account_id], references: [id])
-  assigned_rep      User?           @relation("AssignedRep", fields: [assigned_rep_id], references: [id])
-  source            LeadSource      @relation(fields: [source_id], references: [id])
-  stage             PipelineStage   @relation(fields: [stage_id], references: [id])
+  account           Account          @relation(fields: [account_id], references: [id])
+  assigned_rep      User?            @relation("AssignedRep", fields: [assigned_rep_id], references: [id])
+  source            LeadSource       @relation(fields: [source_id], references: [id])
+  stage             PipelineStage    @relation(fields: [stage_id], references: [id])
+  import_job        ImportJobStatus? @relation(fields: [import_job_id], references: [id])
   signals           Signal[]
   notes             LeadNote[]
   follow_up_actions FollowUpAction[]
@@ -496,14 +498,25 @@ model ImportJobStatus {
   account_id   String
   user_id      String
   status       ImportStatus @default(PENDING)
-  total_rows   Int          @default(0)
-  inserted     Int          @default(0)
-  duplicates   Int          @default(0)
-  errors       Int          @default(0)
-  progress_pct Int          @default(0)
+
+  // Session identity
+  name              String?
+  file_name         String?
+  source_id         String?
+
+  total_rows        Int      @default(0)
+  inserted          Int      @default(0)
+  duplicates        Int      @default(0)
+  errors            Int      @default(0)
+  progress_pct      Int      @default(0)
+  high_intent_count Int      @default(0)  // leads graded A or B from this import
+  total_value       Int      @default(0)  // sum of expected_value (INR)
+
   error_detail Json?
-  created_at   DateTime     @default(now())
+  created_at   DateTime  @default(now())
   completed_at DateTime?
+
+  leads Lead[]
 
   @@index([account_id])
   @@map("import_job_status")
