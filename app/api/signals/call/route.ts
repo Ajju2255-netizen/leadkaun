@@ -5,6 +5,7 @@ import { apiSuccess, apiError, parseBody, NOT_FOUND } from "@/lib/api/response"
 import { processSignalAndUpdateScores } from "@/lib/scoring/orchestrator"
 import { SIGNAL_WEIGHTS } from "@/lib/scoring/signal-weights"
 import { applyAutoStage } from "@/lib/pipeline/auto-stage"
+import { scheduleFollowUp } from "@/lib/follow-ups/schedule"
 import type { SignalType } from "@prisma/client"
 
 const CALL_SIGNAL_TYPES = [
@@ -134,7 +135,13 @@ export async function POST(req: Request) {
       }
 
       // Auto-advance pipeline stage based on call outcome
-      await applyAutoStage(lead, signalType, session.account.id, session.user.id, tx)
+      const CALL_POSITIVE: SignalType[] = ["CALL_ANSWERED_INTERESTED", "CALL_ANSWERED_CALLBACK"]
+      const advanced = await applyAutoStage(lead, signalType, session.account.id, session.user.id, tx)
+
+      // If stage didn't advance but signal is positive, schedule follow-up for current stage
+      if (!advanced && CALL_POSITIVE.includes(signalType)) {
+        await scheduleFollowUp(lead, lead.stage.key, tx)
+      }
 
       // Recompute all scores
       return processSignalAndUpdateScores(data.lead_id, session.account.id, tx)

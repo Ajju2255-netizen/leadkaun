@@ -423,9 +423,10 @@ model FollowUpAction {
   status          FollowUpStatus @default(PENDING)
   completed_at    DateTime?
   completed_by    String?
-  is_overdue      Boolean        @default(false)
-  show_tip        Boolean        @default(false)
-  tip_text        String?
+  is_overdue        Boolean        @default(false)
+  escalation_count  Int            @default(0)   // how many times this follow-up has gone overdue
+  show_tip          Boolean        @default(false)
+  tip_text          String?
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt

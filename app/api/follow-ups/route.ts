@@ -32,12 +32,13 @@ export async function GET(req: Request) {
       include: {
         lead: {
           select: {
-            id:          true,
-            first_name:  true,
-            last_name:   true,
-            grade:       true,
-            company_name: true,
-            phone:       true,
+            id:             true,
+            first_name:     true,
+            last_name:      true,
+            grade:          true,
+            company_name:   true,
+            phone:          true,
+            expected_value: true,
           },
         },
       },

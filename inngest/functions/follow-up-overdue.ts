@@ -44,13 +44,13 @@ export const followUpOverdueFn = inngest.createFunction(
 
     logger.info(`Marking ${overdueActions.length} follow-ups as overdue`)
 
-    // Mark all overdue in bulk
+    // Mark all overdue in bulk, increment escalation counter
     await step.run("mark-overdue", async () => {
       await prisma.followUpAction.updateMany({
         where: {
           id: { in: overdueActions.map((a) => a.id) },
         },
-        data: { status: "OVERDUE", is_overdue: true },
+        data: { status: "OVERDUE", is_overdue: true, escalation_count: { increment: 1 } },
       })
     })
 

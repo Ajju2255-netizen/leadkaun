@@ -1,4 +1,5 @@
 import type { SignalType, PrismaClient } from "@prisma/client"
+import { scheduleFollowUp } from "@/lib/follow-ups/schedule"
 
 type Tx = Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0]
 
@@ -23,29 +24,35 @@ const SIGNAL_TO_STAGE: Partial<Record<SignalType, AutoTransition>> = {
 
 export async function applyAutoStage(
   lead: {
-    id:       string
-    stage_id: string
-    stage:    { key: string; display_order: number; is_terminal: boolean }
+    id:              string
+    account_id:      string
+    stage_id:        string
+    stage:           { key: string; display_order: number; is_terminal: boolean }
+    assigned_rep_id: string | null
+    won_at:          Date | null
+    lost_at:         Date | null
+    is_junk:         boolean
+    is_missed:       boolean
   },
   signalType: SignalType,
   accountId:  string,
   userId:     string,
   tx:         Tx,
-): Promise<void> {
+): Promise<boolean> {
   // Never move terminal (won/lost) leads
-  if (lead.stage.is_terminal) return
+  if (lead.stage.is_terminal) return false
 
   const transition = SIGNAL_TO_STAGE[signalType]
-  if (!transition) return
+  if (!transition) return false
 
   // Find the target stage for this account
   const targetStage = await tx.pipelineStage.findFirst({
     where: { account_id: accountId, key: transition.key },
   })
-  if (!targetStage) return
+  if (!targetStage) return false
 
   // Only advance — never auto-move backward
-  if (targetStage.display_order <= lead.stage.display_order) return
+  if (targetStage.display_order <= lead.stage.display_order) return false
 
   // Move the lead
   await tx.lead.update({
@@ -66,4 +73,9 @@ export async function applyAutoStage(
       note:          `Auto: ${transition.reason}`,
     },
   })
+
+  // Schedule a follow-up for the new stage
+  await scheduleFollowUp(lead, targetStage.key, tx)
+
+  return true
 }
