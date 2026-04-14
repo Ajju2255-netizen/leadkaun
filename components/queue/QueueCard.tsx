@@ -1,33 +1,9 @@
 "use client"
 
-/*
- * QueueCard — the primary work surface for sales reps.
- *
- * Design intent:
- *   The card is the most-touched UI in the product. Every decision should
- *   reduce friction and increase confidence in the action to take.
- *
- *   Layout: grade badge anchors the eye top-left (F-pattern reading start),
- *   name/company follows, NBA surfaces the single most useful next action,
- *   score bars give signal-at-a-glance, action buttons are large enough for
- *   one-tap on mobile.
- *
- *   Grade border: a 3px left border in grade colour gives immediate peripheral
- *   awareness of priority without requiring the user to read the badge.
- *   Colour semantics match GradeBadge for consistency.
- *
- *   NBA box: slate-50 tinted, indigo text — calm but distinct. Not alarming.
- *   The brain treats soft blue-slate as "information" vs red as "danger".
- *
- *   Actions: Log Call (indigo, primary CTA) > Log WA (emerald, secondary CTA)
- *   > View (ghost). Visual weight mirrors action importance.
- */
-
 import { useState } from "react"
 import Link from "next/link"
-import { Phone, MessageCircle, ExternalLink, MapPin, Clock } from "lucide-react"
+import { Phone, MessageCircle, ExternalLink, MapPin } from "lucide-react"
 import { GradeBadge } from "@/components/shared/GradeBadge"
-import { ScoreBar } from "@/components/shared/ScoreBar"
 import { LogCallModal } from "./LogCallModal"
 import { LogWhatsAppModal } from "./LogWhatsAppModal"
 import type { QueueLead } from "@/hooks/useQueue"
@@ -40,9 +16,16 @@ const GRADE_BORDER: Record<string, string> = {
   A: "border-l-emerald-500",
   B: "border-l-blue-500",
   C: "border-l-amber-400",
-  D: "border-l-orange-500",
-  E: "border-l-red-500",
+  D: "border-l-slate-300",
+  E: "border-l-red-400",
   F: "border-l-slate-200",
+}
+
+function formatValue(v: number): string {
+  if (v >= 10_000_000) return `₹${(v / 10_000_000).toFixed(1)}Cr`
+  if (v >= 100_000)    return `₹${(v / 100_000).toFixed(1)}L`
+  if (v >= 1_000)      return `₹${(v / 1_000).toFixed(0)}K`
+  return `₹${v.toLocaleString("en-IN")}`
 }
 
 export function QueueCard({ lead }: Props) {
@@ -51,17 +34,16 @@ export function QueueCard({ lead }: Props) {
 
   const fullName    = [lead.first_name, lead.last_name].filter(Boolean).join(" ")
   const borderColor = GRADE_BORDER[lead.grade] ?? GRADE_BORDER["F"]
+  const isHot       = lead.grade === "A" || lead.grade === "B"
 
   return (
     <>
-      <div
-        className={`
-          rounded-xl bg-white border-l-[3px] ${borderColor}
-          shadow-[0_1px_3px_rgba(15,23,42,0.06),0_1px_2px_rgba(15,23,42,0.04)]
-          hover:shadow-[0_4px_12px_rgba(15,23,42,0.08),0_2px_4px_rgba(15,23,42,0.05)]
-          transition-shadow duration-200 p-4 space-y-3
-        `}
-      >
+      <div className={`
+        rounded-xl bg-white border-l-[3px] ${borderColor}
+        shadow-[0_1px_3px_rgba(15,23,42,0.06),0_1px_2px_rgba(15,23,42,0.04)]
+        hover:shadow-[0_4px_12px_rgba(15,23,42,0.08),0_2px_4px_rgba(15,23,42,0.05)]
+        transition-shadow duration-200 p-4 space-y-3
+      `}>
 
         {/* ── Header ──────────────────────────────────────────────────────── */}
         <div className="flex items-start justify-between gap-3">
@@ -74,51 +56,38 @@ export function QueueCard({ lead }: Props) {
               >
                 {fullName}
               </Link>
-              {lead.company_name && (
-                <p className="text-[12px] text-slate-400 truncate mt-0.5 leading-tight">
-                  {lead.company_name}
-                </p>
-              )}
+              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                {lead.company_name && (
+                  <p className="text-[12px] text-slate-400 truncate leading-tight">{lead.company_name}</p>
+                )}
+                {lead.city && (
+                  <span className="inline-flex items-center gap-0.5 text-[11px] text-slate-400">
+                    <MapPin className="w-2.5 h-2.5" />
+                    {lead.city}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            {lead.followups_due > 0 && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-600 bg-red-50 ring-1 ring-red-200 px-1.5 py-0.5 rounded">
-                <Clock className="w-3 h-3" />
-                {lead.followups_due} due
+          {/* Value pill */}
+          {lead.expected_value ? (
+            <div className="shrink-0 text-right">
+              <span className={`text-[13px] font-bold tabular-nums ${isHot ? "text-emerald-700" : "text-slate-600"}`}>
+                {formatValue(lead.expected_value)}
               </span>
-            )}
-            {lead.city && (
-              <span className="inline-flex items-center gap-0.5 text-[11px] text-slate-400">
-                <MapPin className="w-3 h-3" />
-                {lead.city}
-              </span>
-            )}
-          </div>
+            </div>
+          ) : null}
         </div>
 
-        {/* ── Next Best Action ─────────────────────────────────────────────── */}
-        {lead.nba && (
-          <div className="rounded-lg bg-slate-50 border border-slate-100 px-3 py-2.5">
-            <p className="text-[12px] font-semibold text-slate-700 leading-snug">
-              {lead.nba.action}
-            </p>
-            <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
-              {lead.nba.reason}
-            </p>
-          </div>
-        )}
-
-        {/* ── Score bars ───────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-3 gap-3">
-          <ScoreBar value={lead.fit_score}     label="Fit"     type="fit"     showValue />
-          <ScoreBar value={lead.intent_score}  label="Intent"  type="intent"  showValue />
-          <ScoreBar value={lead.quality_score} label="Quality" type="quality" showValue />
+        {/* ── Action banner ────────────────────────────────────────────────── */}
+        <div className={`rounded-lg px-3 py-2.5 border ${lead.next_action.color}`}>
+          <p className="text-[12px] font-semibold leading-snug">{lead.next_action.label}</p>
+          <p className="text-[11px] mt-0.5 leading-snug opacity-80">{lead.next_action.reason}</p>
         </div>
 
         {/* ── Actions ──────────────────────────────────────────────────────── */}
-        <div className="flex items-center gap-2 pt-0.5">
+        <div className="flex items-center gap-2">
           <button
             onClick={() => setCallOpen(true)}
             className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-[12px] font-semibold py-2 transition-colors"
@@ -136,6 +105,7 @@ export function QueueCard({ lead }: Props) {
           <Link
             href={`/leads/${lead.id}`}
             className="flex items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-slate-400 hover:text-slate-600 transition-colors p-2"
+            title="View full lead"
           >
             <ExternalLink className="w-3.5 h-3.5" />
           </Link>
@@ -143,18 +113,8 @@ export function QueueCard({ lead }: Props) {
 
       </div>
 
-      <LogCallModal
-        open={callOpen}
-        onClose={() => setCallOpen(false)}
-        leadId={lead.id}
-        leadName={fullName}
-      />
-      <LogWhatsAppModal
-        open={waOpen}
-        onClose={() => setWaOpen(false)}
-        leadId={lead.id}
-        leadName={fullName}
-      />
+      <LogCallModal     open={callOpen} onClose={() => setCallOpen(false)} leadId={lead.id} leadName={fullName} />
+      <LogWhatsAppModal open={waOpen}   onClose={() => setWaOpen(false)}   leadId={lead.id} leadName={fullName} />
     </>
   )
 }

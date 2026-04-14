@@ -1,75 +1,53 @@
 import { prisma } from "@/lib/prisma"
 import { requireAuth, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
-import { computeNextBestAction } from "@/lib/scoring/nba"
-import type { SignalRecord } from "@/lib/scoring/types"
+import { getNextAction, buildActionReason } from "@/lib/scoring/next-action"
 
 /**
  * GET /api/queue
- * Returns the ranked priority queue for the current rep.
  *
- * Ranking formula (TAD 5.2):
- *   rank_score = (grade_weight × 40) + (intent_score × 0.35) + (fit_score × 0.25)
+ * Returns active leads grouped and sorted for the priority queue view.
  *
- * Grade weights: A=100, B=80, C=70, D=50, E=30, F=0
+ * - REP: only their assigned leads
+ * - ADMIN / MANAGER: all account leads (or ?rep= filter for a specific rep)
  *
- * Exclusions:
- *   - is_junk = true
- *   - is_fatigued = true
- *   - won_at or lost_at set (terminal)
- *   - all follow-up actions snoozed (due_date > now)
+ * Within each grade group, leads are sorted by expected_value DESC so the
+ * highest-value opportunity surfaces first.
+ *
+ * Exclusions: junk, won, lost, fatigued.
  */
-
-const GRADE_WEIGHT: Record<string, number> = {
-  A: 100, B: 80, C: 70, D: 50, E: 30, F: 0,
-}
-
 export async function GET(req: Request) {
   try {
     const session = await requireAuth()
     const { searchParams } = new URL(req.url)
-    const limit = Math.min(50, parseInt(searchParams.get("limit") ?? "25"))
 
-    // For ADMIN/MANAGER without a rep filter, return empty (they use the leads page)
-    const repId =
+    // Rep filter: REP always sees only their leads; admin can optionally filter
+    const repFilter =
       session.user.role === "REP"
-        ? session.user.id
-        : (searchParams.get("rep") ?? null)
-
-    if (!repId) {
-      return apiSuccess({ leads: [], total: 0 })
-    }
-
-    const now = new Date()
+        ? { assigned_rep_id: session.user.id }
+        : searchParams.get("rep")
+        ? { assigned_rep_id: searchParams.get("rep")! }
+        : {}   // admin/manager with no rep filter → all account leads
 
     const leads = await prisma.lead.findMany({
       where: {
-        account_id:      session.account.id,
-        assigned_rep_id: repId,
-        is_junk:         false,
-        is_fatigued:     false,
-        won_at:          null,
-        lost_at:         null,
-        // Exclude snoozed: only include if at least one follow-up is due now
-        // (or no follow-ups at all — new lead)
-        OR: [
-          {
-            follow_up_actions: {
-              some: { status: "PENDING", due_date: { lte: now } },
-            },
-          },
-          {
-            follow_up_actions: { none: {} },
-          },
-        ],
+        account_id: session.account.id,
+        is_junk:    false,
+        is_fatigued: false,
+        won_at:     null,
+        lost_at:    null,
+        ...repFilter,
       },
+      orderBy: [
+        { grade:          "asc"  },  // A first
+        { expected_value: "desc" },  // highest value within grade
+        { imported_at:    "desc" },
+      ],
+      take: 200,
       include: {
         source: { select: { id: true, name: true, key: true } },
         stage:  { select: { id: true, name: true, key: true } },
-        signals: {
-          orderBy: { created_at: "desc" },
-          take: 10,
-        },
+        assigned_rep: { select: { id: true, first_name: true, last_name: true } },
         follow_up_actions: {
           where:   { status: { in: ["PENDING", "OVERDUE"] } },
           orderBy: { due_date: "asc" },
@@ -78,33 +56,41 @@ export async function GET(req: Request) {
       },
     })
 
-    // Compute rank score and NBA for each lead
-    const ranked = leads
-      .map((lead) => {
-        const gradeWeight = GRADE_WEIGHT[lead.grade] ?? 0
-        const rankScore =
-          gradeWeight * 0.40 +
-          lead.intent_score * 0.35 +
-          lead.fit_score * 0.25
+    // Attach next_action with smart reason to each lead
+    const enriched = leads.map((lead) => ({
+      ...lead,
+      next_action: {
+        ...getNextAction(lead.grade),
+        reason: buildActionReason({
+          grade:         lead.grade,
+          fit_score:     lead.fit_score,
+          intent_score:  lead.intent_score,
+          quality_score: lead.quality_score,
+          inquiry_text:  lead.inquiry_text,
+        }),
+      },
+    }))
 
-        const signals: SignalRecord[] = lead.signals.map((s) => ({
-          signal_type:  s.signal_type,
-          signal_value: s.signal_value,
-          created_at:   s.created_at,
-        }))
+    // Group by grade
+    const grouped: Record<string, typeof enriched> = { A: [], B: [], C: [], D: [], E: [] }
+    for (const lead of enriched) {
+      if (grouped[lead.grade]) grouped[lead.grade].push(lead)
+    }
 
-        const nba = computeNextBestAction(
-          lead.grade,
-          signals,
-          !!lead.first_contact_at,
-        )
+    // Summary stats per group
+    const summary = Object.entries(grouped).map(([grade, items]) => ({
+      grade,
+      count:      items.length,
+      total_value: items.reduce((s, l) => s + (l.expected_value ?? 0), 0),
+      action:     getNextAction(grade),
+    }))
 
-        return { ...lead, rank_score: Math.round(rankScore), nba }
-      })
-      .sort((a, b) => b.rank_score - a.rank_score)
-      .slice(0, limit)
-
-    return apiSuccess({ leads: ranked, total: ranked.length })
+    return apiSuccess({
+      leads:   enriched,
+      grouped,
+      summary,
+      total:   enriched.length,
+    })
   } catch (e) {
     return handleAuthError(e) ?? apiError("Internal server error", "SERVER_ERROR", 500)
   }

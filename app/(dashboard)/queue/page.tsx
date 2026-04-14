@@ -1,101 +1,235 @@
 "use client"
 
-/*
- * Priority Queue page.
- *
- * Design intent:
- *   The queue is the rep's daily cockpit — the one place they come to know
- *   exactly what to do next. The execution score bar at the top provides
- *   instant motivation (progress = completion). As the bar fills, the rep
- *   gets a sense of daily accomplishment — Zeigarnik effect working in our
- *   favour.
- *
- *   Empty state is kept positive ("queue is clear") not neutral ("no leads"),
- *   because clearing the queue IS the win.
- */
-
+import { useState } from "react"
 import { useQueue } from "@/hooks/useQueue"
 import { QueueCard } from "@/components/queue/QueueCard"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Zap } from "lucide-react"
+import type { QueueLead } from "@/hooks/useQueue"
+
+// Section definitions — order is the display order
+const SECTIONS = [
+  {
+    grade:       "A",
+    label:       "Call Now",
+    emoji:       "🔥",
+    description: "Highest intent — act immediately",
+    bg:          "bg-green-50",
+    border:      "border-green-200",
+    header:      "text-green-800",
+    defaultOpen: true,
+  },
+  {
+    grade:       "B",
+    label:       "Call Today",
+    emoji:       "📞",
+    description: "Good leads — don't let them cool",
+    bg:          "bg-blue-50",
+    border:      "border-blue-200",
+    header:      "text-blue-800",
+    defaultOpen: true,
+  },
+  {
+    grade:       "C",
+    label:       "Nurture",
+    emoji:       "📩",
+    description: "Send follow-up material",
+    bg:          "bg-amber-50",
+    border:      "border-amber-200",
+    header:      "text-amber-800",
+    defaultOpen: true,
+  },
+  {
+    grade:       "D",
+    label:       "Low Priority",
+    emoji:       "⏳",
+    description: "Revisit when capacity allows",
+    bg:          "bg-gray-50",
+    border:      "border-gray-200",
+    header:      "text-gray-600",
+    defaultOpen: false,
+  },
+  {
+    grade:       "E",
+    label:       "Drop",
+    emoji:       "❌",
+    description: "Not worth pursuing now",
+    bg:          "bg-red-50",
+    border:      "border-red-200",
+    header:      "text-red-700",
+    defaultOpen: false,
+  },
+]
+
+function formatValue(v: number): string {
+  if (v >= 10_000_000) return `₹${(v / 10_000_000).toFixed(1)}Cr`
+  if (v >= 100_000)    return `₹${(v / 100_000).toFixed(1)}L`
+  return `₹${(v / 1_000).toFixed(0)}K`
+}
+
+interface SectionProps {
+  grade:       string
+  label:       string
+  emoji:       string
+  description: string
+  bg:          string
+  border:      string
+  header:      string
+  leads:       QueueLead[]
+  totalValue:  number
+  defaultOpen: boolean
+}
+
+function GradeSection({ grade, label, emoji, description, bg, border, header, leads, totalValue, defaultOpen }: SectionProps) {
+  const [open, setOpen] = useState(defaultOpen)
+
+  if (leads.length === 0) return null
+
+  return (
+    <div className={`rounded-xl border ${border} ${bg} overflow-hidden`}>
+      {/* Section header */}
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between px-4 py-3 hover:brightness-95 transition-all"
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-xl">{emoji}</span>
+          <div className="text-left">
+            <p className={`text-[14px] font-bold ${header}`}>{label}</p>
+            <p className={`text-[12px] ${header} opacity-70`}>{description}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+          {totalValue > 0 && (
+            <span className={`text-[12px] font-semibold ${header} opacity-80`}>
+              {formatValue(totalValue)}
+            </span>
+          )}
+          <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[12px] font-bold ${header} bg-white/60`}>
+            {leads.length}
+          </span>
+          <span className={`text-[12px] ${header} opacity-60`}>{open ? "▲" : "▼"}</span>
+        </div>
+      </button>
+
+      {/* Cards */}
+      {open && (
+        <div className="px-4 pb-4 space-y-3">
+          {leads.map((lead) => (
+            <QueueCard key={lead.id} lead={lead} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function QueuePage() {
   const { data, isLoading, error } = useQueue()
 
-  const leads     = data?.leads ?? []
-  const actioned  = leads.filter((l) => l.followups_due === 0).length
-  const execScore = leads.length > 0 ? Math.round((actioned / leads.length) * 100) : 0
+  const grouped    = data?.grouped ?? {}
+  const summary    = data?.summary ?? []
+  const totalLeads = data?.total ?? 0
+
+  // Hot leads = A + B for the execution score bar
+  const hotCount = (grouped["A"]?.length ?? 0) + (grouped["B"]?.length ?? 0)
+  const hotValue = [
+    ...(grouped["A"] ?? []),
+    ...(grouped["B"] ?? []),
+  ].reduce((s, l) => s + (l.expected_value ?? 0), 0)
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-2xl mx-auto space-y-5">
 
-      {/* ── Page heading ─────────────────────────────────────────────────── */}
+      {/* ── Page heading ──────────────────────────────────────────────────── */}
       <div>
         <h1 className="text-[22px] font-bold text-slate-900 tracking-tight">Priority Queue</h1>
         <p className="text-[13px] text-slate-400 mt-0.5">
-          {data ? `${data.total} lead${data.total === 1 ? "" : "s"} ranked by score` : "Loading your queue…"}
+          {isLoading
+            ? "Loading…"
+            : `${totalLeads} active lead${totalLeads === 1 ? "" : "s"} · sorted by priority`}
         </p>
       </div>
 
-      {/* ── Daily Execution Score ─────────────────────────────────────────── */}
-      {leads.length > 0 && (
-        <div className="rounded-xl bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06),0_1px_2px_rgba(15,23,42,0.04)] p-4">
-          <div className="flex items-center justify-between mb-2.5">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-md bg-indigo-100 flex items-center justify-center">
-                <Zap className="w-3.5 h-3.5 text-indigo-600" strokeWidth={2.5} />
-              </div>
-              <span className="text-[13px] font-semibold text-slate-700">Daily Execution Score</span>
+      {/* ── Hot leads summary banner ───────────────────────────────────────── */}
+      {!isLoading && hotCount > 0 && (
+        <div className="rounded-xl border-2 border-green-300 bg-green-50 px-4 py-3 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center shrink-0">
+              <Zap className="w-4 h-4 text-green-700" strokeWidth={2.5} />
             </div>
-            <span className="text-[13px] font-bold text-slate-800 tabular-nums">{execScore}%</span>
+            <div>
+              <p className="text-[13px] font-bold text-green-800">
+                {hotCount} lead{hotCount > 1 ? "s" : ""} need your attention today
+              </p>
+              <p className="text-[12px] text-green-700 opacity-80">
+                {hotValue > 0 ? `${formatValue(hotValue)} at stake · ` : ""}
+                {grouped["A"]?.length ? `${grouped["A"].length} call now` : ""}
+                {grouped["A"]?.length && grouped["B"]?.length ? " · " : ""}
+                {grouped["B"]?.length ? `${grouped["B"].length} call today` : ""}
+              </p>
+            </div>
           </div>
+        </div>
+      )}
 
-          {/* Progress track */}
-          <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
+      {/* ── Grade distribution row ─────────────────────────────────────────── */}
+      {!isLoading && summary.length > 0 && totalLeads > 0 && (
+        <div className="flex gap-2 flex-wrap">
+          {summary.filter((s) => s.count > 0).map((s) => (
             <div
-              className="h-full rounded-full bg-indigo-500 transition-all duration-500"
-              style={{ width: `${execScore}%` }}
-            />
-          </div>
-
-          <p className="text-[11px] text-slate-400 mt-2">
-            {actioned} of {leads.length} leads actioned today
-          </p>
-        </div>
-      )}
-
-      {/* ── Error ────────────────────────────────────────────────────────── */}
-      {error && (
-        <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-[13px] text-red-600">
-          Failed to load queue — please refresh the page.
-        </div>
-      )}
-
-      {/* ── Loading skeletons ─────────────────────────────────────────────── */}
-      {isLoading && (
-        <div className="space-y-3">
-          {[...Array(5)].map((_, i) => (
-            <Skeleton key={i} className="h-[168px] w-full rounded-xl" />
+              key={s.grade}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-medium border ${s.action.color}`}
+            >
+              <span>{s.action.label.split(" ")[0]}</span>
+              <span>Grade {s.grade}</span>
+              <span className="font-bold">{s.count}</span>
+            </div>
           ))}
         </div>
       )}
 
-      {/* ── Empty state ───────────────────────────────────────────────────── */}
-      {!isLoading && leads.length === 0 && !error && (
-        <div className="rounded-xl bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06),0_1px_2px_rgba(15,23,42,0.04)] px-6 py-12 text-center">
-          <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center mx-auto mb-3">
-            <Zap className="w-5 h-5 text-emerald-600" />
-          </div>
-          <p className="text-[14px] font-semibold text-slate-700">Queue is clear</p>
-          <p className="text-[12px] text-slate-400 mt-1">All leads are actioned. Great work!</p>
+      {/* ── Error ─────────────────────────────────────────────────────────── */}
+      {error && (
+        <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-[13px] text-red-600">
+          Failed to load queue — please refresh.
         </div>
       )}
 
-      {/* ── Queue cards ───────────────────────────────────────────────────── */}
-      {!isLoading && leads.length > 0 && (
+      {/* ── Loading ────────────────────────────────────────────────────────── */}
+      {isLoading && (
         <div className="space-y-3">
-          {leads.map((lead) => (
-            <QueueCard key={lead.id} lead={lead} />
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-[160px] w-full rounded-xl" />
+          ))}
+        </div>
+      )}
+
+      {/* ── Empty state ────────────────────────────────────────────────────── */}
+      {!isLoading && totalLeads === 0 && !error && (
+        <div className="rounded-xl bg-white border border-slate-100 shadow-sm px-6 py-12 text-center">
+          <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center mx-auto mb-3">
+            <Zap className="w-5 h-5 text-emerald-600" />
+          </div>
+          <p className="text-[14px] font-semibold text-slate-700">No active leads</p>
+          <p className="text-[12px] text-slate-400 mt-1">
+            Import leads or assign some to get started.
+          </p>
+        </div>
+      )}
+
+      {/* ── Grade sections ─────────────────────────────────────────────────── */}
+      {!isLoading && totalLeads > 0 && (
+        <div className="space-y-3">
+          {SECTIONS.map((section) => (
+            <GradeSection
+              key={section.grade}
+              {...section}
+              leads={grouped[section.grade] ?? []}
+              totalValue={(grouped[section.grade] ?? []).reduce(
+                (s, l) => s + (l.expected_value ?? 0), 0
+              )}
+            />
           ))}
         </div>
       )}
