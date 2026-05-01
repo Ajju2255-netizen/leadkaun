@@ -12,6 +12,7 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        /* ── shadcn / base-ui standard tokens (mapped to Coastal Sunrise) ── */
         background:  "var(--background)",
         foreground:  "var(--foreground)",
         border:      "var(--border)",
@@ -54,6 +55,36 @@ const config: Config = {
           "accent-foreground":   "var(--sidebar-accent-foreground)",
           border:                "var(--sidebar-border)",
           ring:                  "var(--sidebar-ring)",
+        },
+
+        /* ── Coastal Sunrise semantic tokens ── */
+        bg: {
+          pure:  "var(--bg-pure)",
+          cream: "var(--bg-cream)",
+          sky:   "var(--bg-sky)",
+          mist:  "var(--bg-mist)",
+        },
+        ink: {
+          DEFAULT: "var(--ink)",
+          soft:    "var(--ink-soft)",
+          muted:   "var(--ink-muted)",
+          faint:   "var(--ink-faint)",
+        },
+
+        /* Grade tokens — semantic per the lead-grading system */
+        grade: {
+          a: "var(--grade-a)",
+          b: "var(--grade-b)",
+          c: "var(--grade-c)",
+          d: "var(--grade-d)",
+          e: "var(--grade-e)",
+          f: "var(--grade-f)",
+        },
+
+        /* Hairlines */
+        hairline: {
+          DEFAULT: "var(--hairline)",
+          strong:  "var(--hairline-strong)",
         },
       },
       borderRadius: {

@@ -21,11 +21,23 @@ export async function GET(req: Request) {
     tomorrow.setDate(tomorrow.getDate() + 1)
 
     const isManager = session.user.role === "ADMIN" || session.user.role === "MANAGER"
+    const repFilterId = isManager ? (repId ?? undefined) : session.user.id
+
+    // Defensive promotion: PENDING with past due → OVERDUE. Idempotent.
+    await prisma.followUpAction.updateMany({
+      where: {
+        account_id: session.account.id,
+        ...(repFilterId ? { assigned_rep_id: repFilterId } : {}),
+        status:     "PENDING",
+        due_date:   { lt: new Date() },
+      },
+      data: { status: "OVERDUE", is_overdue: true },
+    })
 
     const actions = await prisma.followUpAction.findMany({
       where: {
         account_id:      session.account.id,
-        assigned_rep_id: isManager ? (repId ?? undefined) : session.user.id,
+        assigned_rep_id: repFilterId,
         status:          { in: ["PENDING", "OVERDUE"] },
         due_date:        { lt: tomorrow },
       },

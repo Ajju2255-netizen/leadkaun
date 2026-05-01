@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
@@ -10,50 +11,60 @@ import {
   CalendarCheck,
   BarChart2,
   AlertTriangle,
+  Trophy,
   Bell,
-  UserCog,
-  Target,
-  FileText,
+  LogOut,
+  Menu,
+  X,
   type LucideIcon,
 } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { LeadkaunMark } from "@/components/shared/LeadkaunMark"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import type { AuthSession } from "@/lib/auth/session"
 import type { UserRole } from "@prisma/client"
 
 type NavItem = {
-  href:    string
-  label:   string
-  icon:    LucideIcon
-  roles:   UserRole[]
-  section: "main" | "settings"
+  href:  string
+  label: string
+  icon:  LucideIcon
+  roles: UserRole[]
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { href: "/queue",      label: "Priority Queue", icon: Zap,             roles: ["ADMIN","MANAGER","REP"], section: "main" },
-  { href: "/dashboard",  label: "Dashboard",     icon: LayoutDashboard, roles: ["ADMIN","MANAGER","REP"], section: "main" },
-  { href: "/leads",      label: "All Leads",      icon: Users,           roles: ["ADMIN","MANAGER","REP"], section: "main" },
-  { href: "/pipeline",   label: "Pipeline",       icon: Columns2,        roles: ["ADMIN","MANAGER","REP"], section: "main" },
-  { href: "/follow-ups", label: "Follow-ups",     icon: CalendarCheck,   roles: ["ADMIN","MANAGER","REP"], section: "main" },
-  { href: "/analytics",  label: "Analytics",      icon: BarChart2,       roles: ["ADMIN","MANAGER"],       section: "main" },
-  { href: "/missed",     label: "Missed Opps",    icon: AlertTriangle,   roles: ["ADMIN","MANAGER"],       section: "main" },
-  { href: "/notifications", label: "Notifications", icon: Bell,          roles: ["ADMIN","MANAGER","REP"], section: "main" },
-  { href: "/settings/team",      label: "Team",          icon: UserCog,  roles: ["ADMIN"],                 section: "settings" },
-  { href: "/settings/icp",       label: "ICP Settings",  icon: Target,   roles: ["ADMIN"],                 section: "settings" },
-  { href: "/settings/templates", label: "Templates",     icon: FileText, roles: ["ADMIN","MANAGER"],       section: "settings" },
+  { href: "/queue",         label: "Priority Queue", icon: Zap,             roles: ["ADMIN","MANAGER","REP"] },
+  { href: "/dashboard",     label: "Dashboard",      icon: LayoutDashboard, roles: ["ADMIN","MANAGER","REP"] },
+  { href: "/leads",         label: "All Leads",      icon: Users,           roles: ["ADMIN","MANAGER","REP"] },
+  { href: "/pipeline",      label: "Pipeline",       icon: Columns2,        roles: ["ADMIN","MANAGER","REP"] },
+  { href: "/follow-ups",    label: "Follow-ups",     icon: CalendarCheck,   roles: ["ADMIN","MANAGER","REP"] },
+  { href: "/analytics",     label: "Analytics",      icon: BarChart2,       roles: ["ADMIN","MANAGER"]       },
+  { href: "/rep-tracking",  label: "Rep Tracking",   icon: Trophy,          roles: ["ADMIN","MANAGER"]       },
+  { href: "/missed",        label: "Missed Opps",    icon: AlertTriangle,   roles: ["ADMIN","MANAGER"]       },
+  { href: "/notifications", label: "Notifications",  icon: Bell,            roles: ["ADMIN","MANAGER","REP"] },
 ]
 
 const ROLE_LABEL: Record<UserRole, string> = {
   ADMIN: "Admin", MANAGER: "Manager", REP: "Sales Rep",
 }
 
+// Defensive: API routes use `apiSuccess(payload)` which returns the payload directly,
+// not wrapped in `{ data: payload }`. Old code (and some hooks scattered across the
+// codebase) assumed a `.data` envelope — handle both shapes so React Query never
+// receives undefined.
+type CountPayload = { count?: number; data?: { count?: number } }
+function unwrapCount(d: CountPayload): { count: number } {
+  return { count: d?.data?.count ?? d?.count ?? 0 }
+}
+
 function useMissedCount(enabled: boolean) {
   const { data } = useQuery({
     queryKey:        ["missed-count"],
-    queryFn:         () =>
-      fetch("/api/analytics/missed/count", { credentials: "include" })
-        .then((r) => r.ok ? r.json().then((d: { data: { count: number } }) => d.data) : { count: 0 }),
+    queryFn:         async () => {
+      const r = await fetch("/api/analytics/missed/count", { credentials: "include" })
+      if (!r.ok) return { count: 0 }
+      return unwrapCount(await r.json())
+    },
     refetchInterval: 60_000,
     staleTime:       55_000,
     enabled,
@@ -64,9 +75,11 @@ function useMissedCount(enabled: boolean) {
 function useNotifCount() {
   const { data } = useQuery({
     queryKey:        ["notif-count"],
-    queryFn:         () =>
-      fetch("/api/notifications/count", { credentials: "include" })
-        .then((r) => r.ok ? r.json().then((d: { data: { count: number } }) => d.data) : { count: 0 }),
+    queryFn:         async () => {
+      const r = await fetch("/api/notifications/count", { credentials: "include" })
+      if (!r.ok) return { count: 0 }
+      return unwrapCount(await r.json())
+    },
     refetchInterval: 60_000,
     staleTime:       55_000,
   })
@@ -82,15 +95,13 @@ export function DashboardShell({
 }) {
   const pathname = usePathname()
   const router   = useRouter()
-  const { user, account } = session
+  const { user } = session
 
   const isManager   = user.role === "ADMIN" || user.role === "MANAGER"
   const missedCount = useMissedCount(isManager)
   const notifCount  = useNotifCount()
 
-  const visible     = NAV_ITEMS.filter((i) => i.roles.includes(user.role))
-  const mainNav     = visible.filter((i) => i.section === "main")
-  const settingsNav = visible.filter((i) => i.section === "settings")
+  const mainNav = NAV_ITEMS.filter((i) => i.roles.includes(user.role))
 
   const initials = [user.firstName, user.lastName]
     .filter(Boolean)
@@ -106,35 +117,47 @@ export function DashboardShell({
   }
 
   function NavLink({ item }: { item: NavItem }) {
-    const isActive      = pathname === item.href || pathname.startsWith(item.href + "/")
-    const Icon          = item.icon
-    const showMissed    = item.href === "/missed"         && missedCount > 0
-    const showNotif     = item.href === "/notifications"  && notifCount  > 0
+    const isActive   = pathname === item.href || pathname.startsWith(item.href + "/")
+    const Icon       = item.icon
+    const showMissed = item.href === "/missed"        && missedCount > 0
+    const showNotif  = item.href === "/notifications" && notifCount  > 0
 
     return (
       <Link
         href={item.href}
         className={`
-          relative flex items-center gap-2.5 px-3 py-[7px] rounded-md text-[13px] font-medium
-          transition-colors duration-100 outline-none
+          relative flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13px]
+          transition-all duration-150 outline-none
           ${isActive
-            ? "bg-blue-50 text-blue-700 before:absolute before:left-0 before:top-1 before:bottom-1 before:w-[3px] before:rounded-r-full before:bg-blue-600"
-            : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
+            ? "text-sky-700 font-semibold bg-sky-50/80 before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-r-full before:bg-sky-500 before:shadow-[0_0_8px_rgba(14,165,233,0.45)]"
+            : "text-ink-soft font-medium hover:bg-sky-50/40 hover:text-sky-600"
           }
         `}
       >
         <Icon
-          className={`w-[15px] h-[15px] shrink-0 ${isActive ? "text-blue-600" : "text-slate-400"}`}
+          className={`w-[15px] h-[15px] shrink-0 ${isActive ? "text-sky-500" : "text-ink-muted"}`}
           strokeWidth={isActive ? 2.5 : 2}
         />
         {item.label}
         {showMissed && (
-          <span className="ml-auto inline-flex items-center justify-center text-[10px] font-bold bg-red-500 text-white rounded-full min-w-[18px] h-[18px] px-1">
+          <span
+            className="ml-auto inline-flex items-center justify-center text-[10px] font-bold text-white rounded-full min-w-[20px] h-[18px] px-1.5"
+            style={{
+              background: "linear-gradient(180deg, #FDBA74 0%, #FB923C 100%)",
+              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.5), 0 2px 6px rgba(251,146,60,0.40)",
+            }}
+          >
             {missedCount > 99 ? "99+" : missedCount}
           </span>
         )}
         {showNotif && (
-          <span className="ml-auto inline-flex items-center justify-center text-[10px] font-bold bg-blue-500 text-white rounded-full min-w-[18px] h-[18px] px-1">
+          <span
+            className="ml-auto inline-flex items-center justify-center text-[10px] font-bold text-white rounded-full min-w-[20px] h-[18px] px-1.5"
+            style={{
+              background: "linear-gradient(180deg, #38BDF8 0%, #0EA5E9 100%)",
+              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.5), 0 2px 6px rgba(14,165,233,0.40)",
+            }}
+          >
             {notifCount > 99 ? "99+" : notifCount}
           </span>
         )}
@@ -142,67 +165,141 @@ export function DashboardShell({
     )
   }
 
-  return (
-    <TooltipProvider>
-      <div className="flex min-h-screen bg-background">
+  // Mobile drawer state — closed by default; route changes auto-close it.
+  const [mobileOpen, setMobileOpen] = useState(false)
+  useEffect(() => { setMobileOpen(false) }, [pathname])
+  // Lock body scroll while drawer is open on mobile.
+  useEffect(() => {
+    if (mobileOpen) document.body.style.overflow = "hidden"
+    else document.body.style.overflow = ""
+    return () => { document.body.style.overflow = "" }
+  }, [mobileOpen])
 
-        {/* ── Sidebar ─────────────────────────────────────────────────────── */}
-        <aside className="w-[220px] flex flex-col shrink-0 bg-white border-r border-slate-100">
+  function SidebarBody({ onItemClick }: { onItemClick?: () => void }) {
+    return (
+      <>
+        <Link
+          href="/dashboard"
+          onClick={onItemClick}
+          className="flex items-center gap-2.5 px-4 h-14 shrink-0 group"
+          style={{ borderBottom: "1px solid var(--hairline)" }}
+        >
+          <LeadkaunMark size={26} gloss className="transition-transform group-hover:scale-[1.06]" />
+          <span className="text-[15px] font-semibold text-ink tracking-[-0.025em] leading-none">
+            Leadkaun
+          </span>
+        </Link>
 
-          {/* Logo */}
-          <div className="flex items-center gap-2.5 px-4 h-14 border-b border-slate-100 shrink-0">
-            <div className="w-6 h-6 rounded-md bg-indigo-600 flex items-center justify-center shrink-0">
-              <Zap className="w-3.5 h-3.5 text-white" strokeWidth={2.5} />
-            </div>
-            <span className="text-[15px] font-semibold text-slate-900 tracking-tight">Leadkaun</span>
-          </div>
+        <nav className="flex-1 px-2 pt-3 pb-2 space-y-1 overflow-y-auto" onClick={onItemClick}>
+          {mainNav.map((item) => <NavLink key={item.href} item={item} />)}
+        </nav>
 
-          {/* Main nav */}
-          <nav className="flex-1 px-2 pt-3 pb-2 space-y-0.5 overflow-y-auto">
-            {mainNav.map((item) => <NavLink key={item.href} item={item} />)}
-
-            {/* Settings section */}
-            {settingsNav.length > 0 && (
-              <>
-                <div className="pt-3 pb-1 px-3">
-                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                    Settings
-                  </span>
-                </div>
-                {settingsNav.map((item) => <NavLink key={item.href} item={item} />)}
-              </>
-            )}
-          </nav>
-
-          {/* User footer */}
-          <div className="px-3 py-3 border-t border-slate-100 space-y-2.5">
-            <div className="flex items-center gap-2.5">
-              {/* Avatar */}
-              <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
-                <span className="text-[11px] font-bold text-indigo-700">{initials}</span>
+        <div className="px-3 py-3" style={{ borderTop: "1px solid var(--hairline)" }}>
+          <div className="flex items-center gap-2.5">
+            <Link href="/settings/profile" onClick={onItemClick} className="flex items-center gap-2.5 min-w-0 flex-1 group">
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-transform group-hover:scale-[1.05]"
+                style={{
+                  background: "linear-gradient(180deg, #BAE6FD 0%, #7DD3FC 100%)",
+                  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.85), 0 2px 6px rgba(14,165,233,0.22)",
+                }}
+              >
+                <span className="text-[11px] font-bold text-sky-700">{initials}</span>
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-medium text-slate-800 truncate leading-tight">
+                <p className="text-[12.5px] font-semibold text-ink truncate leading-tight group-hover:text-sky-600 transition-colors">
                   {user.firstName} {user.lastName}
                 </p>
-                <p className="text-[11px] text-slate-400 truncate leading-tight">
-                  {account.name} · {ROLE_LABEL[user.role]}
+                <p className="text-[10px] text-ink-muted truncate leading-tight mt-0.5 font-mono uppercase tracking-[0.10em]">
+                  {ROLE_LABEL[user.role]}
                 </p>
               </div>
-            </div>
+            </Link>
             <button
               onClick={handleLogout}
-              className="text-[12px] text-slate-400 hover:text-red-500 transition-colors w-full text-left pl-0.5"
+              title="Sign out"
+              className="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-ink-muted hover:text-red-500 hover:bg-red-50 transition-colors"
             >
-              Sign out
+              <LogOut className="w-3.5 h-3.5" strokeWidth={2} />
             </button>
           </div>
+        </div>
+      </>
+    )
+  }
 
+  // Find the active nav item for the mobile top-bar title
+  const activeItem = mainNav.find((i) => pathname === i.href || pathname.startsWith(i.href + "/"))
+
+  return (
+    <TooltipProvider>
+      <div className="flex h-screen md:p-3 md:gap-3 overflow-hidden">
+
+        {/* ── Mobile top-bar (hidden md+) ─────────────────────────────────── */}
+        <div className="md:hidden fixed top-0 left-0 right-0 z-30 h-14 flex items-center justify-between px-3 glass-1 gloss-edge border-b border-white/30">
+          <button
+            onClick={() => setMobileOpen(true)}
+            aria-label="Open navigation"
+            className="w-10 h-10 rounded-xl flex items-center justify-center text-ink hover:bg-white/40 active:scale-[0.96] transition-all"
+          >
+            <Menu className="w-5 h-5" strokeWidth={2.25} />
+          </button>
+          <div className="flex items-center gap-2">
+            <LeadkaunMark size={22} gloss />
+            <span className="text-[14px] font-semibold text-ink tracking-[-0.025em]">
+              {activeItem?.label ?? "Leadkaun"}
+            </span>
+          </div>
+          <Link
+            href="/notifications"
+            aria-label="Notifications"
+            className="relative w-10 h-10 rounded-xl flex items-center justify-center text-ink hover:bg-white/40 active:scale-[0.96] transition-all"
+          >
+            <Bell className="w-5 h-5" strokeWidth={2.25} />
+            {notifCount > 0 && (
+              <span className="absolute top-1.5 right-1.5 min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-bold text-white inline-flex items-center justify-center"
+                style={{
+                  background: "linear-gradient(180deg, #38BDF8 0%, #0EA5E9 100%)",
+                  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.5), 0 2px 6px rgba(14,165,233,0.40)",
+                }}
+              >
+                {notifCount > 9 ? "9+" : notifCount}
+              </span>
+            )}
+          </Link>
+        </div>
+
+        {/* ── Desktop sidebar (md+) ───────────────────────────────────────── */}
+        <aside className="hidden md:flex w-[224px] flex-col shrink-0 glass-1 gloss-edge rounded-2xl overflow-hidden">
+          <SidebarBody />
         </aside>
 
-        {/* ── Main content ────────────────────────────────────────────────── */}
-        <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          <div className="flex-1 p-6 md:p-8 overflow-auto">{children}</div>
+        {/* ── Mobile drawer (only when open, hidden md+) ───────────────────── */}
+        {mobileOpen && (
+          <div className="md:hidden fixed inset-0 z-40 flex">
+            {/* Backdrop */}
+            <button
+              aria-label="Close navigation"
+              onClick={() => setMobileOpen(false)}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-150"
+            />
+            {/* Drawer */}
+            <aside className="relative w-[260px] h-full flex flex-col glass-3 gloss-edge shadow-2xl animate-in slide-in-from-left duration-200">
+              <button
+                onClick={() => setMobileOpen(false)}
+                aria-label="Close"
+                className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full glass-1 flex items-center justify-center text-ink hover:bg-white/60 transition-all"
+              >
+                <X className="w-4 h-4" strokeWidth={2.25} />
+              </button>
+              <SidebarBody onItemClick={() => setMobileOpen(false)} />
+            </aside>
+          </div>
+        )}
+
+        {/* ── Main content ─────────────────────────────────────────────────── */}
+        <main className="flex-1 flex flex-col min-w-0 md:glass-1 md:gloss-edge md:rounded-2xl overflow-hidden pt-14 md:pt-0">
+          <div className="flex-1 p-4 sm:p-6 md:p-8 overflow-auto">{children}</div>
         </main>
 
       </div>

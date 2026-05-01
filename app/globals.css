@@ -2,109 +2,646 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── Grade colour tokens ─────────────────────────────────────────────────── */
+/* ============================================================================
+   LEADKAUN APP — COASTAL SUNRISE
+   Light-first product surface. Sky/electric blue soul, warm peach signature.
+   Mirrors the marketing site's design system at app intensity (subtle blur,
+   restrained gloss — apps need restraint, not theatre).
+   ============================================================================ */
+
 :root {
-  --grade-a: #059669;
-  --grade-b: #2563eb;
-  --grade-c: #d97706;
-  --grade-d: #ea580c;
-  --grade-e: #dc2626;
-  --grade-f: #94a3b8;
+  /* ── Surfaces ── */
+  --bg-pure:   #FFFFFF;
+  --bg-cream:  #FFFBF5;
+  --bg-sky:    #F0F9FF;
+  --bg-mist:   #F8FAFC;
+
+  /* ── Text — slate ramp, never pure black ── */
+  --ink:        #0F172A;
+  --ink-soft:   #475569;
+  --ink-muted:  #94A3B8;
+  --ink-faint:  #CBD5E1;
+
+  /* ── Blues — primary identity ── */
+  --sky-50:   #F0F9FF;
+  --sky-100:  #E0F2FE;
+  --sky-200:  #BAE6FD;
+  --sky-300:  #7DD3FC;
+  --sky-400:  #38BDF8;
+  --sky-500:  #0EA5E9;   /* PRIMARY */
+  --sky-600:  #0284C7;   /* hover only */
+  --cyan-300: #67E8F9;
+  --cyan-400: #22D3EE;
+  --cyan-500: #06B6D4;
+
+  /* ── Warm — signature contrast ── */
+  --peach-100:  #FFEDD5;
+  --peach-200:  #FED7AA;
+  --peach-300:  #FDBA74;
+  --orange-400: #FB923C;
+  --orange-500: #F97316;
+
+  /* ── Reserved semantic ── */
+  --mint-300: #6EE7B7;
+  --mint-400: #34D399;
+  --mint-500: #10B981;
+  --red-500:  #EF4444;
+  --red-600:  #DC2626;
+
+  /* ── Hairlines / glass edges ── */
+  --hairline:        rgba(15, 23, 42, 0.06);
+  --hairline-strong: rgba(15, 23, 42, 0.10);
+  --glass-edge:      rgba(255, 255, 255, 0.92);
+
+  /* ── Grade palette (Coastal-Sunrise refit) ── */
+  --grade-a: var(--mint-500);    /* hot — call now */
+  --grade-b: var(--sky-500);     /* warm — follow up this week */
+  --grade-c: var(--orange-400);  /* lukewarm — nurture */
+  --grade-d: var(--orange-500);  /* cold — light touch */
+  --grade-e: var(--red-500);     /* at-risk / urgency */
+  --grade-f: var(--ink-muted);   /* junk / auto-discarded */
+}
+
+@layer base {
+  :root {
+    /* ── shadcn / base-ui compat tokens — re-pointed to Coastal Sunrise ── */
+    --background:           var(--bg-pure);
+    --foreground:           var(--ink);
+    --card:                 var(--bg-pure);
+    --card-foreground:      var(--ink);
+    --popover:              var(--bg-pure);
+    --popover-foreground:   var(--ink);
+
+    --primary:              var(--sky-500);
+    --primary-foreground:   #FFFFFF;
+    --secondary:            var(--bg-mist);
+    --secondary-foreground: var(--ink);
+    --muted:                var(--bg-mist);
+    --muted-foreground:     var(--ink-soft);
+    --accent:               var(--sky-100);
+    --accent-foreground:    var(--sky-600);
+    --destructive:          var(--red-500);
+    --destructive-foreground: #FFFFFF;
+
+    --border:               var(--hairline);
+    --input:                rgba(15, 23, 42, 0.10);
+    --ring:                 rgba(14, 165, 233, 0.32);
+    --radius:               0.875rem;   /* 14px — sits between marketing's lg/xl */
+
+    /* ── Sidebar — glass-1 sky-tinted active ── */
+    --sidebar:                    rgba(255, 255, 255, 0.55);
+    --sidebar-foreground:         var(--ink-soft);
+    --sidebar-primary:            var(--sky-500);
+    --sidebar-primary-foreground: var(--sky-50);
+    --sidebar-accent:             var(--sky-50);
+    --sidebar-accent-foreground:  var(--sky-600);
+    --sidebar-border:             var(--hairline);
+    --sidebar-ring:               var(--sky-500);
+  }
+
+  .dark {
+    /* Dark mode is intentionally not maintained. The class is kept so
+       next-themes does not throw, but Coastal Sunrise is light-only. */
+  }
+
+  * { @apply border-border; }
+
+  html, body { min-height: 100%; }
+
+  body {
+    @apply text-foreground;
+    /* Soft mesh app background — much subtler than marketing.
+       Three blobs at ~30% intensity, no animation, GPU-cheap. */
+    background-color: var(--bg-mist);
+    background-image:
+      radial-gradient(ellipse 50% 40% at 8% 12%,  rgba(125, 211, 252, 0.18), transparent 70%),
+      radial-gradient(ellipse 35% 30% at 92% 88%, rgba(253, 186, 116, 0.16), transparent 72%),
+      radial-gradient(ellipse 30% 25% at 80% 35%, rgba(34, 211, 238, 0.10),  transparent 70%);
+    background-attachment: fixed;
+    font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+}
+
+/* ============================================================================
+   FOCUS — Coastal halo
+   ============================================================================ */
+
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--sky-500);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px var(--sky-100);
+    border-radius: 6px;
+  }
+  ::selection {
+    background: var(--sky-200);
+    color: var(--sky-600);
+  }
 }
 
 @layer utilities {
   .text-balance { text-wrap: balance; }
 
-  /* Subtle elevation — just enough to lift cards off the page bg */
+  /* ──────────────────────────────────────────────────────────────────────
+     SHADOW SCALE
+     ────────────────────────────────────────────────────────────────────── */
+
   .shadow-card {
-    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04), 0 2px 8px rgba(15, 23, 42, 0.03);
   }
   .shadow-card-hover {
-    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08), 0 2px 4px rgba(15, 23, 42, 0.05);
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08), 0 1px 4px rgba(15, 23, 42, 0.04);
+  }
+  .shadow-card-raised {
+    box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.05);
+  }
+
+  .elevate-1 {
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.05);
+  }
+  .elevate-2 {
+    box-shadow:
+      0 1px 2px rgba(15, 23, 42, 0.04),
+      0 8px 20px rgba(15, 23, 42, 0.06),
+      0 16px 40px rgba(15, 23, 42, 0.05);
+  }
+  .elevate-3 {
+    box-shadow:
+      0 1px 2px rgba(15, 23, 42, 0.05),
+      0 12px 28px rgba(15, 23, 42, 0.08),
+      0 28px 64px rgba(15, 23, 42, 0.07),
+      0 40px 96px rgba(14, 165, 233, 0.10);
+  }
+  .aura-sky-hover:hover {
+    box-shadow:
+      0 1px 2px rgba(15, 23, 42, 0.05),
+      0 12px 28px rgba(15, 23, 42, 0.08),
+      0 24px 56px rgba(14, 165, 233, 0.22);
+  }
+  .aura-peach-hover:hover {
+    box-shadow:
+      0 1px 2px rgba(15, 23, 42, 0.05),
+      0 12px 28px rgba(15, 23, 42, 0.08),
+      0 24px 56px rgba(251, 146, 60, 0.22);
+  }
+
+  /* ──────────────────────────────────────────────────────────────────────
+     GLASS — three tiers + tinted variants
+     App intensity is calibrated lower than marketing site to keep data UI
+     readable. Same blur recipe; less aggressive opacity differentials.
+     ────────────────────────────────────────────────────────────────────── */
+
+  .glass-1 {
+    background: rgba(255, 255, 255, 0.65);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+            backdrop-filter: blur(14px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.85),
+      0 1px 1px rgba(15, 23, 42, 0.03);
+  }
+
+  .glass-2 {
+    background: rgba(255, 255, 255, 0.78);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+            backdrop-filter: blur(20px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.92),
+      inset 0 -1px 0 rgba(15, 23, 42, 0.04),
+      0 1px 2px rgba(15, 23, 42, 0.04),
+      0 8px 24px rgba(15, 23, 42, 0.05);
+  }
+
+  .glass-3 {
+    background: rgba(255, 255, 255, 0.86);
+    -webkit-backdrop-filter: blur(28px) saturate(170%);
+            backdrop-filter: blur(28px) saturate(170%);
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 1),
+      inset 0 -1px 0 rgba(15, 23, 42, 0.05),
+      0 1px 2px rgba(15, 23, 42, 0.04),
+      0 12px 32px rgba(15, 23, 42, 0.07),
+      0 24px 64px rgba(14, 165, 233, 0.10);
+  }
+
+  .glass-sky {
+    background: linear-gradient(180deg, rgba(186, 230, 253, 0.42) 0%, rgba(255, 255, 255, 0.78) 100%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+            backdrop-filter: blur(18px) saturate(160%);
+    border: 1px solid rgba(125, 211, 252, 0.45);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.92),
+      0 1px 2px rgba(15, 23, 42, 0.04),
+      0 8px 24px rgba(14, 165, 233, 0.14);
+  }
+
+  .glass-peach {
+    background: linear-gradient(180deg, rgba(254, 215, 170, 0.40) 0%, rgba(255, 255, 255, 0.78) 100%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+            backdrop-filter: blur(18px) saturate(160%);
+    border: 1px solid rgba(253, 186, 116, 0.45);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.92),
+      0 1px 2px rgba(15, 23, 42, 0.04),
+      0 8px 24px rgba(251, 146, 60, 0.14);
+  }
+
+  /* Specular gloss highlight — 1px inner top */
+  .gloss-edge {
+    position: relative;
+  }
+  .gloss-edge::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.5) 0%, transparent 50%);
+    mix-blend-mode: screen;
+    opacity: 0.6;
+  }
+
+  /* Fallback for browsers without backdrop-filter */
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .glass-1, .glass-2, .glass-3, .glass-sky, .glass-peach {
+      background: rgba(255, 255, 255, 0.94);
+    }
+  }
+
+  /* ──────────────────────────────────────────────────────────────────────
+     LEGACY GLASS / CARD ALIASES — keep existing usages working
+     ────────────────────────────────────────────────────────────────────── */
+
+  /* Was: white/97 + slate-200 border — now glass-2 + gloss edge */
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.78);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+            backdrop-filter: blur(20px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    border-radius: 16px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.92),
+      0 1px 2px rgba(15, 23, 42, 0.04),
+      0 8px 24px rgba(15, 23, 42, 0.05);
+  }
+
+  /* Was: solid white card — now light glass for consistency */
+  .glass-card {
+    background: rgba(255, 255, 255, 0.82);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+            backdrop-filter: blur(16px) saturate(150%);
+    border: 1px solid rgba(255, 255, 255, 0.65);
+    border-radius: 12px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.85),
+      0 1px 2px rgba(15, 23, 42, 0.04),
+      0 4px 12px rgba(15, 23, 42, 0.04);
+  }
+
+  /* Interactive card — lifts on hover */
+  .glass-card-lift {
+    background: rgba(255, 255, 255, 0.82);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+            backdrop-filter: blur(16px) saturate(150%);
+    border: 1px solid rgba(255, 255, 255, 0.65);
+    border-radius: 12px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.85),
+      0 1px 2px rgba(15, 23, 42, 0.04),
+      0 4px 12px rgba(15, 23, 42, 0.04);
+    transition: transform 220ms cubic-bezier(.2,.8,.2,1),
+                box-shadow 220ms cubic-bezier(.2,.8,.2,1);
+  }
+  .glass-card-lift:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.92),
+      0 4px 14px rgba(15, 23, 42, 0.07),
+      0 12px 28px rgba(14, 165, 233, 0.12);
+  }
+
+  /* Hot lead — sky-tinted glass */
+  .card-hot {
+    background: linear-gradient(145deg, rgba(186, 230, 253, 0.32) 0%, rgba(255, 255, 255, 0.85) 65%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+            backdrop-filter: blur(16px) saturate(160%);
+    border: 1px solid rgba(125, 211, 252, 0.45);
+    border-radius: 12px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.92),
+      0 1px 2px rgba(15, 23, 42, 0.04),
+      0 8px 22px rgba(14, 165, 233, 0.14);
+  }
+
+  /* Sky urgency glow */
+  .glow-hot {
+    box-shadow:
+      0 0 0 1.5px rgba(14, 165, 233, 0.32),
+      0 8px 24px rgba(14, 165, 233, 0.18);
+  }
+
+  /* ──────────────────────────────────────────────────────────────────────
+     LIFT — interactive card hover transform
+     ────────────────────────────────────────────────────────────────────── */
+
+  .lift {
+    transition: transform 220ms cubic-bezier(.2,.8,.2,1),
+                box-shadow 220ms cubic-bezier(.2,.8,.2,1);
+  }
+  .lift:hover { transform: translateY(-2px); }
+
+  /* ──────────────────────────────────────────────────────────────────────
+     TYPOGRAPHY UTILITIES
+     ────────────────────────────────────────────────────────────────────── */
+
+  .section-label {
+    @apply text-[11px] font-bold uppercase tracking-widest;
+    color: var(--ink-muted);
+  }
+  .stat-number {
+    @apply text-[28px] font-black tabular-nums leading-none;
+    color: var(--ink);
+  }
+  .money-dominant {
+    @apply text-[22px] font-black tabular-nums leading-none;
+  }
+  .money-value {
+    @apply text-[14px] font-bold tabular-nums;
+  }
+
+  /* ──────────────────────────────────────────────────────────────────────
+     BUTTONS — Coastal Sunrise gloss family
+     Legacy class names kept; recipes upgraded.
+     ────────────────────────────────────────────────────────────────────── */
+
+  /* btn-primary — sky gradient with gloss edges + sky glow */
+  .btn-primary {
+    background: linear-gradient(180deg, #38BDF8 0%, #0EA5E9 100%);
+    color: #FFFFFF;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.45),
+      inset 0 -1px 0 rgba(2, 132, 199, 0.45),
+      0 1px 2px rgba(15, 23, 42, 0.08),
+      0 4px 12px rgba(14, 165, 233, 0.28);
+    transition: transform 180ms cubic-bezier(.2,.8,.2,1),
+                box-shadow 180ms cubic-bezier(.2,.8,.2,1),
+                filter 180ms ease;
+  }
+  .btn-primary:hover {
+    filter: brightness(1.04);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.55),
+      inset 0 -1px 0 rgba(2, 132, 199, 0.5),
+      0 2px 4px rgba(15, 23, 42, 0.10),
+      0 8px 20px rgba(14, 165, 233, 0.38);
+    transform: translateY(-1px);
+  }
+  .btn-primary:active { transform: translateY(0); filter: brightness(0.98); }
+
+  /* btn-warm — peach gradient (the complementary CTA, e.g. "Book demo" placements) */
+  .btn-warm {
+    background: linear-gradient(180deg, #FDBA74 0%, #FB923C 100%);
+    color: #FFFFFF;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.5),
+      inset 0 -1px 0 rgba(234, 88, 12, 0.45),
+      0 1px 2px rgba(15, 23, 42, 0.08),
+      0 4px 12px rgba(251, 146, 60, 0.28);
+    transition: transform 180ms cubic-bezier(.2,.8,.2,1),
+                box-shadow 180ms cubic-bezier(.2,.8,.2,1),
+                filter 180ms ease;
+  }
+  .btn-warm:hover {
+    filter: brightness(1.04);
+    transform: translateY(-1px);
+  }
+
+  /* btn-success — mint gradient — for "won deal", "marked closed-won" etc. */
+  .btn-success {
+    background: linear-gradient(180deg, #6EE7B7 0%, #10B981 100%);
+    color: #FFFFFF;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.5),
+      inset 0 -1px 0 rgba(5, 150, 105, 0.45),
+      0 1px 2px rgba(15, 23, 42, 0.08),
+      0 4px 12px rgba(16, 185, 129, 0.28);
+    transition: transform 180ms cubic-bezier(.2,.8,.2,1),
+                box-shadow 180ms cubic-bezier(.2,.8,.2,1),
+                filter 180ms ease;
+  }
+  .btn-success:hover {
+    filter: brightness(1.04);
+    transform: translateY(-1px);
+  }
+
+  /* btn-danger — red gradient — true urgency only */
+  .btn-danger {
+    background: linear-gradient(180deg, #F87171 0%, #DC2626 100%);
+    color: #FFFFFF;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.5),
+      inset 0 -1px 0 rgba(153, 27, 27, 0.45),
+      0 1px 2px rgba(15, 23, 42, 0.08),
+      0 4px 12px rgba(239, 68, 68, 0.28);
+    transition: transform 180ms cubic-bezier(.2,.8,.2,1),
+                box-shadow 180ms cubic-bezier(.2,.8,.2,1),
+                filter 180ms ease;
+  }
+  .btn-danger:hover {
+    filter: brightness(1.04);
+    transform: translateY(-1px);
+  }
+
+  /* btn-secondary — frosted glass with sky-600 text (the most-used neutral CTA) */
+  .btn-secondary {
+    background: rgba(255, 255, 255, 0.78);
+    -webkit-backdrop-filter: blur(14px) saturate(150%);
+            backdrop-filter: blur(14px) saturate(150%);
+    border: 1px solid rgba(125, 211, 252, 0.45);
+    color: var(--sky-600);
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.92),
+      0 1px 2px rgba(15, 23, 42, 0.04),
+      0 4px 12px rgba(14, 165, 233, 0.08);
+    transition: transform 180ms cubic-bezier(.2,.8,.2,1),
+                box-shadow 180ms cubic-bezier(.2,.8,.2,1),
+                background 180ms ease;
+  }
+  .btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 1),
+      0 2px 4px rgba(15, 23, 42, 0.06),
+      0 8px 20px rgba(14, 165, 233, 0.16);
+    transform: translateY(-1px);
+  }
+
+  /* btn-ghost — bare text, sky on hover */
+  .btn-ghost {
+    color: var(--ink-muted);
+    background: transparent;
+    border: none;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 500;
+    transition: color 150ms, background 150ms;
+  }
+  .btn-ghost:hover {
+    color: var(--sky-600);
+    background: var(--sky-50);
+  }
+
+  /* Optional gloss shimmer on hover */
+  .shimmer-on-hover {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+  }
+  .shimmer-on-hover::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      115deg,
+      transparent 30%,
+      rgba(255, 255, 255, 0.40) 50%,
+      transparent 70%
+    );
+    transform: translateX(-120%);
+    transition: transform 900ms cubic-bezier(.2,.8,.2,1);
+    pointer-events: none;
+    z-index: 1;
+  }
+  .shimmer-on-hover:hover::after { transform: translateX(120%); }
+
+  /* ──────────────────────────────────────────────────────────────────────
+     ANIMATED BLOBS — available as utilities, not auto-rendered
+     Use sparingly in app surfaces (e.g. empty states, onboarding).
+     ────────────────────────────────────────────────────────────────────── */
+
+  @keyframes blob-drift {
+    0%,   100% { transform: translate3d(0, 0, 0) scale(1); }
+    50%        { transform: translate3d(2%, -2%, 0) scale(1.05); }
+  }
+
+  .blob {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(64px);
+    pointer-events: none;
+    will-change: transform;
+    animation: blob-drift 16s ease-in-out infinite;
+  }
+  .blob-sm { width: 240px;  height: 240px; }
+  .blob-md { width: 400px;  height: 400px; filter: blur(80px); }
+  .blob-lg { width: 600px;  height: 600px; filter: blur(100px); }
+  .blob-xl { width: 840px;  height: 840px; filter: blur(120px); }
+
+  .blob-sky    { background: radial-gradient(circle, rgba(125, 211, 252, 0.55) 0%, rgba(125, 211, 252, 0) 70%); }
+  .blob-cyan   { background: radial-gradient(circle, rgba(34, 211, 238, 0.45)  0%, rgba(34, 211, 238, 0) 70%); }
+  .blob-peach  { background: radial-gradient(circle, rgba(253, 186, 116, 0.50) 0%, rgba(253, 186, 116, 0) 70%); }
+  .blob-orange { background: radial-gradient(circle, rgba(251, 146, 60, 0.42)  0%, rgba(251, 146, 60, 0) 70%); }
+  .blob-mint   { background: radial-gradient(circle, rgba(110, 231, 183, 0.42) 0%, rgba(110, 231, 183, 0) 70%); }
+
+  /* ──────────────────────────────────────────────────────────────────────
+     URGENCY animations
+     ────────────────────────────────────────────────────────────────────── */
+
+  .pulse-slow {
+    animation: pulse-slow 3s ease-in-out infinite;
+  }
+  @keyframes pulse-slow {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.70; }
+  }
+
+  .urgent-blink {
+    animation: urgent-blink 1.8s ease-in-out infinite;
+  }
+  @keyframes urgent-blink {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.5; }
+  }
+
+  /* ──────────────────────────────────────────────────────────────────────
+     REDUCED MOTION — kill drift, lift, shimmer
+     ────────────────────────────────────────────────────────────────────── */
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+    .blob { animation: none !important; }
+    .lift:hover, .glass-card-lift:hover { transform: none !important; }
+    .shimmer-on-hover::after { display: none !important; }
+    .pulse-slow, .urgent-blink { animation: none !important; opacity: 1 !important; }
   }
 }
 
-@layer base {
-  :root {
-    /* ── Page: barely-off-white so white cards lift ── */
-    --background:           oklch(0.984 0.003 247);   /* slate-50 */
-    --foreground:           oklch(0.133 0.028 264);   /* slate-900 */
-
-    /* ── Cards: pure white ── */
-    --card:                 oklch(1 0 0);
-    --card-foreground:      oklch(0.133 0.028 264);
-    --popover:              oklch(1 0 0);
-    --popover-foreground:   oklch(0.133 0.028 264);
-
-    /* ── Brand: indigo — professional, distinct from grade colours ── */
-    --primary:              oklch(0.511 0.211 264);   /* indigo-600 */
-    --primary-foreground:   oklch(1 0 0);
-
-    --secondary:            oklch(0.968 0.007 247);   /* slate-100 */
-    --secondary-foreground: oklch(0.372 0.030 259);   /* slate-700 */
-
-    --muted:                oklch(0.968 0.007 247);   /* slate-100 */
-    --muted-foreground:     oklch(0.554 0.023 256);   /* slate-500 */
-
-    --accent:               oklch(0.968 0.007 247);
-    --accent-foreground:    oklch(0.372 0.030 259);
-
-    --destructive:          oklch(0.577 0.245 27.325);
-    --destructive-foreground: oklch(1 0 0);
-
-    --border:               oklch(0.929 0.013 255);   /* slate-200 */
-    --input:                oklch(0.929 0.013 255);
-    --ring:                 oklch(0.511 0.211 264);   /* indigo-600 */
-    --radius:               0.5rem;                   /* 8px */
-
-    /* ── Sidebar: white — Intercom-style ── */
-    --sidebar:                    oklch(1 0 0);
-    --sidebar-foreground:         oklch(0.554 0.023 256);  /* slate-500 */
-    --sidebar-primary:            oklch(0.546 0.195 252);  /* blue-600 active text */
-    --sidebar-primary-foreground: oklch(0.972 0.022 249);  /* blue-50 active bg */
-    --sidebar-accent:             oklch(0.984 0.003 247);  /* slate-50 hover bg */
-    --sidebar-accent-foreground:  oklch(0.372 0.030 259);  /* slate-700 hover text */
-    --sidebar-border:             oklch(0.968 0.007 247);  /* slate-100 right border */
-    --sidebar-ring:               oklch(0.511 0.211 264);
-  }
-
-  .dark {
-    --background:           oklch(0.145 0 0);
-    --foreground:           oklch(0.985 0 0);
-    --card:                 oklch(0.205 0 0);
-    --card-foreground:      oklch(0.985 0 0);
-    --popover:              oklch(0.205 0 0);
-    --popover-foreground:   oklch(0.985 0 0);
-    --primary:              oklch(0.6 0.2 264);
-    --primary-foreground:   oklch(0.985 0 0);
-    --secondary:            oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted:                oklch(0.269 0 0);
-    --muted-foreground:     oklch(0.708 0 0);
-    --accent:               oklch(0.269 0 0);
-    --accent-foreground:    oklch(0.985 0 0);
-    --destructive:          oklch(0.704 0.191 22.216);
-    --destructive-foreground: oklch(0.985 0 0);
-    --border:               oklch(1 0 0 / 10%);
-    --input:                oklch(1 0 0 / 15%);
-    --ring:                 oklch(0.6 0.2 264);
-    --sidebar:              oklch(0.145 0 0);
-    --sidebar-foreground:   oklch(0.708 0 0);
-    --sidebar-primary:      oklch(0.6 0.2 264);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent:       oklch(0.205 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border:       oklch(1 0 0 / 8%);
-    --sidebar-ring:         oklch(0.6 0.2 264);
-  }
-
-  * { @apply border-border; }
-
-  body {
-    @apply bg-background text-foreground;
-    font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
-  }
+/* ────────────────────────────────────────────────────────────────────────
+   COASTAL SUNRISE LAUNCH SWEEP — auto-promote flat sky-600 buttons + tag
+   pills to the gradient-glossy recipe so settings/legacy spots match the
+   engine pages. Targets only <button>, <a>, and <select> so decorative
+   non-interactive uses (icon-pill backgrounds, dots) keep their flat fill.
+   ──────────────────────────────────────────────────────────────────────── */
+button.bg-sky-600,
+a.bg-sky-600 {
+  background: linear-gradient(180deg, #38BDF8 0%, #0EA5E9 100%) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -1px 0 rgba(2, 132, 199, 0.45),
+    0 1px 2px rgba(15, 23, 42, 0.08),
+    0 4px 12px rgba(14, 165, 233, 0.28) !important;
+  transition: transform 180ms cubic-bezier(.2,.8,.2,1),
+              box-shadow 180ms cubic-bezier(.2,.8,.2,1),
+              filter 180ms ease;
+}
+button.bg-sky-600:hover,
+a.bg-sky-600:hover {
+  filter: brightness(1.04);
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -1px 0 rgba(2, 132, 199, 0.5),
+    0 2px 4px rgba(15, 23, 42, 0.10),
+    0 8px 20px rgba(14, 165, 233, 0.38) !important;
+}
+button.bg-sky-600:active,
+a.bg-sky-600:active { transform: translateY(0); filter: brightness(0.98); }
+button.bg-sky-600:disabled,
+a.bg-sky-600[aria-disabled="true"] {
+  filter: grayscale(0.2) brightness(1);
+  transform: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -1px 0 rgba(2, 132, 199, 0.45),
+    0 1px 2px rgba(15, 23, 42, 0.06) !important;
 }

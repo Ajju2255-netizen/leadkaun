@@ -2,12 +2,11 @@
 
 import { useState, useEffect } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { toast } from "sonner"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Lightbulb, Trophy, ChevronDown, ChevronUp, Sparkles } from "lucide-react"
+import { Lightbulb, Trophy, ChevronDown, ChevronUp, Sparkles, Target, Save } from "lucide-react"
+
+// ── Options ───────────────────────────────────────────────────────────────────
 
 const INDUSTRY_OPTIONS = [
   "Real Estate", "Healthcare", "Education", "IT Services", "Manufacturing",
@@ -39,45 +38,49 @@ const SALES_CYCLE_OPTIONS = [
   { value: "OVER_THREE_MONTHS", label: "Over 3 months" },
 ]
 
+// ── Types ─────────────────────────────────────────────────────────────────────
+
 interface IcpData {
-  icp_configured:      boolean
-  icp_industries:      string[]
-  icp_states:          string[]
-  icp_business_types:  string[]
-  icp_roles:           string[]
-  icp_budget_min:      number | null
-  icp_budget_max:      number | null
-  icp_sales_cycle:     string | null
-  sql_fit_threshold:   number
+  icp_configured:       boolean
+  icp_industries:       string[]
+  icp_states:           string[]
+  icp_business_types:   string[]
+  icp_roles:            string[]
+  icp_budget_min:       number | null
+  icp_budget_max:       number | null
+  icp_sales_cycle:      string | null
+  sql_fit_threshold:    number
   sql_intent_threshold: number
-  weight_overrides:    Record<string, number> | null
+  weight_overrides:     Record<string, number> | null
 }
 
 interface SuggestionItem {
-  value:     string
-  total:     number
-  won:       number
+  value:      string
+  total:      number
+  won:        number
   won_value?: number
 }
 
 interface Suggestions {
-  industries:     SuggestionItem[]
-  states:         SuggestionItem[]
-  roles:          SuggestionItem[]
-  has_won_leads:  boolean
-  total_analyzed: number
+  industries:    SuggestionItem[]
+  states:        SuggestionItem[]
+  roles:         SuggestionItem[]
+  has_won_leads: boolean
+  total_analyzed:number
 }
 
 async function fetchIcp(): Promise<IcpData> {
   const res = await fetch("/api/settings/icp")
   if (!res.ok) throw new Error("Failed to fetch ICP")
-  return res.json().then((r) => r.data.icp)
+  // API returns { icp: ... } directly via apiSuccess({icp: account}) — no .data envelope
+  return res.json().then((r) => r.icp ?? r.data?.icp)
 }
 
 async function fetchSuggestions(): Promise<Suggestions> {
   const res = await fetch("/api/settings/icp/suggestions")
   if (!res.ok) throw new Error("Failed to fetch suggestions")
-  return res.json().then((r) => r.data)
+  // API returns suggestions object directly — accept both shapes for safety
+  return res.json().then((r) => r?.data ?? r)
 }
 
 // ── Toggle chips ──────────────────────────────────────────────────────────────
@@ -88,9 +91,9 @@ function ToggleChips({
   onChange,
   suggestions,
 }: {
-  options:     string[]
-  selected:    string[]
-  onChange:    (v: string[]) => void
+  options:      string[]
+  selected:     string[]
+  onChange:     (v: string[]) => void
   suggestions?: SuggestionItem[]
 }) {
   function toggle(val: string) {
@@ -110,15 +113,16 @@ function ToggleChips({
             type="button"
             onClick={() => toggle(opt)}
             className={`
-              inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm border transition-colors
+              inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold border transition-all
               ${active
-                ? "bg-primary text-primary-foreground border-primary"
-                : "bg-background text-foreground border-border hover:border-primary"}
+                ? "bg-sky-600 text-white border-sky-600 shadow-[0_1px_2px_rgba(14, 165, 233,0.25)]"
+                : "bg-white text-slate-600 border-slate-200 hover:border-sky-300 hover:text-sky-700 hover:bg-sky-50"
+              }
             `}
           >
             {opt}
             {sug && sug.total > 0 && (
-              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
                 active ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
               }`}>
                 {sug.total}
@@ -169,21 +173,20 @@ function SuggestionsPanel({
   }
 
   return (
-    <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 overflow-hidden">
-      {/* Header */}
+    <div className="rounded-xl border border-sky-100 bg-sky-50/60 overflow-hidden">
       <div
-        className="flex items-center justify-between px-5 py-4 cursor-pointer"
+        className="flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-sky-50/80 transition-colors"
         onClick={() => setExpanded((e) => !e)}
       >
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center">
-            <Sparkles className="w-3.5 h-3.5 text-white" />
+          <div className="w-8 h-8 rounded-xl bg-sky-600 flex items-center justify-center shrink-0">
+            <Sparkles className="w-4 h-4 text-white" />
           </div>
           <div>
-            <p className="text-[13px] font-semibold text-indigo-900">
+            <p className="text-[13px] font-bold text-sky-900">
               Leadkaun detected {suggestions.total_analyzed} leads in your pipeline
             </p>
-            <p className="text-[11px] text-indigo-600 mt-0.5">
+            <p className="text-[11px] text-sky-600 mt-0.5">
               {hasNew
                 ? "Here are the top segments. Click to add them to your ICP."
                 : "All detected segments are already in your ICP."}
@@ -200,31 +203,34 @@ function SuggestionsPanel({
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); applyAll() }}
-              className="text-[12px] font-semibold text-indigo-700 bg-white border border-indigo-200 px-3 py-1 rounded-lg hover:bg-indigo-50 transition-colors"
+              className="text-[12px] font-semibold text-sky-700 bg-white border border-sky-200 px-3 py-1 rounded-full hover:bg-sky-50 transition-colors"
             >
-              Apply all suggestions
+              Apply all
             </button>
           )}
-          {expanded ? <ChevronUp className="w-4 h-4 text-indigo-400" /> : <ChevronDown className="w-4 h-4 text-indigo-400" />}
+          {expanded
+            ? <ChevronUp className="w-4 h-4 text-sky-400" />
+            : <ChevronDown className="w-4 h-4 text-sky-400" />}
         </div>
       </div>
 
-      {/* Body */}
       {expanded && hasNew && (
-        <div className="px-5 pb-5 space-y-4 border-t border-indigo-100 pt-4">
+        <div className="px-5 pb-5 space-y-4 border-t border-sky-100 pt-4">
           {newIndustries.length > 0 && (
             <div className="space-y-2">
-              <p className="text-[11px] font-semibold text-indigo-600 uppercase tracking-wide">Industries in your leads</p>
+              <p className="text-[10px] font-bold text-sky-500 uppercase tracking-widest">Industries in your leads</p>
               <div className="flex flex-wrap gap-2">
                 {newIndustries.map((item) => (
                   <button
                     key={item.value}
                     type="button"
                     onClick={() => onApplyIndustries([...currentIndustries, item.value])}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-medium bg-white border border-indigo-200 text-indigo-800 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-colors"
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-semibold
+                               bg-white border border-sky-200 text-sky-800
+                               hover:bg-sky-600 hover:text-white hover:border-sky-600 transition-all"
                   >
                     {item.value}
-                    <span className="text-[10px] text-indigo-500">{item.total}</span>
+                    <span className="text-[10px] opacity-70">{item.total}</span>
                     {item.won > 0 && <Trophy className="w-3 h-3 text-amber-500" />}
                   </button>
                 ))}
@@ -234,17 +240,19 @@ function SuggestionsPanel({
 
           {newStates.length > 0 && (
             <div className="space-y-2">
-              <p className="text-[11px] font-semibold text-indigo-600 uppercase tracking-wide">States in your leads</p>
+              <p className="text-[10px] font-bold text-sky-500 uppercase tracking-widest">States in your leads</p>
               <div className="flex flex-wrap gap-2">
                 {newStates.map((item) => (
                   <button
                     key={item.value}
                     type="button"
                     onClick={() => onApplyStates([...currentStates, item.value])}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-medium bg-white border border-indigo-200 text-indigo-800 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-colors"
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-semibold
+                               bg-white border border-sky-200 text-sky-800
+                               hover:bg-sky-600 hover:text-white hover:border-sky-600 transition-all"
                   >
                     {item.value}
-                    <span className="text-[10px] text-indigo-500">{item.total}</span>
+                    <span className="text-[10px] opacity-70">{item.total}</span>
                     {item.won > 0 && <Trophy className="w-3 h-3 text-amber-500" />}
                   </button>
                 ))}
@@ -254,17 +262,19 @@ function SuggestionsPanel({
 
           {newRoles.length > 0 && (
             <div className="space-y-2">
-              <p className="text-[11px] font-semibold text-indigo-600 uppercase tracking-wide">Decision makers in your leads</p>
+              <p className="text-[10px] font-bold text-sky-500 uppercase tracking-widest">Decision makers in your leads</p>
               <div className="flex flex-wrap gap-2">
                 {newRoles.map((item) => (
                   <button
                     key={item.value}
                     type="button"
                     onClick={() => onApplyRoles([...currentRoles, item.value])}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-medium bg-white border border-indigo-200 text-indigo-800 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-colors"
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-semibold
+                               bg-white border border-sky-200 text-sky-800
+                               hover:bg-sky-600 hover:text-white hover:border-sky-600 transition-all"
                   >
                     {item.value}
-                    <span className="text-[10px] text-indigo-500">{item.total}</span>
+                    <span className="text-[10px] opacity-70">{item.total}</span>
                     {item.won > 0 && <Trophy className="w-3 h-3 text-amber-500" />}
                   </button>
                 ))}
@@ -288,34 +298,50 @@ function WinInsightsCard({ suggestions }: { suggestions: Suggestions }) {
   return (
     <div className="rounded-xl border border-amber-100 bg-amber-50/60 px-5 py-4 space-y-3">
       <div className="flex items-center gap-2">
-        <Trophy className="w-4 h-4 text-amber-600" />
-        <p className="text-[13px] font-semibold text-amber-900">Your winning segments</p>
+        <div className="w-7 h-7 rounded-xl bg-amber-100 flex items-center justify-center">
+          <Trophy className="w-3.5 h-3.5 text-amber-600" />
+        </div>
+        <p className="text-[13px] font-bold text-amber-900">Your winning segments</p>
         <span className="text-[11px] text-amber-600">— based on deals you&apos;ve closed</span>
       </div>
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-2">
         {wonIndustries.map((item) => (
-          <div key={item.value} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-amber-200 text-[12px]">
-            <span className="font-medium text-amber-900">{item.value}</span>
+          <div key={item.value} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-amber-200 text-[12px]">
+            <span className="font-semibold text-amber-900">{item.value}</span>
             <span className="text-amber-500">{item.won} win{item.won !== 1 ? "s" : ""}</span>
             {item.won_value != null && item.won_value > 0 && (
-              <span className="text-emerald-600 font-semibold">
-                ₹{item.won_value >= 100000
-                  ? `${(item.won_value / 100000).toFixed(1)}L`
-                  : `${(item.won_value / 1000).toFixed(0)}K`}
+              <span className="text-emerald-600 font-bold">
+                ₹{item.won_value >= 100_000
+                  ? `${(item.won_value / 100_000).toFixed(1)}L`
+                  : `${(item.won_value / 1_000).toFixed(0)}K`}
               </span>
             )}
           </div>
         ))}
         {wonStates.map((item) => (
-          <div key={item.value} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-amber-200 text-[12px]">
-            <span className="font-medium text-amber-900">{item.value}</span>
+          <div key={item.value} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-amber-200 text-[12px]">
+            <span className="font-semibold text-amber-900">{item.value}</span>
             <span className="text-amber-500">{item.won} win{item.won !== 1 ? "s" : ""}</span>
           </div>
         ))}
       </div>
-      <p className="text-[11px] text-amber-600">
-        These segments are already scoring higher in your pipeline. Make sure they&apos;re in your ICP to keep rewarding them.
+      <p className="text-[11px] text-amber-600 leading-relaxed">
+        These segments are already scoring higher. Make sure they&apos;re in your ICP to keep rewarding them.
       </p>
+    </div>
+  )
+}
+
+// ── Section wrapper ───────────────────────────────────────────────────────────
+
+function Section({ title, desc, children }: { title: string; desc: string; children: React.ReactNode }) {
+  return (
+    <div className="glass-card px-5 py-4 space-y-3">
+      <div>
+        <p className="text-[14px] font-bold text-slate-900">{title}</p>
+        <p className="text-[12px] text-slate-400 mt-0.5">{desc}</p>
+      </div>
+      {children}
     </div>
   )
 }
@@ -331,18 +357,16 @@ export default function IcpPage() {
     staleTime: 60_000,
   })
 
-  const [industries,   setIndustries]   = useState<string[]>([])
-  const [states,       setStates]       = useState<string[]>([])
+  const [industries,    setIndustries]    = useState<string[]>([])
+  const [states,        setStates]        = useState<string[]>([])
   const [businessTypes, setBusinessTypes] = useState<string[]>([])
-  const [roles,        setRoles]        = useState<string[]>([])
-  const [budgetMin,    setBudgetMin]    = useState("")
-  const [budgetMax,    setBudgetMax]    = useState("")
-  const [salesCycle,   setSalesCycle]   = useState("")
+  const [roles,         setRoles]         = useState<string[]>([])
+  const [budgetMin,     setBudgetMin]     = useState("")
+  const [budgetMax,     setBudgetMax]     = useState("")
+  const [salesCycle,    setSalesCycle]    = useState("")
   const [fitThreshold,    setFitThreshold]    = useState(60)
   const [intentThreshold, setIntentThreshold] = useState(50)
-
-  const [banner,  setBanner]  = useState("")
-  const [saving,  setSaving]  = useState(false)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (!data) return
@@ -360,7 +384,6 @@ export default function IcpPage() {
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
-    setBanner("")
     try {
       const res = await fetch("/api/settings/icp", {
         method:  "PUT",
@@ -381,14 +404,14 @@ export default function IcpPage() {
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? "Save failed")
 
-      // Trigger a background regrade so leads reflect the new ICP immediately
+      // Background regrade
       fetch("/api/admin/regrade", { method: "POST", credentials: "include" }).catch(() => {})
 
-      setBanner(`Saved — ${json.data.updated} leads are being regraded`)
+      toast.success(`Saved — ${json.data.updated} leads are being regraded`)
       qc.invalidateQueries({ queryKey: ["icp-settings"] })
       qc.invalidateQueries({ queryKey: ["leads"] })
     } catch (err: unknown) {
-      setBanner(err instanceof Error ? err.message : "Save failed")
+      toast.error(err instanceof Error ? err.message : "Save failed")
     } finally {
       setSaving(false)
     }
@@ -396,33 +419,33 @@ export default function IcpPage() {
 
   if (isLoading) {
     return (
-      <div className="max-w-3xl mx-auto py-8 px-4 space-y-4">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-12 w-full" />
-        ))}
+      <div className="max-w-2xl mx-auto space-y-4">
+        {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-xl" />)}
       </div>
     )
   }
 
   return (
-    <div className="max-w-3xl mx-auto py-8 px-4">
+    <div className="max-w-2xl mx-auto space-y-5">
 
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-2 mb-1">
-          <h1 className="text-2xl font-semibold">Best Customers</h1>
-          <span className="text-sm text-muted-foreground font-normal mt-0.5">(ICP Settings)</span>
+      {/* ── Header ────────────────────────────────────────────────────── */}
+      <div>
+        <div className="flex items-center gap-2.5 mb-1">
+          <div className="w-8 h-8 rounded-xl bg-sky-600 flex items-center justify-center">
+            <Target className="w-4 h-4 text-white" />
+          </div>
+          <h1 className="text-[22px] font-bold text-slate-900 tracking-tight">Best Customers</h1>
+          <span className="text-[13px] text-slate-400 font-normal mt-0.5">ICP Settings</span>
         </div>
-        <p className="text-muted-foreground text-sm leading-relaxed max-w-xl">
+        <p className="text-[13px] text-slate-400 leading-relaxed max-w-xl">
           Tell us who your best customers are — the industries, locations, and roles that close best.
-          The more you define, the smarter your lead scoring gets.{" "}
-          <span className="text-slate-500">All fields are optional.</span>
+          The more you define, the smarter your lead scoring gets.
         </p>
       </div>
 
-      {/* Suggestions panel */}
+      {/* ── Suggestions panel ────────────────────────────────────────── */}
       {suggestions && suggestions.total_analyzed >= 5 && (
-        <div className="mb-6 space-y-3">
+        <div className="space-y-3">
           <SuggestionsPanel
             suggestions={suggestions}
             currentIndustries={industries}
@@ -436,175 +459,168 @@ export default function IcpPage() {
         </div>
       )}
 
-      {/* No-leads hint */}
+      {/* ── No-leads hint ────────────────────────────────────────────── */}
       {suggestions && suggestions.total_analyzed < 5 && (
-        <div className="mb-6 flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-          <Lightbulb className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
-          <p className="text-[13px] text-slate-500">
+        <div className="glass-card flex items-start gap-3 px-4 py-3.5">
+          <div className="w-7 h-7 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 mt-0.5">
+            <Lightbulb className="w-3.5 h-3.5 text-slate-400" />
+          </div>
+          <p className="text-[13px] text-slate-500 leading-relaxed">
             Once you import leads, Leadkaun will automatically suggest industries and states based on what&apos;s in your pipeline.
           </p>
         </div>
       )}
 
-      {/* Save banner */}
-      {banner && (
-        <div className="mb-6 px-4 py-3 rounded-lg bg-green-50 border border-green-200 text-green-800 text-sm">
-          {banner}
-        </div>
-      )}
+      {/* ── Form ─────────────────────────────────────────────────────── */}
+      <form onSubmit={handleSave} className="space-y-4">
 
-      <form onSubmit={handleSave} className="space-y-8">
-
-        {/* Industries */}
-        <div className="space-y-3">
-          <div>
-            <Label className="text-base font-medium">Target Industries</Label>
-            <p className="text-xs text-muted-foreground mt-0.5">Industries where your best customers come from</p>
-          </div>
+        <Section title="Target Industries" desc="Industries where your best customers come from">
           <ToggleChips
             options={INDUSTRY_OPTIONS}
             selected={industries}
             onChange={setIndustries}
             suggestions={suggestions?.industries}
           />
-        </div>
+        </Section>
 
-        {/* States */}
-        <div className="space-y-3">
-          <div>
-            <Label className="text-base font-medium">Target States</Label>
-            <p className="text-xs text-muted-foreground mt-0.5">Geographies you sell into most effectively</p>
-          </div>
+        <Section title="Target States" desc="Geographies you sell into most effectively">
           <ToggleChips
             options={STATE_OPTIONS}
             selected={states}
             onChange={setStates}
             suggestions={suggestions?.states}
           />
-        </div>
+        </Section>
 
-        {/* Business Types */}
-        <div className="space-y-3">
-          <div>
-            <Label className="text-base font-medium">Business Types</Label>
-            <p className="text-xs text-muted-foreground mt-0.5">The type of business you typically close</p>
-          </div>
+        <Section title="Business Types" desc="The type of business you typically close">
           <ToggleChips
             options={BUSINESS_TYPE_OPTIONS}
             selected={businessTypes}
             onChange={setBusinessTypes}
           />
-        </div>
+        </Section>
 
-        {/* Decision Maker Roles */}
-        <div className="space-y-3">
-          <div>
-            <Label className="text-base font-medium">Decision Maker Roles</Label>
-            <p className="text-xs text-muted-foreground mt-0.5">Who in the company typically buys from you</p>
-          </div>
+        <Section title="Decision Maker Roles" desc="Who in the company typically buys from you">
           <ToggleChips
             options={ROLE_OPTIONS}
             selected={roles}
             onChange={setRoles}
             suggestions={suggestions?.roles}
           />
-        </div>
+        </Section>
 
-        {/* Budget */}
-        <div className="space-y-3">
-          <div>
-            <Label className="text-base font-medium">Budget Range (₹)</Label>
-            <p className="text-xs text-muted-foreground mt-0.5">Deal sizes you typically close — leads outside this range score lower</p>
-          </div>
-          <div className="flex gap-4 items-center">
+        <Section title="Budget Range (₹)" desc="Deal sizes you typically close — leads outside this range score lower">
+          <div className="flex gap-3 items-center">
             <div className="flex-1 space-y-1">
-              <Label className="text-xs text-muted-foreground">Min</Label>
-              <Input
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Min</p>
+              <input
                 type="number"
                 placeholder="e.g. 50000"
                 value={budgetMin}
                 onChange={(e) => setBudgetMin(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-[13px] text-slate-900
+                           placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500/30
+                           focus:border-sky-400 transition-all"
               />
             </div>
-            <span className="text-muted-foreground mt-5">—</span>
+            <span className="text-slate-300 mt-5 text-lg">—</span>
             <div className="flex-1 space-y-1">
-              <Label className="text-xs text-muted-foreground">Max</Label>
-              <Input
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Max</p>
+              <input
                 type="number"
                 placeholder="e.g. 500000"
                 value={budgetMax}
                 onChange={(e) => setBudgetMax(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-[13px] text-slate-900
+                           placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500/30
+                           focus:border-sky-400 transition-all"
               />
             </div>
           </div>
-        </div>
+        </Section>
 
-        {/* Sales Cycle */}
-        <div className="space-y-2">
-          <div>
-            <Label className="text-base font-medium">Typical Sales Cycle</Label>
-            <p className="text-xs text-muted-foreground mt-0.5">Used to calibrate intent decay speed</p>
-          </div>
-          <Select value={salesCycle} onValueChange={(v) => setSalesCycle(v ?? "")}>
-            <SelectTrigger className="w-60">
-              <SelectValue placeholder="Select…" />
-            </SelectTrigger>
-            <SelectContent>
-              {SALES_CYCLE_OPTIONS.map((o) => (
-                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <hr />
+        <Section title="Typical Sales Cycle" desc="Used to calibrate intent decay speed">
+          <select
+            value={salesCycle}
+            onChange={(e) => setSalesCycle(e.target.value)}
+            className="w-60 px-3.5 py-2.5 rounded-xl border border-slate-200 text-[13px] text-slate-900
+                       focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-400
+                       bg-white transition-all"
+          >
+            <option value="">Select…</option>
+            {SALES_CYCLE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </Section>
 
         {/* SQL Thresholds */}
-        <div className="space-y-6">
-          <div>
-            <h2 className="text-base font-semibold mb-1">SQL Thresholds</h2>
-            <p className="text-sm text-muted-foreground">
+        <div className="glass-card px-5 py-4 space-y-5">
+          <div className="border-b border-slate-100 pb-4">
+            <p className="text-[14px] font-bold text-slate-900">SQL Thresholds</p>
+            <p className="text-[12px] text-slate-400 mt-0.5">
               A lead is flagged as Sales Qualified when both scores exceed these thresholds.
             </p>
           </div>
 
-          <div className="space-y-3">
-            <div className="flex justify-between">
-              <Label>Fit Score Threshold</Label>
-              <span className="text-sm font-medium tabular-nums">{fitThreshold}</span>
+          {/* Fit threshold */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[13px] font-semibold text-slate-800">Fit Score Threshold</p>
+                <p className="text-[11px] text-slate-400">How well the lead matches your ICP</p>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-sky-50 flex items-center justify-center">
+                <span className="text-[14px] font-black text-sky-600 tabular-nums">{fitThreshold}</span>
+              </div>
             </div>
             <input
               type="range" min={0} max={100} step={5}
               value={fitThreshold}
               onChange={(e) => setFitThreshold(parseInt(e.target.value))}
-              className="w-full accent-primary"
+              className="w-full h-1.5 rounded-full accent-sky-600 cursor-pointer"
             />
-            <div className="flex justify-between text-xs text-muted-foreground">
+            <div className="flex justify-between text-[10px] text-slate-400 font-medium">
               <span>Lenient (0)</span><span>Strict (100)</span>
             </div>
           </div>
 
-          <div className="space-y-3">
-            <div className="flex justify-between">
-              <Label>Intent Score Threshold</Label>
-              <span className="text-sm font-medium tabular-nums">{intentThreshold}</span>
+          {/* Intent threshold */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[13px] font-semibold text-slate-800">Intent Score Threshold</p>
+                <p className="text-[11px] text-slate-400">Engagement signals and buying intent</p>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-sky-50 flex items-center justify-center">
+                <span className="text-[14px] font-black text-sky-600 tabular-nums">{intentThreshold}</span>
+              </div>
             </div>
             <input
               type="range" min={0} max={100} step={5}
               value={intentThreshold}
               onChange={(e) => setIntentThreshold(parseInt(e.target.value))}
-              className="w-full accent-primary"
+              className="w-full h-1.5 rounded-full accent-sky-600 cursor-pointer"
             />
-            <div className="flex justify-between text-xs text-muted-foreground">
+            <div className="flex justify-between text-[10px] text-slate-400 font-medium">
               <span>Lenient (0)</span><span>Strict (100)</span>
             </div>
           </div>
         </div>
 
-        <div className="flex justify-end pt-4">
-          <Button type="submit" disabled={saving} size="lg">
+        {/* Save button */}
+        <div className="flex justify-end pt-1">
+          <button
+            type="submit"
+            disabled={saving}
+            className="flex items-center gap-2 h-11 px-6 rounded-full bg-sky-600 hover:bg-sky-700
+                       text-white text-[14px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed
+                       active:scale-[0.97] transition-all
+                       shadow-[0_2px_8px_rgba(14, 165, 233,0.3),inset_0_1px_0_rgba(255,255,255,0.12)]"
+          >
+            <Save className="w-4 h-4" />
             {saving ? "Saving…" : "Save & Regrade Leads"}
-          </Button>
+          </button>
         </div>
       </form>
     </div>

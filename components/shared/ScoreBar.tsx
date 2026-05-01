@@ -1,19 +1,21 @@
 import { cn } from "@/lib/utils"
 
 /*
- * Score bars: thin (5px), single-colour fills — no gradients.
- * Gradient would add noise; single colour reads cleanly in a 3-bar row.
+ * Coastal Sunrise score bars — thin (5px) gradient fills.
+ *
+ * Each fill is a subtle 2-stop vertical gradient that catches light at the top.
+ * Single-color reads cleanly at this size; gradient adds just enough dimension.
  *
  * Colour semantics:
- *   fit     = blue  (calculated/ICP match — "cold" data)
- *   intent  = green (engagement — "warm" signal)
- *   quality = violet (data completeness — "structural")
+ *   fit     = sky    (calculated/ICP match — the calm one)
+ *   intent  = mint   (engagement — growth / positive)
+ *   quality = cyan   (data structural — the cool data accent)
  */
 const FILL: Record<string, string> = {
-  fit:     "bg-blue-500",
-  intent:  "bg-emerald-500",
-  quality: "bg-violet-500",
-  default: "bg-indigo-500",
+  fit:     "linear-gradient(180deg, #38BDF8 0%, #0EA5E9 100%)",
+  intent:  "linear-gradient(180deg, #6EE7B7 0%, #10B981 100%)",
+  quality: "linear-gradient(180deg, #67E8F9 0%, #06B6D4 100%)",
+  default: "linear-gradient(180deg, #475569 0%, #0F172A 100%)",
 }
 
 interface Props {
@@ -38,14 +40,17 @@ export function ScoreBar({
     <div className={cn("space-y-1.5", className)}>
       {(label || showValue) && (
         <div className="flex items-center justify-between">
-          {label    && <span className="text-[11px] text-slate-400 font-medium">{label}</span>}
-          {showValue && <span className="text-[11px] font-semibold text-slate-600 tabular-nums">{clamped}</span>}
+          {label    && <span className="text-[11px] text-ink-soft font-medium">{label}</span>}
+          {showValue && <span className="text-[11px] font-semibold text-ink tabular-nums">{clamped}</span>}
         </div>
       )}
-      <div className="h-[5px] w-full rounded-full bg-slate-100 overflow-hidden">
+      <div
+        className="h-[5px] w-full rounded-full overflow-hidden"
+        style={{ background: "rgba(15,23,42,0.06)" }}
+      >
         <div
-          className={cn("h-full rounded-full transition-all duration-300", fill)}
-          style={{ width: `${clamped}%` }}
+          className="h-full rounded-full transition-all duration-300"
+          style={{ width: `${clamped}%`, background: fill }}
         />
       </div>
     </div>

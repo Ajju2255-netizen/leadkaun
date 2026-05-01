@@ -2,12 +2,8 @@
 
 import { useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { toast } from "sonner"
+import { UserPlus, Users, X, ShieldCheck, UserCog } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 
 interface Member {
@@ -20,55 +16,71 @@ interface Member {
   _count: { assigned_leads: number }
 }
 
-interface MembersResponse {
-  members: Member[]
+async function fetchMembers(): Promise<{ members: Member[] }> {
+  const res = await fetch("/api/team/members")
+  if (!res.ok) throw new Error("Failed")
+  // API returns { members } directly via apiSuccess({members}) — accept both shapes
+  return res.json().then((r) => r?.members ? r : (r?.data ?? { members: [] }))
 }
 
-async function fetchMembers(): Promise<MembersResponse> {
-  const res = await fetch("/api/team/members")
-  if (!res.ok) throw new Error("Failed to fetch members")
-  return res.json().then((r) => r.data)
+const ROLE_COLORS: Record<string, string> = {
+  ADMIN:   "bg-sky-50 text-sky-700 border-sky-200",
+  MANAGER: "bg-violet-50 text-violet-700 border-violet-200",
+  REP:     "bg-slate-100 text-slate-600 border-slate-200",
+}
+
+const ROLE_LABELS: Record<string, string> = {
+  ADMIN: "Admin", MANAGER: "Manager", REP: "Rep",
+}
+
+function Avatar({ name, active }: { name: string; active: boolean }) {
+  const initials = name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
+  return (
+    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-black shrink-0
+      ${active ? "bg-sky-100 text-sky-700" : "bg-slate-100 text-slate-400"}`}>
+      {initials}
+    </div>
+  )
 }
 
 export default function TeamPage() {
   const qc = useQueryClient()
-  const { data, isLoading } = useQuery<MembersResponse>({
+  const { data, isLoading } = useQuery<{ members: Member[] }>({
     queryKey: ["team-members"],
-    queryFn: fetchMembers,
+    queryFn:  fetchMembers,
   })
 
-  const [inviteEmail, setInviteEmail] = useState("")
-  const [inviteRole, setInviteRole] = useState<"REP" | "MANAGER">("REP")
+  const [inviteEmail,   setInviteEmail]   = useState("")
+  const [inviteRole,    setInviteRole]    = useState<"REP" | "MANAGER">("REP")
   const [inviteLoading, setInviteLoading] = useState(false)
-  const [inviteMsg, setInviteMsg] = useState("")
 
-  // Deactivate dialog
   const [deactivateTarget, setDeactivateTarget] = useState<Member | null>(null)
-  const [reassignTo, setReassignTo] = useState("")
+  const [reassignTo,       setReassignTo]       = useState("")
+  const [deactivating,     setDeactivating]     = useState(false)
 
-  // Role change dialog
   const [roleTarget, setRoleTarget] = useState<Member | null>(null)
-  const [newRole, setNewRole] = useState<"REP" | "MANAGER">("REP")
+  const [newRole,    setNewRole]    = useState<"REP" | "MANAGER">("REP")
+  const [roleSaving, setRoleSaving] = useState(false)
 
-  const activeReps = (data?.members ?? []).filter((m) => m.is_active && m.role === "REP")
+  const members    = data?.members ?? []
+  const activeReps = members.filter((m) => m.is_active && m.role === "REP")
 
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault()
     setInviteLoading(true)
-    setInviteMsg("")
     try {
-      const res = await fetch("/api/team/invite", {
-        method: "POST",
+      const res  = await fetch("/api/team/invite", {
+        method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
+        body:    JSON.stringify({ email: inviteEmail, role: inviteRole }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? "Invite failed")
-      setInviteMsg(`Invite sent to ${inviteEmail}`)
+      toast.success(`Invite sent to ${inviteEmail}`)
       setInviteEmail("")
       qc.invalidateQueries({ queryKey: ["team-members"] })
     } catch (err: unknown) {
-      setInviteMsg(err instanceof Error ? err.message : "Invite failed")
+      toast.error(err instanceof Error ? err.message : "Invite failed")
     } finally {
       setInviteLoading(false)
     }
@@ -76,18 +88,18 @@ export default function TeamPage() {
 
   async function handleDeactivate() {
     if (!deactivateTarget) return
+    setDeactivating(true)
     const body: Record<string, unknown> = { is_active: false }
     if (reassignTo) body.reassign_to_rep_id = reassignTo
-    const res = await fetch(`/api/team/members/${deactivateTarget.id}`, {
-      method: "PATCH",
+    const res  = await fetch(`/api/team/members/${deactivateTarget.id}`, {
+      method:  "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body:    JSON.stringify(body),
     })
     const json = await res.json()
-    if (!res.ok) {
-      alert(json.error ?? "Failed to deactivate")
-      return
-    }
+    setDeactivating(false)
+    if (!res.ok) { toast.error(json.error ?? "Failed to deactivate"); return }
+    toast.success(`${deactivateTarget.first_name} deactivated`)
     setDeactivateTarget(null)
     setReassignTo("")
     qc.invalidateQueries({ queryKey: ["team-members"] })
@@ -95,219 +107,268 @@ export default function TeamPage() {
 
   async function handleRoleChange() {
     if (!roleTarget) return
-    const res = await fetch(`/api/team/members/${roleTarget.id}`, {
-      method: "PATCH",
+    setRoleSaving(true)
+    const res  = await fetch(`/api/team/members/${roleTarget.id}`, {
+      method:  "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ role: newRole }),
+      body:    JSON.stringify({ role: newRole }),
     })
-    if (!res.ok) {
-      const json = await res.json()
-      alert(json.error ?? "Failed to update role")
-      return
-    }
+    const json = await res.json()
+    setRoleSaving(false)
+    if (!res.ok) { toast.error(json.error ?? "Failed to update role"); return }
+    toast.success(`Role updated to ${ROLE_LABELS[newRole]}`)
     setRoleTarget(null)
     qc.invalidateQueries({ queryKey: ["team-members"] })
   }
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4 space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold">Team Management</h1>
-        <p className="text-muted-foreground mt-1">Invite members, manage roles, and reassign leads.</p>
+    <div className="max-w-2xl mx-auto space-y-6">
+
+      {/* ── Header ───────────────────────────────────────────────────────── */}
+      <div className="flex items-start gap-3">
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_6px_18px_rgba(14,165,233,0.32)]">
+          <Users className="w-6 h-6 text-white" strokeWidth={2.4} />
+        </div>
+        <div>
+          <h1 className="text-[26px] font-extrabold text-slate-900 tracking-tight leading-tight">Team</h1>
+          <p className="text-[13px] text-slate-500 mt-0.5">Invite members, manage roles, reassign leads.</p>
+        </div>
       </div>
 
-      {/* Invite Form */}
-      <div className="border rounded-lg p-6 space-y-4">
-        <h2 className="text-base font-semibold">Invite a Team Member</h2>
-        <form onSubmit={handleInvite} className="flex gap-3 items-end">
-          <div className="flex-1 space-y-1">
-            <Label htmlFor="invite-email">Email</Label>
-            <Input
-              id="invite-email"
+      {/* ── Invite card ──────────────────────────────────────────────────── */}
+      <div className="glass-card px-5 py-5">
+        <div className="flex items-center gap-2.5 mb-4">
+          <div className="w-8 h-8 rounded-xl bg-sky-50 flex items-center justify-center">
+            <UserPlus className="w-4 h-4 text-sky-600" />
+          </div>
+          <p className="text-[14px] font-bold text-slate-900">Invite a Team Member</p>
+        </div>
+        <form onSubmit={handleInvite} className="flex gap-2.5 items-end">
+          <div className="flex-1">
+            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+              Email
+            </label>
+            <input
               type="email"
+              required
               placeholder="rep@company.com"
               value={inviteEmail}
               onChange={(e) => setInviteEmail(e.target.value)}
-              required
+              className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-[13px]
+                         focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
             />
           </div>
-          <div className="w-36 space-y-1">
-            <Label>Role</Label>
-            <Select value={inviteRole} onValueChange={(v) => setInviteRole((v ?? "REP") as "REP" | "MANAGER")}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="REP">Rep</SelectItem>
-                <SelectItem value="MANAGER">Manager</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="w-36">
+            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+              Role
+            </label>
+            <select
+              value={inviteRole}
+              onChange={(e) => setInviteRole(e.target.value as "REP" | "MANAGER")}
+              className="w-full h-[42px] px-3 rounded-xl border border-slate-200 bg-white text-[13px]
+                         text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500/30
+                         focus:border-sky-400 transition-all"
+            >
+              <option value="REP">Rep</option>
+              <option value="MANAGER">Manager</option>
+            </select>
           </div>
-          <Button type="submit" disabled={inviteLoading}>
+          <button
+            type="submit"
+            disabled={inviteLoading}
+            className="h-[42px] px-5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white
+                       text-[13px] font-semibold transition-all duration-150 disabled:opacity-50 shrink-0"
+          >
             {inviteLoading ? "Sending…" : "Send Invite"}
-          </Button>
+          </button>
         </form>
-        {inviteMsg && (
-          <p className={inviteMsg.includes("sent") ? "text-green-600 text-sm" : "text-destructive text-sm"}>
-            {inviteMsg}
-          </p>
+      </div>
+
+      {/* ── Members list ─────────────────────────────────────────────────── */}
+      <div className="glass-card overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <Users className="w-4 h-4 text-slate-400" />
+            <p className="text-[13px] font-bold text-slate-800">
+              Members
+              {!isLoading && (
+                <span className="text-slate-400 font-normal ml-1.5">· {members.length}</span>
+              )}
+            </p>
+          </div>
+        </div>
+
+        {isLoading ? (
+          <div className="p-4 space-y-3">
+            {[1,2,3].map(i => <Skeleton key={i} className="h-14 rounded-xl" />)}
+          </div>
+        ) : members.length === 0 ? (
+          <div className="px-5 py-12 text-center text-[13px] text-slate-400">No team members yet.</div>
+        ) : (
+          <div className="divide-y divide-slate-50">
+            {members.map((m) => (
+              <div key={m.id} className={`px-5 py-3.5 flex items-center gap-3 hover:bg-slate-50 transition-colors ${!m.is_active ? "opacity-60" : ""}`}>
+                <Avatar name={`${m.first_name} ${m.last_name}`} active={m.is_active} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-[13px] font-semibold text-slate-800 leading-tight">
+                      {m.first_name} {m.last_name}
+                    </p>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${ROLE_COLORS[m.role]}`}>
+                      {ROLE_LABELS[m.role]}
+                    </span>
+                    {!m.is_active && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-400 border border-slate-200">
+                        Inactive
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    {m.email}
+                    {m._count.assigned_leads > 0 && ` · ${m._count.assigned_leads} lead${m._count.assigned_leads !== 1 ? "s" : ""}`}
+                  </p>
+                </div>
+                {/* Actions */}
+                {m.role !== "ADMIN" && (
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      onClick={() => { setRoleTarget(m); setNewRole(m.role === "REP" ? "MANAGER" : "REP") }}
+                      className="flex items-center gap-1 text-[11px] font-semibold text-slate-500
+                                 border border-slate-200 rounded-full px-2.5 py-1 hover:border-sky-300
+                                 hover:text-sky-600 hover:bg-sky-50 transition-all duration-150"
+                      title="Change role"
+                    >
+                      <UserCog className="w-3 h-3" />
+                      Role
+                    </button>
+                    {m.is_active && (
+                      <button
+                        onClick={() => { setDeactivateTarget(m); setReassignTo("") }}
+                        className="flex items-center gap-1 text-[11px] font-semibold text-slate-400
+                                   border border-slate-200 rounded-full px-2.5 py-1 hover:border-red-300
+                                   hover:text-red-600 hover:bg-red-50 transition-all duration-150"
+                        title="Deactivate"
+                      >
+                        <X className="w-3 h-3" />
+                        Off
+                      </button>
+                    )}
+                  </div>
+                )}
+                {m.role === "ADMIN" && (
+                  <div className="shrink-0">
+                    <ShieldCheck className="w-4 h-4 text-sky-400" aria-label="Admin" />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         )}
       </div>
 
-      {/* Members Table */}
-      <div className="border rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50">
-            <tr>
-              <th className="px-4 py-3 text-left font-medium">Member</th>
-              <th className="px-4 py-3 text-left font-medium">Role</th>
-              <th className="px-4 py-3 text-left font-medium">Status</th>
-              <th className="px-4 py-3 text-left font-medium">Active Leads</th>
-              <th className="px-4 py-3 text-right font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {isLoading
-              ? Array.from({ length: 4 }).map((_, i) => (
-                  <tr key={i}>
-                    <td className="px-4 py-3" colSpan={5}>
-                      <Skeleton className="h-5 w-full" />
-                    </td>
-                  </tr>
-                ))
-              : (data?.members ?? []).map((m) => (
-                  <tr key={m.id} className="hover:bg-muted/20">
-                    <td className="px-4 py-3">
-                      <div className="font-medium">
-                        {m.first_name} {m.last_name}
-                      </div>
-                      <div className="text-muted-foreground text-xs">{m.email}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge variant="outline" className="capitalize">
-                        {m.role.toLowerCase()}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge variant={m.is_active ? "default" : "secondary"}>
-                        {m.is_active ? "Active" : "Inactive"}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">{m._count.assigned_leads}</td>
-                    <td className="px-4 py-3 text-right space-x-2">
-                      {m.role !== "ADMIN" && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setRoleTarget(m)
-                            setNewRole(m.role === "REP" ? "MANAGER" : "REP")
-                          }}
-                        >
-                          Change Role
-                        </Button>
-                      )}
-                      {m.is_active && m.role !== "ADMIN" && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive"
-                          onClick={() => {
-                            setDeactivateTarget(m)
-                            setReassignTo("")
-                          }}
-                        >
-                          Deactivate
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Deactivate Dialog */}
-      <Dialog open={!!deactivateTarget} onOpenChange={(open) => !open && setDeactivateTarget(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Deactivate {deactivateTarget?.first_name}?</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <p className="text-sm text-muted-foreground">
+      {/* ── Deactivate modal ─────────────────────────────────────────────── */}
+      {deactivateTarget && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px] flex items-end sm:items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl border border-slate-200 p-6 w-full max-w-sm space-y-4
+                          shadow-[0_24px_48px_rgba(15,23,42,0.18)]">
+            <div className="flex items-center justify-between">
+              <h2 className="text-[17px] font-bold text-slate-900">Deactivate {deactivateTarget.first_name}?</h2>
+              <button onClick={() => setDeactivateTarget(null)}
+                className="w-7 h-7 flex items-center justify-center rounded-full text-slate-400
+                           hover:text-slate-700 hover:bg-slate-100 transition-all">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-[13px] text-slate-500">
               This member has{" "}
-              <span className="font-semibold text-foreground">{deactivateTarget?._count.assigned_leads}</span> active
-              leads.
-              {(deactivateTarget?._count.assigned_leads ?? 0) > 0
-                ? " Select a rep to reassign them before deactivating."
+              <span className="font-semibold text-slate-800">{deactivateTarget._count.assigned_leads}</span>{" "}
+              active lead{deactivateTarget._count.assigned_leads !== 1 ? "s" : ""}.
+              {(deactivateTarget._count.assigned_leads ?? 0) > 0
+                ? " Reassign them before deactivating."
                 : " No leads to reassign."}
             </p>
-            {(deactivateTarget?._count.assigned_leads ?? 0) > 0 && (
-              <div className="space-y-1">
-                <Label>Reassign leads to</Label>
-                <Select
+            {(deactivateTarget._count.assigned_leads ?? 0) > 0 && (
+              <div className="space-y-1.5">
+                <label className="text-[12px] font-semibold text-slate-500 uppercase tracking-wider">
+                  Reassign leads to
+                </label>
+                <select
                   value={reassignTo}
-                  onValueChange={(v) => setReassignTo(v ?? "")}
+                  onChange={(e) => setReassignTo(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-[13px]
+                             text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500/30
+                             focus:border-sky-400 transition-all"
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a rep…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {activeReps
-                      .filter((r) => r.id !== deactivateTarget?.id)
-                      .map((r) => (
-                        <SelectItem key={r.id} value={r.id}>
-                          {r.first_name} {r.last_name}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
+                  <option value="">Select a rep…</option>
+                  {activeReps.filter((r) => r.id !== deactivateTarget.id).map((r) => (
+                    <option key={r.id} value={r.id}>{r.first_name} {r.last_name}</option>
+                  ))}
+                </select>
               </div>
             )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeactivateTarget(null)}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={(deactivateTarget?._count.assigned_leads ?? 0) > 0 && !reassignTo}
-              onClick={handleDeactivate}
-            >
-              Deactivate
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Role Change Dialog */}
-      <Dialog open={!!roleTarget} onOpenChange={(open) => !open && setRoleTarget(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Change Role for {roleTarget?.first_name}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-1">
-              <Label>New Role</Label>
-              <Select value={newRole} onValueChange={(v) => setNewRole((v ?? "REP") as "REP" | "MANAGER")}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="REP">Rep</SelectItem>
-                  <SelectItem value="MANAGER">Manager</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => setDeactivateTarget(null)}
+                className="flex-1 h-10 rounded-full border border-slate-200 text-[13px] font-semibold
+                           text-slate-600 hover:bg-slate-50 transition-all">
+                Cancel
+              </button>
+              <button
+                onClick={handleDeactivate}
+                disabled={deactivating || ((deactivateTarget._count.assigned_leads ?? 0) > 0 && !reassignTo)}
+                className="flex-1 h-10 rounded-full bg-red-600 hover:bg-red-700 text-white
+                           text-[13px] font-semibold transition-all disabled:opacity-50">
+                {deactivating ? "Deactivating…" : "Deactivate"}
+              </button>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRoleTarget(null)}>
-              Cancel
-            </Button>
-            <Button onClick={handleRoleChange}>Save</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
+
+      {/* ── Role change modal ────────────────────────────────────────────── */}
+      {roleTarget && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px] flex items-end sm:items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl border border-slate-200 p-6 w-full max-w-sm space-y-4
+                          shadow-[0_24px_48px_rgba(15,23,42,0.18)]">
+            <div className="flex items-center justify-between">
+              <h2 className="text-[17px] font-bold text-slate-900">Change Role</h2>
+              <button onClick={() => setRoleTarget(null)}
+                className="w-7 h-7 flex items-center justify-center rounded-full text-slate-400
+                           hover:text-slate-700 hover:bg-slate-100 transition-all">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-[13px] text-slate-500">
+              Update role for <span className="font-semibold text-slate-800">{roleTarget.first_name} {roleTarget.last_name}</span>
+            </p>
+            <div className="space-y-1.5">
+              <label className="text-[12px] font-semibold text-slate-500 uppercase tracking-wider">New Role</label>
+              <select
+                value={newRole}
+                onChange={(e) => setNewRole(e.target.value as "REP" | "MANAGER")}
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-[13px]
+                           text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500/30
+                           focus:border-sky-400 transition-all"
+              >
+                <option value="REP">Rep</option>
+                <option value="MANAGER">Manager</option>
+              </select>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => setRoleTarget(null)}
+                className="flex-1 h-10 rounded-full border border-slate-200 text-[13px] font-semibold
+                           text-slate-600 hover:bg-slate-50 transition-all">
+                Cancel
+              </button>
+              <button onClick={handleRoleChange} disabled={roleSaving}
+                className="flex-1 h-10 rounded-full bg-sky-600 hover:bg-sky-700 text-white
+                           text-[13px] font-semibold transition-all disabled:opacity-50">
+                {roleSaving ? "Saving…" : "Save Role"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

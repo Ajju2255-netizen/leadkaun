@@ -88,10 +88,55 @@ export async function GET(_req: Request) {
 
     const totalValue = enriched.reduce((s, l) => s + (l.expected_value ?? 0), 0)
 
+    // ── Yesterday comparison: pool size 24h ago vs now ─────────────────────
+    // Pool 24h ago = leads that are still missed AND were already missed 24h ago.
+    // (Any lead that became missed in the last 24h was NOT in yesterday's pool.)
+    const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+    const yesterdayPool = enriched
+      .filter((l) => l.missed_at && new Date(l.missed_at) < dayAgo)
+      .reduce((s, l) => s + (l.expected_value ?? 0), 0)
+    const value_vs_yesterday_pct =
+      yesterdayPool > 0
+        ? Math.round(((totalValue - yesterdayPool) / yesterdayPool) * 100)
+        : null
+
+    // ── 7-day trend — daily inflow of newly-stale value ────────────────────
+    // For each of the last 7 days (oldest → newest), sum value of leads that
+    // became missed on that day. Drives the sparkline + 7d % change.
+    const trend_7d: number[] = []
+    for (let i = 6; i >= 0; i--) {
+      const dayStart = new Date(now)
+      dayStart.setHours(0, 0, 0, 0)
+      dayStart.setDate(dayStart.getDate() - i)
+      const dayEnd = new Date(dayStart)
+      dayEnd.setDate(dayEnd.getDate() + 1)
+      const dayValue = enriched
+        .filter((l) => l.missed_at && new Date(l.missed_at) >= dayStart && new Date(l.missed_at) < dayEnd)
+        .reduce((s, l) => s + (l.expected_value ?? 0), 0)
+      trend_7d.push(dayValue)
+    }
+
+    // 7d % change = pool size change over 7 days.
+    // Approximation: pool_7d_ago = pool_now − value of leads that became missed in last 7 days.
+    const sevenDaysAgo  = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+    const newInLast7Days = enriched
+      .filter((l) => l.missed_at && new Date(l.missed_at) >= sevenDaysAgo)
+      .reduce((s, l) => s + (l.expected_value ?? 0), 0)
+    const poolSevenDaysAgo = totalValue - newInLast7Days
+    const value_7d_pct_change =
+      poolSevenDaysAgo > 0
+        ? Math.round(((totalValue - poolSevenDaysAgo) / poolSevenDaysAgo) * 100)
+        : newInLast7Days > 0
+        ? 100  // pool grew from zero — flag a sharp rise
+        : null
+
     return apiSuccess({
       total_count:         enriched.length,
       total_value:         totalValue,
       recovered_this_week: recoveredThisWeek._sum.won_value ?? 0,
+      value_vs_yesterday_pct,
+      value_7d_pct_change,
+      trend_7d,
       leads:               enriched,
       by_rep:              Array.from(byRepMap.values()),
     })

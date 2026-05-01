@@ -15,6 +15,20 @@ const OUTREACH_SIGNAL_TYPES: SignalType[] = [
   "CALL_VOICEMAIL",
 ]
 
+// Signals that indicate the lead is actively engaged / interested
+const HOT_SIGNAL_TYPES: SignalType[] = [
+  "CALL_ANSWERED_INTERESTED",
+  "CALL_ANSWERED_CALLBACK",
+  "WA_REPLIED_1H",
+  "WA_REPLIED_4H",
+  "WA_REPLIED_24H",
+  "WA_TAG_ASKED_PRICING",
+  "WA_TAG_NEGOTIATING",
+  "WA_TAG_DECISION_PENDING",
+]
+
+const HOT_WINDOW_MS = 2 * 3_600_000 // 2 hours
+
 /**
  * GET /api/queue
  *
@@ -66,27 +80,48 @@ export async function GET(req: Request) {
           orderBy: { due_date: "asc" },
           take: 1,
         },
+        signals: {
+          orderBy: { created_at: "desc" },
+          take:    3,
+          select:  { signal_type: true, created_at: true },
+        },
       },
     })
 
-    // Attach next_action + hours_since_import to each lead
+    // Attach next_action + signal intelligence to each lead
     const now = Date.now()
-    const enriched = leads.map((lead) => ({
-      ...lead,
-      next_action: {
-        ...getNextAction(lead.grade),
-        reason: buildActionReason({
-          grade:         lead.grade,
-          fit_score:     lead.fit_score,
-          intent_score:  lead.intent_score,
-          quality_score: lead.quality_score,
-          inquiry_text:  lead.inquiry_text,
-        }),
-      },
-      hours_since_import: lead.imported_at
-        ? Math.floor((now - new Date(lead.imported_at).getTime()) / 3_600_000)
-        : null,
-    }))
+    const enriched = leads.map((lead) => {
+      const latestSignal    = lead.signals[0] ?? null
+      const latestSignalMs  = latestSignal ? new Date(latestSignal.created_at).getTime() : null
+      const msSinceSignal   = latestSignalMs != null ? now - latestSignalMs : null
+      const isHotSignal     = latestSignal != null
+        && HOT_SIGNAL_TYPES.includes(latestSignal.signal_type as SignalType)
+        && msSinceSignal != null
+        && msSinceSignal < HOT_WINDOW_MS
+
+      return {
+        ...lead,
+        next_action: {
+          ...getNextAction(lead.grade),
+          reason: buildActionReason({
+            grade:         lead.grade,
+            fit_score:     lead.fit_score,
+            intent_score:  lead.intent_score,
+            quality_score: lead.quality_score,
+            inquiry_text:  lead.inquiry_text,
+          }),
+        },
+        hours_since_import:       lead.imported_at
+          ? Math.floor((now - new Date(lead.imported_at).getTime()) / 3_600_000)
+          : null,
+        last_signal_at:           latestSignal?.created_at ?? null,
+        last_signal_type:         latestSignal?.signal_type ?? null,
+        minutes_since_last_signal: msSinceSignal != null
+          ? Math.floor(msSinceSignal / 60_000)
+          : null,
+        is_hot_signal:            isHotSignal,
+      }
+    })
 
     // Count outreach signals logged today (any call attempt = "contacted")
     const todayStart = new Date()
@@ -100,10 +135,17 @@ export async function GET(req: Request) {
       },
     })
 
-    // Group by grade
+    // Group by grade — hot-signal leads bubble to top within each group
     const grouped: Record<string, typeof enriched> = { A: [], B: [], C: [], D: [], E: [] }
     for (const lead of enriched) {
       if (grouped[lead.grade]) grouped[lead.grade].push(lead)
+    }
+    for (const g of Object.keys(grouped)) {
+      grouped[g].sort((a, b) => {
+        if (a.is_hot_signal && !b.is_hot_signal) return -1
+        if (!a.is_hot_signal && b.is_hot_signal) return 1
+        return 0
+      })
     }
 
     // Summary stats per group

@@ -1,6 +1,7 @@
+import { z } from "zod"
 import { prisma } from "@/lib/prisma"
-import { requireAuth, handleAuthError } from "@/lib/auth/middleware"
-import { apiSuccess, apiError } from "@/lib/api/response"
+import { requireAuth, requireRole, handleAuthError } from "@/lib/auth/middleware"
+import { apiSuccess, apiError, parseBody } from "@/lib/api/response"
 
 /**
  * GET /api/lead-sources
@@ -46,6 +47,52 @@ export async function GET() {
     }
 
     return apiSuccess({ sources })
+  } catch (err) {
+    const authResponse = handleAuthError(err)
+    if (authResponse) return authResponse
+    return apiError("Internal server error", "INTERNAL_ERROR", 500)
+  }
+}
+
+const CreateSchema = z.object({
+  name:            z.string().min(1).max(80),
+  intent_baseline: z.number().int().min(0).max(100).optional().default(30),
+})
+
+/**
+ * POST /api/lead-sources
+ * Create a custom lead source. Admin only.
+ */
+export async function POST(req: Request) {
+  try {
+    const session = await requireRole("ADMIN")
+    const { data, error } = await parseBody(req, CreateSchema)
+    if (error) return error
+
+    const key = data.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_|_$/g, "")
+
+    // Ensure key is unique within the account
+    const existing = await prisma.leadSource.findFirst({
+      where: { account_id: session.account.id, key },
+    })
+    const finalKey = existing ? `${key}_${Date.now()}` : key
+
+    const source = await prisma.leadSource.create({
+      data: {
+        account_id:       session.account.id,
+        name:             data.name,
+        key:              finalKey,
+        intent_baseline:  data.intent_baseline,
+        reliability_score: 70.0,
+        is_custom:        true,
+      },
+      select: { id: true, name: true, key: true, intent_baseline: true, is_custom: true },
+    })
+
+    return apiSuccess({ source }, 201)
   } catch (err) {
     const authResponse = handleAuthError(err)
     if (authResponse) return authResponse

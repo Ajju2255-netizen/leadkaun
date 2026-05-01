@@ -1,8 +1,13 @@
 "use client"
 
+import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
+import {
+  AlertTriangle, X, RefreshCw, Bell, CheckCheck, ChevronRight,
+  Clock, Sparkles,
+} from "lucide-react"
 import { GradeBadge } from "@/components/shared/GradeBadge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { timeAgo } from "@/lib/format"
@@ -28,19 +33,58 @@ interface NotifItem {
   } | null
 }
 
-// ── Config ────────────────────────────────────────────────────────────────────
+// ── Per-type styling ──────────────────────────────────────────────────────────
 
-const TYPE_CONFIG: Record<string, { icon: string; label: string; border: string }> = {
-  AT_RISK:       { icon: "🚨", label: "At Risk",   border: "border-l-red-500"     },
-  FOLLOW_UP_DUE: { icon: "📞", label: "Follow-up", border: "border-l-amber-500"   },
-  MISSED:        { icon: "❌", label: "Missed",     border: "border-l-slate-300"   },
-  RECOVERY:      { icon: "🔄", label: "Recovery",  border: "border-l-emerald-500" },
-}
-
-const PRIORITY_DOT: Record<string, string> = {
-  high:   "bg-red-500",
-  medium: "bg-amber-400",
-  low:    "bg-slate-300",
+const TYPE_CONFIG: Record<NotifItem["type"], {
+  icon:       React.ReactNode
+  label:      string
+  pillBg:     string   // gradient for the round icon pill
+  pillGlow:   string   // outer glow shadow
+  rail:       string   // left accent rail color
+  unreadTint: string   // unread-card tint
+  ctaLabel:   string
+  chipColor:  string   // count chip text/bg
+}> = {
+  AT_RISK: {
+    icon:       <AlertTriangle className="w-4 h-4" strokeWidth={2.5} />,
+    label:      "At risk",
+    pillBg:     "bg-gradient-to-br from-rose-400 to-rose-500",
+    pillGlow:   "shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_4px_12px_rgba(244,63,94,0.32)]",
+    rail:       "bg-gradient-to-b from-rose-400 to-rose-500",
+    unreadTint: "bg-rose-50/40",
+    ctaLabel:   "Go to queue",
+    chipColor:  "bg-rose-50 text-rose-700 border-rose-200",
+  },
+  FOLLOW_UP_DUE: {
+    icon:       <Clock className="w-4 h-4" strokeWidth={2.5} />,
+    label:      "Follow-up",
+    pillBg:     "bg-gradient-to-br from-orange-300 to-orange-400",
+    pillGlow:   "shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_4px_12px_rgba(251,146,60,0.32)]",
+    rail:       "bg-gradient-to-b from-orange-300 to-orange-400",
+    unreadTint: "bg-orange-50/30",
+    ctaLabel:   "Go to follow-ups",
+    chipColor:  "bg-orange-50 text-orange-700 border-orange-200",
+  },
+  MISSED: {
+    icon:       <X className="w-4 h-4" strokeWidth={3} />,
+    label:      "Missed",
+    pillBg:     "bg-gradient-to-br from-slate-400 to-slate-500",
+    pillGlow:   "shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_4px_12px_rgba(100,116,139,0.30)]",
+    rail:       "bg-gradient-to-b from-slate-300 to-slate-400",
+    unreadTint: "bg-slate-50/60",
+    ctaLabel:   "View missed leads",
+    chipColor:  "bg-slate-50 text-slate-700 border-slate-200",
+  },
+  RECOVERY: {
+    icon:       <RefreshCw className="w-4 h-4" strokeWidth={2.5} />,
+    label:      "Recovery",
+    pillBg:     "bg-gradient-to-br from-emerald-400 to-emerald-500",
+    pillGlow:   "shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_4px_12px_rgba(16,185,129,0.32)]",
+    rail:       "bg-gradient-to-b from-emerald-400 to-emerald-500",
+    unreadTint: "bg-emerald-50/30",
+    ctaLabel:   "Recover now",
+    chipColor:  "bg-emerald-50 text-emerald-700 border-emerald-200",
+  },
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -54,77 +98,102 @@ function formatValue(v: number): string {
 
 async function fetchNotifications(): Promise<{ items: NotifItem[] }> {
   const res = await fetch("/api/notifications", { credentials: "include" })
-  if (!res.ok) throw new Error("Failed to fetch notifications")
+  if (!res.ok) throw new Error("Failed")
   return res.json()
 }
 
 // ── Notification Card ─────────────────────────────────────────────────────────
 
-function NotifCard({ item, onRead }: { item: NotifItem; onRead: (id: string, url: string | null) => void }) {
-  const cfg = TYPE_CONFIG[item.type] ?? TYPE_CONFIG.MISSED
+function NotifCard({ item, onRead }: {
+  item:   NotifItem
+  onRead: (id: string, url: string | null) => void
+}) {
+  const cfg      = TYPE_CONFIG[item.type] ?? TYPE_CONFIG.MISSED
+  const isHigh   = item.priority === "high"
+  const isUnread = !item.is_read
 
   return (
     <div
-      className={`rounded-xl bg-white border border-l-[3px] shadow-[0_1px_3px_rgba(15,23,42,0.06)] p-4 space-y-2.5 transition-opacity ${
-        item.is_read ? "opacity-60" : ""
-      } ${cfg.border}`}
+      onClick={() => isUnread && onRead(item.id, null)}
+      className={`
+        relative rounded-2xl transition-all duration-200 overflow-hidden
+        ${isUnread ? "cursor-pointer hover:-translate-y-[1px]" : "opacity-70"}
+        ${isHigh && isUnread ? "glass-2 " + cfg.unreadTint
+          : isUnread        ? "glass-2"
+                            : "glass-1"}
+        ${isUnread ? "hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_4px_18px_rgba(15,23,42,0.08)]" : ""}
+      `}
     >
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2">
-          {/* Priority dot */}
-          <span className={`w-2 h-2 rounded-full shrink-0 ${PRIORITY_DOT[item.priority] ?? PRIORITY_DOT.low}`} />
-          {/* Type pill */}
-          <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
-            {cfg.icon} {cfg.label}
-          </span>
-          {!item.is_read && (
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
-          )}
+      {isUnread && (
+        <div className={`absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full ${cfg.rail} shadow-[0_0_6px_currentColor]`} />
+      )}
+
+      <div className="px-5 py-4 pl-6">
+        {/* Top row: icon pill + label + (high pill) + time */}
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div className="flex items-center gap-2.5">
+            <div className={`w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 text-white ${cfg.pillBg} ${cfg.pillGlow}`}>
+              {cfg.icon}
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{cfg.label}</span>
+              {isHigh && (
+                <span className="ml-1.5 inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200 align-middle">
+                  <Sparkles className="w-2 h-2" /> HIGH
+                </span>
+              )}
+              {isUnread && !isHigh && (
+                <span className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-sky-500 align-middle" />
+              )}
+            </div>
+          </div>
+          <span className="text-[11px] text-slate-400 font-medium shrink-0">{timeAgo(item.created_at)}</span>
         </div>
-        <span className="text-[11px] text-slate-400 shrink-0">{timeAgo(item.created_at)}</span>
-      </div>
 
-      {/* Content */}
-      <div>
-        <p className="text-[13px] font-semibold text-slate-800 leading-snug">{item.title}</p>
-        <p className="text-[12px] text-slate-500 mt-0.5">{item.message}</p>
-      </div>
+        <p className="text-[14px] font-bold text-slate-900 leading-snug">{item.title}</p>
+        <p className="text-[12px] text-slate-500 mt-1 leading-relaxed">{item.message}</p>
 
-      {/* Lead row */}
-      {item.lead && (
-        <div className="flex items-center gap-2">
-          <GradeBadge grade={item.lead.grade as "A"|"B"|"C"|"D"|"E"|"F"} size="sm" />
-          <span className="text-[12px] text-slate-600 truncate">
-            {item.lead.first_name} {item.lead.last_name}
-            {item.lead.company_name && ` · ${item.lead.company_name}`}
-          </span>
-          {item.lead.expected_value ? (
-            <span className="text-[12px] font-bold text-emerald-700 tabular-nums ml-auto shrink-0">
-              {formatValue(item.lead.expected_value)}
+        {item.lead && (
+          <div className="flex items-center gap-2.5 mt-3 pt-3 border-t border-white/40">
+            <GradeBadge grade={item.lead.grade as "A"|"B"|"C"|"D"|"E"|"F"} size="sm" />
+            <span className="text-[12px] font-semibold text-slate-700 truncate flex-1">
+              {item.lead.first_name} {item.lead.last_name}
+              {item.lead.company_name && (
+                <span className="text-slate-400 font-normal"> · {item.lead.company_name}</span>
+              )}
             </span>
-          ) : null}
-        </div>
-      )}
+            {item.lead.expected_value ? (
+              <span className="text-[12px] font-extrabold text-emerald-700 tabular-nums shrink-0 font-mono">
+                {formatValue(item.lead.expected_value)}
+              </span>
+            ) : null}
+          </div>
+        )}
 
-      {/* Action button */}
-      {item.action_url && (
-        <button
-          onClick={() => onRead(item.id, item.action_url)}
-          className="w-full flex items-center justify-center rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[12px] font-semibold py-2 transition-colors"
-        >
-          {item.type === "AT_RISK"       && "📞 Go to Priority Queue →"}
-          {item.type === "FOLLOW_UP_DUE" && "📅 Go to Follow-ups →"}
-          {item.type === "MISSED"        && "❌ View Missed Leads →"}
-          {item.type === "RECOVERY"      && "🔄 Recover Now →"}
-          {!["AT_RISK","FOLLOW_UP_DUE","MISSED","RECOVERY"].includes(item.type) && "View →"}
-        </button>
-      )}
+        {item.action_url && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onRead(item.id, item.action_url) }}
+            className={`
+              mt-3 w-full flex items-center justify-center gap-1.5 h-9 rounded-full
+              text-[12px] font-semibold text-white transition-all duration-150 active:scale-[0.98]
+              ${isHigh
+                ? "bg-gradient-to-b from-rose-400 to-rose-500 hover:from-rose-500 hover:to-rose-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(244,63,94,0.32)]"
+                : "bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)]"
+              }
+            `}
+          >
+            {cfg.ctaLabel}
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
     </div>
   )
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
+
+type Filter = "all" | "unread" | "high"
 
 export default function NotificationsPage() {
   const router      = useRouter()
@@ -136,9 +205,26 @@ export default function NotificationsPage() {
     refetchInterval: 60_000,
   })
 
+  const [filter, setFilter] = useState<Filter>("all")
+
   const items   = data?.items ?? []
-  const unread  = items.filter((i) => !i.is_read).length
-  const highPri = items.filter((i) => i.priority === "high" && !i.is_read).length
+  const unread  = items.filter((i) => !i.is_read)
+  const highPri = unread.filter((i) => i.priority === "high")
+
+  const counts = useMemo(() => {
+    const out = { AT_RISK: 0, FOLLOW_UP_DUE: 0, MISSED: 0, RECOVERY: 0 } as Record<NotifItem["type"], number>
+    for (const it of unread) out[it.type] = (out[it.type] || 0) + 1
+    return out
+  }, [unread])
+
+  const filtered = useMemo(() => {
+    if (filter === "unread") return unread
+    if (filter === "high")   return items.filter((i) => i.priority === "high")
+    return items
+  }, [filter, items, unread])
+
+  const groupedUnread = filtered.filter((i) => !i.is_read)
+  const groupedRead   = filtered.filter((i) =>  i.is_read)
 
   async function markRead(id: string, url: string | null) {
     await fetch(`/api/notifications/${id}/read`, { method: "POST", credentials: "include" })
@@ -157,61 +243,164 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-5">
+    <div className="max-w-[760px] mx-auto space-y-5 pb-12">
 
-      {/* Heading */}
+      {/* ── Header ───────────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-[22px] font-bold text-slate-900 tracking-tight">Notifications</h1>
-          <p className="text-[13px] text-slate-400 mt-0.5">
-            {isLoading ? "Loading…" : unread > 0 ? `${unread} unread · ${items.length} total` : `${items.length} notifications`}
-          </p>
+        <div className="flex items-start gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_6px_18px_rgba(14,165,233,0.32)]">
+            <Bell className="w-6 h-6 text-white" strokeWidth={2.4} />
+          </div>
+          <div>
+            <h1 className="text-[26px] font-extrabold text-slate-900 tracking-tight leading-tight">Notifications</h1>
+            <p className="text-[13px] text-slate-500 mt-0.5">
+              {isLoading
+                ? "Loading…"
+                : unread.length > 0
+                  ? `${unread.length} unread · ${items.length} total · last 7 days`
+                  : "You're all caught up · last 7 days"}
+            </p>
+          </div>
         </div>
-        {unread > 0 && (
+        {unread.length > 0 && (
           <button
             onClick={markAllRead}
-            className="text-[12px] text-slate-500 hover:text-slate-700 border border-slate-200 rounded-lg px-3 py-1.5 transition-colors shrink-0"
+            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full glass-1 text-[12px] font-semibold text-slate-700 hover:text-slate-900 transition-all"
           >
+            <CheckCheck className="w-3.5 h-3.5" />
             Mark all read
           </button>
         )}
       </div>
 
-      {/* High priority banner */}
-      {!isLoading && highPri > 0 && (
-        <div className="rounded-xl border-2 border-red-300 bg-red-50 px-4 py-3 flex items-start gap-3">
-          <span className="text-[18px] mt-0.5">🚨</span>
-          <div>
-            <p className="text-[14px] font-bold text-red-900">
-              {highPri} high-priority alert{highPri > 1 ? "s" : ""} — act now
-            </p>
-            <p className="text-[12px] text-red-700 opacity-80">
-              These leads are at risk of being lost
-            </p>
+      {/* ── Type-count chips ──────────────────────────────────────────────── */}
+      {!isLoading && unread.length > 0 && (
+        <div className="grid grid-cols-4 gap-3">
+          {(Object.keys(TYPE_CONFIG) as NotifItem["type"][]).map((t) => {
+            const cfg = TYPE_CONFIG[t]
+            const c = counts[t] ?? 0
+            return (
+              <div key={t} className="rounded-2xl glass-2 gloss-edge px-4 py-3 flex items-center gap-3">
+                <div className={`w-9 h-9 rounded-2xl flex items-center justify-center text-white shrink-0 ${cfg.pillBg} ${cfg.pillGlow}`}>
+                  {cfg.icon}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 leading-none">{cfg.label}</p>
+                  <p className="text-[20px] font-extrabold text-slate-900 tabular-nums leading-none mt-1.5 font-mono">{c}</p>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* ── High-priority banner ─────────────────────────────────────────── */}
+      {!isLoading && highPri.length > 0 && (
+        <div className="rounded-2xl glass-3 gloss-edge p-5 relative overflow-hidden">
+          <div
+            className="absolute -top-16 -right-16 w-56 h-56 rounded-full pointer-events-none"
+            style={{ background: "radial-gradient(circle, rgba(253,164,175,0.50) 0%, rgba(253,164,175,0) 70%)" }}
+          />
+          <div className="flex items-center gap-3 relative">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-rose-400 to-rose-500 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_6px_18px_rgba(244,63,94,0.32)]">
+              <AlertTriangle className="w-5 h-5 text-white" strokeWidth={2.4} />
+            </div>
+            <div className="flex-1">
+              <p className="text-[15px] font-bold text-slate-900">
+                {highPri.length} high-priority alert{highPri.length > 1 ? "s" : ""} — act now
+              </p>
+              <p className="text-[12px] text-slate-500 mt-0.5">These leads are at risk of being lost.</p>
+            </div>
+            <button
+              onClick={() => setFilter("high")}
+              className="inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 text-white text-[12px] font-semibold transition-all active:scale-[0.97] shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)]"
+            >
+              See high
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
       )}
 
-      {/* Loading */}
+      {/* ── Filter pills ─────────────────────────────────────────────────── */}
+      {!isLoading && items.length > 0 && (
+        <div className="flex items-center gap-2">
+          {([
+            { k: "all"    as const, label: "All",      count: items.length },
+            { k: "unread" as const, label: "Unread",   count: unread.length },
+            { k: "high"   as const, label: "High",     count: items.filter(i => i.priority === "high").length },
+          ]).map(({ k, label, count }) => {
+            const active = filter === k
+            return (
+              <button
+                key={k}
+                onClick={() => setFilter(k)}
+                className={`inline-flex items-center gap-1.5 h-8 px-3.5 rounded-full text-[12px] font-semibold transition-all
+                  ${active
+                    ? "bg-sky-50 text-sky-700 border border-sky-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]"
+                    : "glass-1 text-slate-600 hover:text-slate-900"
+                  }`}
+              >
+                {label}
+                <span className={`text-[10px] font-bold tabular-nums px-1.5 py-0.5 rounded-full ${active ? "bg-sky-100 text-sky-700" : "bg-slate-100 text-slate-500"}`}>
+                  {count}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {/* ── Loading ──────────────────────────────────────────────────────── */}
       {isLoading && (
         <div className="space-y-3">
-          {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-[140px] w-full rounded-xl" />)}
+          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-32 w-full rounded-2xl" />)}
         </div>
       )}
 
-      {/* Empty */}
+      {/* ── Empty ────────────────────────────────────────────────────────── */}
       {!isLoading && items.length === 0 && (
-        <div className="rounded-xl bg-white border border-slate-100 shadow-sm px-6 py-12 text-center">
-          <div className="text-[32px] mb-3">🔔</div>
-          <p className="text-[14px] font-semibold text-slate-700">No notifications</p>
-          <p className="text-[12px] text-slate-400 mt-1">You&apos;re all caught up.</p>
+        <div className="rounded-2xl glass-3 gloss-edge px-6 py-16 text-center">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-400 to-sky-500 flex items-center justify-center mx-auto mb-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_6px_18px_rgba(14,165,233,0.32)]">
+            <Bell className="w-6 h-6 text-white" strokeWidth={2.4} />
+          </div>
+          <p className="text-[15px] font-bold text-slate-900">All clear</p>
+          <p className="text-[12px] text-slate-500 mt-1.5 max-w-[300px] mx-auto leading-relaxed">
+            No alerts right now. Notifications fire when leads go at-risk, follow-ups come due, or Grade A leads are missed.
+          </p>
         </div>
       )}
 
-      {/* Notification cards */}
-      {!isLoading && items.length > 0 && (
+      {/* ── Filter empty ─────────────────────────────────────────────────── */}
+      {!isLoading && items.length > 0 && filtered.length === 0 && (
+        <div className="rounded-2xl glass-2 gloss-edge px-6 py-12 text-center">
+          <p className="text-[13px] text-slate-500">Nothing matches this filter.</p>
+        </div>
+      )}
+
+      {/* ── Unread group ─────────────────────────────────────────────────── */}
+      {!isLoading && groupedUnread.length > 0 && (
         <div className="space-y-3">
-          {items.map((item) => (
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-sky-500 shadow-[0_0_0_3px_rgba(14,165,233,0.15)]" />
+            <p className="text-[11px] font-bold uppercase tracking-wider text-sky-600">Unread · {groupedUnread.length}</p>
+            <div className="flex-1 h-px bg-gradient-to-r from-sky-200/60 to-transparent ml-2" />
+          </div>
+          {groupedUnread.map((item) => (
+            <NotifCard key={item.id} item={item} onRead={markRead} />
+          ))}
+        </div>
+      )}
+
+      {/* ── Read group ───────────────────────────────────────────────────── */}
+      {!isLoading && groupedRead.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-slate-400" />
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Earlier · {groupedRead.length}</p>
+            <div className="flex-1 h-px bg-gradient-to-r from-slate-200/60 to-transparent ml-2" />
+          </div>
+          {groupedRead.map((item) => (
             <NotifCard key={item.id} item={item} onRead={markRead} />
           ))}
         </div>

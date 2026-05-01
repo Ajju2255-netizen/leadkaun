@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect } from "react"
-import { Button } from "@/components/ui/button"
 
 export default function DashboardError({
   error,
@@ -17,17 +16,21 @@ export default function DashboardError({
   return (
     <div className="flex flex-col items-center justify-center min-h-[400px] gap-4 text-center px-4">
       <div className="space-y-2">
-        <h2 className="text-xl font-semibold">Something went wrong</h2>
-        <p className="text-muted-foreground text-sm max-w-sm">
+        <h2 className="text-[18px] font-bold text-slate-900">Something went wrong</h2>
+        <p className="text-[13px] text-slate-500 max-w-sm leading-relaxed">
           {error.message || "An unexpected error occurred. Please try again."}
         </p>
         {error.digest && (
-          <p className="text-xs text-muted-foreground font-mono">Error ID: {error.digest}</p>
+          <p className="text-[11px] text-slate-400 font-mono">Error ID: {error.digest}</p>
         )}
       </div>
-      <Button onClick={reset} variant="outline">
+      <button
+        onClick={reset}
+        className="h-9 px-5 rounded-full border border-slate-200 bg-white hover:bg-slate-50
+                   text-[13px] font-semibold text-slate-700 transition-all active:scale-[0.97]"
+      >
         Try again
-      </Button>
+      </button>
     </div>
   )
 }

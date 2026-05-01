@@ -1,0 +1,199 @@
+import { prisma } from "@/lib/prisma"
+import { requireRole, handleAuthError } from "@/lib/auth/middleware"
+import { apiSuccess, apiError } from "@/lib/api/response"
+
+/**
+ * GET /api/analytics/rep-tracking
+ *
+ * Powers the Sales Rep Tracking page. Computes per-rep + account-level KPIs:
+ *   - ₹ Recovered (this month)        : sum of won_value for leads won by rep this month
+ *   - Grade A Response Time (avg)     : avg speed_to_lead_hours for grade-A leads
+ *   - Follow-up Completion (pct)      : completed / (completed + overdue) over last 30d
+ *   - Follow-up Score (0-100)         : same as completion for now; future: weighted
+ *
+ * Each KPI also returns a "vs last month" % delta at the account level.
+ * Top performer = rep with highest revenue_recovered this month.
+ *
+ * Admin/Manager only.
+ */
+export async function GET() {
+  try {
+    const session   = await requireRole("ADMIN", "MANAGER")
+    const accountId = session.account.id
+
+    const now           = new Date()
+    const monthStart    = new Date(now.getFullYear(), now.getMonth(), 1)
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    const lastMonthEnd   = monthStart   // exclusive
+
+    // ── Active reps in this account ────────────────────────────────────────
+    const reps = await prisma.user.findMany({
+      where: {
+        account_id: accountId,
+        is_active:  true,
+        role:       { in: ["REP", "MANAGER", "ADMIN"] },
+      },
+      select: { id: true, first_name: true, last_name: true, role: true, email: true },
+      orderBy: { first_name: "asc" },
+    })
+
+    // ── Account-level totals (this month vs last month) ─────────────────────
+    const [
+      revenueThisMonth, revenueLastMonth,
+      avgRespThisMonth, avgRespLastMonth,
+      fuCompletedThis, fuOverdueThis,
+      fuCompletedLast, fuOverdueLast,
+    ] = await Promise.all([
+      prisma.lead.aggregate({
+        where: { account_id: accountId, won_at: { gte: monthStart } },
+        _sum:  { won_value: true },
+      }),
+      prisma.lead.aggregate({
+        where: { account_id: accountId, won_at: { gte: lastMonthStart, lt: lastMonthEnd } },
+        _sum:  { won_value: true },
+      }),
+      prisma.lead.aggregate({
+        where: {
+          account_id: accountId, grade: "A",
+          first_contact_at: { gte: monthStart, not: null },
+          speed_to_lead_hours: { not: null, gt: 0 },
+        },
+        _avg: { speed_to_lead_hours: true },
+      }),
+      prisma.lead.aggregate({
+        where: {
+          account_id: accountId, grade: "A",
+          first_contact_at: { gte: lastMonthStart, lt: lastMonthEnd, not: null },
+          speed_to_lead_hours: { not: null, gt: 0 },
+        },
+        _avg: { speed_to_lead_hours: true },
+      }),
+      prisma.followUpAction.count({
+        where: {
+          account_id: accountId, status: "COMPLETED",
+          completed_at: { gte: monthStart },
+        },
+      }),
+      prisma.followUpAction.count({
+        where: {
+          account_id: accountId, status: "OVERDUE",
+          due_date: { gte: monthStart },
+        },
+      }),
+      prisma.followUpAction.count({
+        where: {
+          account_id: accountId, status: "COMPLETED",
+          completed_at: { gte: lastMonthStart, lt: lastMonthEnd },
+        },
+      }),
+      prisma.followUpAction.count({
+        where: {
+          account_id: accountId, status: "OVERDUE",
+          due_date: { gte: lastMonthStart, lt: lastMonthEnd },
+        },
+      }),
+    ])
+
+    const revRecovered = revenueThisMonth._sum.won_value ?? 0
+    const revLast      = revenueLastMonth._sum.won_value ?? 0
+    const avgRespHrs   = avgRespThisMonth._avg.speed_to_lead_hours ?? null
+    const avgRespLast  = avgRespLastMonth._avg.speed_to_lead_hours ?? null
+
+    const fuTotalThis  = fuCompletedThis + fuOverdueThis
+    const fuPctThis    = fuTotalThis > 0 ? Math.round((fuCompletedThis / fuTotalThis) * 100) : null
+    const fuTotalLast  = fuCompletedLast + fuOverdueLast
+    const fuPctLast    = fuTotalLast > 0 ? Math.round((fuCompletedLast / fuTotalLast) * 100) : null
+
+    const pctChange = (now: number | null, prev: number | null): number | null => {
+      if (now == null || prev == null || prev === 0) return null
+      return Math.round(((now - prev) / prev) * 100)
+    }
+
+    // ── Per-rep KPIs (parallel queries) ────────────────────────────────────
+    const repStats = await Promise.all(
+      reps.map(async (rep) => {
+        const [revAgg, respAgg, fuComp, fuOver] = await Promise.all([
+          prisma.lead.aggregate({
+            where: {
+              account_id: accountId,
+              assigned_rep_id: rep.id,
+              won_at: { gte: monthStart },
+            },
+            _sum: { won_value: true },
+          }),
+          prisma.lead.aggregate({
+            where: {
+              account_id: accountId,
+              assigned_rep_id: rep.id,
+              grade: "A",
+              first_contact_at: { gte: monthStart, not: null },
+              speed_to_lead_hours: { not: null, gt: 0 },
+            },
+            _avg: { speed_to_lead_hours: true },
+          }),
+          prisma.followUpAction.count({
+            where: {
+              account_id: accountId, assigned_rep_id: rep.id,
+              status: "COMPLETED", completed_at: { gte: monthStart },
+            },
+          }),
+          prisma.followUpAction.count({
+            where: {
+              account_id: accountId, assigned_rep_id: rep.id,
+              status: "OVERDUE", due_date: { gte: monthStart },
+            },
+          }),
+        ])
+
+        const revenue       = revAgg._sum.won_value ?? 0
+        const respHrs       = respAgg._avg.speed_to_lead_hours ?? null
+        const responseSecs  = respHrs != null ? Math.round(respHrs * 3600) : null
+        const fuTotal       = fuComp + fuOver
+        const fuPct         = fuTotal > 0 ? Math.round((fuComp / fuTotal) * 100) : null
+
+        return {
+          id:                       rep.id,
+          first_name:               rep.first_name,
+          last_name:                rep.last_name,
+          email:                    rep.email,
+          role:                     rep.role,
+          revenue_recovered:        revenue,
+          response_time_seconds:    responseSecs,
+          follow_up_completion_pct: fuPct,
+          // Follow-up score = completion % for now (future: weighted by lead grade)
+          follow_up_score:          fuPct,
+        }
+      })
+    )
+
+    // Filter to reps that have at least one KPI present (cleaner table)
+    const activeRepStats = repStats.filter((r) =>
+      r.revenue_recovered > 0 || r.response_time_seconds != null || r.follow_up_completion_pct != null
+    )
+
+    // Top performer = highest revenue_recovered this month
+    const topPerformer = activeRepStats.length > 0
+      ? [...activeRepStats].sort((a, b) => b.revenue_recovered - a.revenue_recovered)[0]
+      : null
+
+    return apiSuccess({
+      account: {
+        revenue_recovered:                revRecovered,
+        revenue_recovered_pct_change:     pctChange(revRecovered, revLast),
+        avg_response_time_seconds:        avgRespHrs != null ? Math.round(avgRespHrs * 3600) : null,
+        avg_response_time_pct_change:     pctChange(avgRespHrs, avgRespLast),
+        follow_up_completion_pct:         fuPctThis,
+        follow_up_completion_pct_change:  pctChange(fuPctThis, fuPctLast),
+      },
+      reps:           activeRepStats,
+      top_performer:  topPerformer ? {
+        id:                topPerformer.id,
+        first_name:        topPerformer.first_name,
+        last_name:         topPerformer.last_name,
+        revenue_recovered: topPerformer.revenue_recovered,
+      } : null,
+    })
+  } catch (e) {
+    return handleAuthError(e) ?? apiError("Internal server error", "SERVER_ERROR", 500)
+  }
+}

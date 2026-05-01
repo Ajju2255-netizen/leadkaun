@@ -1,28 +1,17 @@
 "use client"
 
 /*
- * Login page — Intercom-inspired.
+ * Login page — Coastal Sunrise.
  *
- * Design intent:
- *   Trust is the primary emotion a login page must convey. We achieve this
- *   through:
- *     - Generous whitespace (calm = trustworthy)
- *     - Clean brand mark at top (identity anchoring)
- *     - No visual noise (no sidebars, decorations, illustrations)
- *     - Single clear CTA (no decision paralysis)
- *     - Soft slate-50 background so the white form "lifts" slightly
- *
- *   The brand mark uses an indigo-filled Zap in a rounded square — same as
- *   the sidebar logo — creating visual continuity from login → app.
- *
- *   Error state: red text below the field it belongs to, not a banner.
- *   Banners feel like a reprimand; inline errors feel like help.
+ * Trust-first auth surface. Mesh sky+peach background with a floating glass-3
+ * form plate. LeadkaunMark + wordmark replaces the indigo Zap. Inputs and
+ * buttons mirror the Coastal Sunrise gloss recipe used everywhere else.
  */
 
 import { Suspense, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { Zap } from "lucide-react"
+import { LeadkaunMark } from "@/components/shared/LeadkaunMark"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 
 function LoginForm() {
@@ -54,28 +43,26 @@ function LoginForm() {
   }
 
   return (
-    <div className="w-full max-w-[360px] space-y-8">
+    <div className="w-full max-w-[380px] space-y-7 relative z-10">
 
-      {/* ── Brand mark ────────────────────────────────────────────────────── */}
+      {/* ── Brand mark ──────────────────────────────────────────────────────── */}
       <div className="flex flex-col items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-md shadow-indigo-200">
-          <Zap className="w-5 h-5 text-white" strokeWidth={2.5} />
-        </div>
+        <LeadkaunMark size={44} gloss />
         <div className="text-center">
-          <h1 className="text-[22px] font-bold text-slate-900 tracking-tight">Leadkaun</h1>
-          <p className="text-[13px] text-slate-400 mt-0.5">Sign in to your workspace</p>
+          <h1 className="text-[22px] font-bold text-ink tracking-[-0.025em]">Leadkaun</h1>
+          <p className="text-[13px] text-ink-muted mt-0.5">Sign in to your workspace</p>
         </div>
       </div>
 
-      {/* ── Form ──────────────────────────────────────────────────────────── */}
+      {/* ── Form ────────────────────────────────────────────────────────────── */}
       <form
         onSubmit={handleSubmit}
-        className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(15,23,42,0.08),0_4px_16px_rgba(15,23,42,0.06)] p-7 space-y-4"
+        className="glass-3 gloss-edge rounded-2xl p-7 space-y-4"
       >
 
         {/* Email */}
         <div className="space-y-1.5">
-          <label htmlFor="email" className="text-[12px] font-semibold text-slate-600 block">
+          <label htmlFor="email" className="text-[12px] font-semibold text-ink-soft block">
             Email address
           </label>
           <input
@@ -88,17 +75,18 @@ function LoginForm() {
             onChange={(e) => setEmail(e.target.value)}
             required
             className="
-              w-full h-10 px-3 rounded-lg border border-slate-200 bg-white
-              text-[13px] text-slate-800 placeholder:text-slate-300
-              outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100
-              transition-colors
+              w-full h-10 px-3 rounded-xl glass-1 gloss-edge
+              border border-white/70
+              text-[13px] text-ink placeholder:text-ink-faint
+              outline-none focus:border-sky-400 focus:[background:rgba(255,255,255,0.92)]
+              transition-all
             "
           />
         </div>
 
         {/* Password */}
         <div className="space-y-1.5">
-          <label htmlFor="password" className="text-[12px] font-semibold text-slate-600 block">
+          <label htmlFor="password" className="text-[12px] font-semibold text-ink-soft block">
             Password
           </label>
           <input
@@ -109,17 +97,25 @@ function LoginForm() {
             onChange={(e) => setPassword(e.target.value)}
             required
             className="
-              w-full h-10 px-3 rounded-lg border border-slate-200 bg-white
-              text-[13px] text-slate-800 placeholder:text-slate-300
-              outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100
-              transition-colors
+              w-full h-10 px-3 rounded-xl glass-1 gloss-edge
+              border border-white/70
+              text-[13px] text-ink placeholder:text-ink-faint
+              outline-none focus:border-sky-400 focus:[background:rgba(255,255,255,0.92)]
+              transition-all
             "
           />
         </div>
 
         {/* Error */}
         {error && (
-          <p className="text-[12px] text-red-500 bg-red-50 rounded-lg px-3 py-2 border border-red-100">
+          <p
+            className="text-[12px] text-red-700 rounded-xl px-3 py-2"
+            style={{
+              background: "rgba(254, 226, 226, 0.85)",
+              border: "1px solid rgba(252, 165, 165, 0.45)",
+              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.6)",
+            }}
+          >
             {error}
           </p>
         )}
@@ -129,20 +125,19 @@ function LoginForm() {
           type="submit"
           disabled={loading}
           className="
-            w-full h-10 rounded-lg bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800
-            text-white text-[13px] font-semibold transition-colors
+            btn-primary shimmer-on-hover
+            w-full h-11 mt-1 text-[13px]
             disabled:opacity-60 disabled:cursor-not-allowed
-            mt-1
           "
         >
-          {loading ? "Signing in…" : "Sign in"}
+          <span className="relative z-[2]">{loading ? "Signing in…" : "Sign in"}</span>
         </button>
       </form>
 
-      {/* ── Footer ────────────────────────────────────────────────────────── */}
-      <p className="text-center text-[12px] text-slate-400">
+      {/* ── Footer ──────────────────────────────────────────────────────────── */}
+      <p className="text-center text-[12px] text-ink-muted">
         New to Leadkaun?{" "}
-        <Link href="/register" className="text-slate-600 font-medium hover:text-indigo-600 transition-colors">
+        <Link href="/register" className="text-sky-600 font-semibold hover:text-sky-500 transition-colors underline-offset-4 hover:underline">
           Create an account
         </Link>
       </p>
@@ -153,9 +148,26 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+    <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden bg-mesh">
+      {/* Mesh background — sky NW + peach SE */}
+      <div
+        className="absolute inset-0 -z-10"
+        style={{
+          background:
+            "radial-gradient(ellipse 60% 50% at 12% 18%, rgba(125,211,252,0.55), transparent 70%), " +
+            "radial-gradient(ellipse 65% 55% at 82% 88%, rgba(253,186,116,0.50), transparent 72%), " +
+            "radial-gradient(ellipse 45% 40% at 88% 50%, rgba(34,211,238,0.30), transparent 70%), " +
+            "var(--bg-pure)",
+        }}
+        aria-hidden
+      />
+
+      {/* Drifting blob accents */}
+      <div className="blob blob-lg blob-sky -top-32 -left-40 absolute" aria-hidden />
+      <div className="blob blob-lg blob-peach -bottom-32 -right-32 absolute" style={{ animationDelay: "3s" }} aria-hidden />
+
       <Suspense fallback={
-        <div className="w-[360px] h-72 rounded-2xl bg-white shadow-sm animate-pulse" />
+        <div className="w-[380px] h-80 rounded-2xl glass-2 gloss-edge animate-pulse" />
       }>
         <LoginForm />
       </Suspense>

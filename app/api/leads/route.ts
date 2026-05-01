@@ -24,6 +24,8 @@ export async function GET(req: Request) {
     const repId       = searchParams.get("rep") ?? undefined
     const search      = searchParams.get("search") ?? undefined
     const importJobId = searchParams.get("batch") ?? undefined
+    const dateFrom    = searchParams.get("date_from") ?? undefined
+    const dateTo      = searchParams.get("date_to")   ?? undefined
     const page        = Math.max(1, parseInt(searchParams.get("page") ?? "1"))
     const isJunk      = searchParams.get("junk") === "true"
 
@@ -42,6 +44,12 @@ export async function GET(req: Request) {
       ...(stageId     ? { stage_id: stageId }         : {}),
       ...(sourceId    ? { source_id: sourceId }        : {}),
       ...(importJobId ? { import_job_id: importJobId } : {}),
+      ...(dateFrom || dateTo ? {
+        imported_at: {
+          ...(dateFrom ? { gte: new Date(dateFrom) } : {}),
+          ...(dateTo   ? { lte: new Date(dateTo + "T23:59:59.999Z") } : {}),
+        },
+      } : {}),
       is_junk: isJunk,
       ...(search
         ? {
@@ -67,6 +75,12 @@ export async function GET(req: Request) {
           source: { select: { id: true, name: true, key: true } },
           stage:  { select: { id: true, name: true, key: true } },
           assigned_rep: { select: { id: true, first_name: true, last_name: true } },
+          // Most-recent signal — drives the "Last Activity" column
+          signals: {
+            select: { created_at: true, signal_type: true },
+            orderBy: { created_at: "desc" },
+            take: 1,
+          },
         },
       }),
       prisma.lead.count({ where }),

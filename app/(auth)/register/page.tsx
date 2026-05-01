@@ -3,24 +3,26 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { LeadkaunMark } from "@/components/shared/LeadkaunMark"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { registerAction } from "./actions"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+
+const inputCls =
+  "w-full h-10 px-3 rounded-xl glass-1 gloss-edge border border-white/70 " +
+  "text-[13px] text-ink placeholder:text-ink-faint outline-none " +
+  "focus:border-sky-400 focus:[background:rgba(255,255,255,0.92)] transition-all"
 
 export default function RegisterPage() {
   const router = useRouter()
 
   const [form, setForm] = useState({
-    orgName: "",
+    orgName:   "",
     firstName: "",
-    lastName: "",
-    email: "",
-    password: "",
+    lastName:  "",
+    email:     "",
+    password:  "",
   })
-  const [error, setError] = useState<string | null>(null)
+  const [error,   setError]   = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -32,7 +34,6 @@ export default function RegisterPage() {
     setError(null)
     setLoading(true)
 
-    // 1. Create account + user via server action
     const result = await registerAction(form)
 
     if (!result.success) {
@@ -41,10 +42,9 @@ export default function RegisterPage() {
       return
     }
 
-    // 2. Sign in immediately after registration
     const supabase = getSupabaseBrowserClient()
     const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: form.email,
+      email:    form.email,
       password: form.password,
     })
 
@@ -59,102 +59,141 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader className="space-y-1">
-          <div className="text-center mb-2">
-            <span className="text-2xl font-bold tracking-tight">Leadkaun</span>
+    <div className="min-h-screen flex items-center justify-center px-4 py-10 relative overflow-hidden">
+
+      {/* Mesh background */}
+      <div
+        className="absolute inset-0 -z-10"
+        style={{
+          background:
+            "radial-gradient(ellipse 60% 50% at 12% 18%, rgba(125,211,252,0.55), transparent 70%), " +
+            "radial-gradient(ellipse 65% 55% at 82% 88%, rgba(253,186,116,0.50), transparent 72%), " +
+            "radial-gradient(ellipse 45% 40% at 88% 50%, rgba(34,211,238,0.30), transparent 70%), " +
+            "var(--bg-pure)",
+        }}
+        aria-hidden
+      />
+      <div className="blob blob-lg blob-sky -top-32 -left-40 absolute" aria-hidden />
+      <div className="blob blob-lg blob-peach -bottom-32 -right-32 absolute" style={{ animationDelay: "3s" }} aria-hidden />
+
+      <div className="w-full max-w-[400px] space-y-7 relative z-10">
+
+        {/* ── Brand mark ──────────────────────────────────────────────────── */}
+        <div className="flex flex-col items-center gap-3">
+          <LeadkaunMark size={44} gloss />
+          <div className="text-center">
+            <h1 className="text-[22px] font-bold text-ink tracking-[-0.025em]">Leadkaun</h1>
+            <p className="text-[13px] text-ink-muted mt-0.5">Create your workspace</p>
           </div>
-          <CardTitle className="text-xl">Create your account</CardTitle>
-          <CardDescription>Get your team started in under 8 minutes</CardDescription>
-        </CardHeader>
+        </div>
 
-        <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="orgName">Organisation name</Label>
-              <Input
-                id="orgName"
-                name="orgName"
-                placeholder="Acme Real Estate"
-                value={form.orgName}
-                onChange={handleChange}
-                required
+        {/* ── Form ────────────────────────────────────────────────────────── */}
+        <form
+          onSubmit={handleSubmit}
+          className="glass-3 gloss-edge rounded-2xl p-7 space-y-4"
+        >
+
+          {/* Org name */}
+          <div className="space-y-1.5">
+            <label htmlFor="orgName" className="text-[12px] font-semibold text-ink-soft block">
+              Organisation name
+            </label>
+            <input
+              id="orgName" name="orgName" required
+              placeholder="Acme Real Estate"
+              value={form.orgName} onChange={handleChange}
+              className={inputCls}
+            />
+          </div>
+
+          {/* First + last name */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label htmlFor="firstName" className="text-[12px] font-semibold text-ink-soft block">
+                First name
+              </label>
+              <input
+                id="firstName" name="firstName" required
+                placeholder="Arjun"
+                value={form.firstName} onChange={handleChange}
+                className={inputCls}
               />
             </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="firstName">First name</Label>
-                <Input
-                  id="firstName"
-                  name="firstName"
-                  placeholder="Arjun"
-                  value={form.firstName}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="lastName">Last name</Label>
-                <Input
-                  id="lastName"
-                  name="lastName"
-                  placeholder="Sharma"
-                  value={form.lastName}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="email">Work email</Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                placeholder="arjun@acmerealty.in"
-                autoComplete="email"
-                value={form.email}
-                onChange={handleChange}
-                required
+            <div className="space-y-1.5">
+              <label htmlFor="lastName" className="text-[12px] font-semibold text-ink-soft block">
+                Last name
+              </label>
+              <input
+                id="lastName" name="lastName" required
+                placeholder="Sharma"
+                value={form.lastName} onChange={handleChange}
+                className={inputCls}
               />
             </div>
+          </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="new-password"
-                placeholder="Min. 8 characters"
-                minLength={8}
-                value={form.password}
-                onChange={handleChange}
-                required
-              />
-            </div>
+          {/* Email */}
+          <div className="space-y-1.5">
+            <label htmlFor="email" className="text-[12px] font-semibold text-ink-soft block">
+              Work email
+            </label>
+            <input
+              id="email" name="email" type="email" required
+              autoComplete="email"
+              placeholder="arjun@acmerealty.in"
+              value={form.email} onChange={handleChange}
+              className={inputCls}
+            />
+          </div>
 
-            {error && (
-              <p className="text-sm text-destructive">{error}</p>
-            )}
-          </CardContent>
+          {/* Password */}
+          <div className="space-y-1.5">
+            <label htmlFor="password" className="text-[12px] font-semibold text-ink-soft block">
+              Password
+            </label>
+            <input
+              id="password" name="password" type="password" required
+              autoComplete="new-password"
+              placeholder="Min. 8 characters"
+              minLength={8}
+              value={form.password} onChange={handleChange}
+              className={inputCls}
+            />
+          </div>
 
-          <CardFooter className="flex flex-col gap-3">
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Creating account…" : "Create account"}
-            </Button>
-            <p className="text-sm text-muted-foreground text-center">
-              Already have an account?{" "}
-              <Link href="/login" className="text-foreground underline underline-offset-4">
-                Sign in
-              </Link>
+          {/* Error */}
+          {error && (
+            <p
+              className="text-[12px] text-red-700 rounded-xl px-3 py-2"
+              style={{
+                background: "rgba(254, 226, 226, 0.85)",
+                border: "1px solid rgba(252, 165, 165, 0.45)",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.6)",
+              }}
+            >
+              {error}
             </p>
-          </CardFooter>
+          )}
+
+          {/* Submit */}
+          <button
+            type="submit"
+            disabled={loading}
+            className="btn-primary shimmer-on-hover w-full h-11 mt-1 text-[13px] disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <span className="relative z-[2]">{loading ? "Creating account…" : "Create account"}</span>
+          </button>
         </form>
-      </Card>
+
+        {/* ── Footer ──────────────────────────────────────────────────────── */}
+        <p className="text-center text-[12px] text-ink-muted">
+          Already have an account?{" "}
+          <Link href="/login" className="text-sky-600 font-semibold hover:text-sky-500 transition-colors underline-offset-4 hover:underline">
+            Sign in
+          </Link>
+        </p>
+
+      </div>
     </div>
   )
 }
