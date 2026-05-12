@@ -1,6 +1,9 @@
 import { prisma } from "@/lib/prisma"
 import { requireRole, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
+import { computeExecutionScore } from "@/lib/scoring/execution-score"
+import { computeRepScore, type RepScoreComponents } from "@/lib/scoring/rep-score"
+import { startOfIstDay, startOfIstMonth, hourIST } from "@/lib/time/ist"
 
 /**
  * GET /api/analytics/rep-tracking
@@ -9,10 +12,14 @@ import { apiSuccess, apiError } from "@/lib/api/response"
  *   - ₹ Recovered (this month)        : sum of won_value for leads won by rep this month
  *   - Grade A Response Time (avg)     : avg speed_to_lead_hours for grade-A leads
  *   - Follow-up Completion (pct)      : completed / (completed + overdue) over last 30d
- *   - Follow-up Score (0-100)         : same as completion for now; future: weighted
+ *   - Follow-up Score (0-100)         : same as completion (legacy, kept for back-compat)
+ *   - Daily Execution Score (0-100)   : NEW — see lib/scoring/execution-score
+ *   - Conversion Rate (pct)           : NEW — won / qualified leads MTD
+ *   - Rep Score (0-100)               : NEW — 5-component blend (see lib/scoring/rep-score)
  *
- * Each KPI also returns a "vs last month" % delta at the account level.
- * Top performer = rep with highest revenue_recovered this month.
+ * `follow_up_score` (legacy) and `rep_score` (new) ship in parallel for one
+ * week of A/B sanity. Frontend reads `rep_score`; legacy callers see no
+ * regression.
  *
  * Admin/Manager only.
  */
@@ -21,10 +28,19 @@ export async function GET() {
     const session   = await requireRole("ADMIN", "MANAGER")
     const accountId = session.account.id
 
-    const now           = new Date()
-    const monthStart    = new Date(now.getFullYear(), now.getMonth(), 1)
-    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    const now            = new Date()
+    const monthStart     = startOfIstMonth(now)
+    const lastMonthStart = startOfIstMonth(new Date(monthStart.getTime() - 1))
     const lastMonthEnd   = monthStart   // exclusive
+    const dayStart       = startOfIstDay(now)
+    const hr             = hourIST(now)
+
+    // Detect this account's "qualified" stage (for conversion rate computation)
+    const qualifiedStage = await prisma.pipelineStage.findFirst({
+      where: { account_id: accountId, key: "qualified" },
+      select: { id: true },
+    })
+    const qualifiedStageId = qualifiedStage?.id ?? null
 
     // ── Active reps in this account ────────────────────────────────────────
     const reps = await prisma.user.findMany({
@@ -112,7 +128,11 @@ export async function GET() {
     // ── Per-rep KPIs (parallel queries) ────────────────────────────────────
     const repStats = await Promise.all(
       reps.map(async (rep) => {
-        const [revAgg, respAgg, fuComp, fuOver] = await Promise.all([
+        const [
+          revAgg, respAgg, fuComp, fuOver,
+          execInputs, wonCount, qualifiedCount,
+          missedRecovered, missedAtRisk,
+        ] = await Promise.all([
           prisma.lead.aggregate({
             where: {
               account_id: accountId,
@@ -143,6 +163,33 @@ export async function GET() {
               status: "OVERDUE", due_date: { gte: monthStart },
             },
           }),
+          loadExecScoreInputs(accountId, rep.id, dayStart, hr),
+          prisma.lead.count({
+            where: {
+              account_id: accountId, assigned_rep_id: rep.id,
+              won_at: { gte: monthStart },
+            },
+          }),
+          countQualifiedLeads(accountId, rep.id, monthStart, qualifiedStageId),
+          // Missed-recovery: won_value of leads that were once is_missed and
+          // were won this month. Uses Lead.won_at + a flag-tracking proxy via
+          // notifications of type RECOVERY (or simply: leads with missed_at
+          // and won_at in this month).
+          prisma.lead.aggregate({
+            where: {
+              account_id: accountId, assigned_rep_id: rep.id,
+              missed_at: { not: null },
+              won_at:    { gte: monthStart, not: null },
+            },
+            _sum: { won_value: true },
+          }),
+          prisma.lead.aggregate({
+            where: {
+              account_id: accountId, assigned_rep_id: rep.id,
+              missed_at: { gte: monthStart, not: null },
+            },
+            _sum: { expected_value: true },
+          }),
         ])
 
         const revenue       = revAgg._sum.won_value ?? 0
@@ -150,6 +197,29 @@ export async function GET() {
         const responseSecs  = respHrs != null ? Math.round(respHrs * 3600) : null
         const fuTotal       = fuComp + fuOver
         const fuPct         = fuTotal > 0 ? Math.round((fuComp / fuTotal) * 100) : null
+
+        // Exec score for today
+        const execResult = computeExecutionScore(execInputs)
+
+        // Conversion rate: won / qualified (MTD); null if no qualified yet
+        const convRate = qualifiedCount > 0
+          ? Math.round((wonCount / qualifiedCount) * 100)
+          : null
+
+        // Missed-recovery %: recovered / (recovered + still-at-risk)
+        const recovered = missedRecovered._sum.won_value ?? 0
+        const atRisk    = missedAtRisk._sum.expected_value ?? 0
+        const recovPct  = (recovered + atRisk) > 0
+          ? Math.round((recovered / (recovered + atRisk)) * 100)
+          : null
+
+        const repResult = computeRepScore({
+          follow_up_pct:    fuPct ?? 0,
+          speed_seconds:    responseSecs,
+          missed_recov_pct: recovPct,
+          exec_score:       execResult.score,
+          conv_rate:        convRate,
+        })
 
         return {
           id:                       rep.id,
@@ -160,8 +230,14 @@ export async function GET() {
           revenue_recovered:        revenue,
           response_time_seconds:    responseSecs,
           follow_up_completion_pct: fuPct,
-          // Follow-up score = completion % for now (future: weighted by lead grade)
+          // Legacy field — kept for one week of A/B parallel ship
           follow_up_score:          fuPct,
+          // New 5-component fields
+          daily_execution_score:    execResult.score,
+          conversion_rate:          convRate,
+          missed_recovery_pct:      recovPct,
+          rep_score:                repResult.score,
+          rep_score_components:     repResult.components as RepScoreComponents,
         }
       })
     )
@@ -196,4 +272,73 @@ export async function GET() {
   } catch (e) {
     return handleAuthError(e) ?? apiError("Internal server error", "SERVER_ERROR", 500)
   }
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+async function loadExecScoreInputs(
+  accountId: string,
+  repId: string,
+  dayStart: Date,
+  hr: number,
+) {
+  const [
+    fuDue, fuCompleted, fuOverdue,
+    touched, abLeads, abContacted, signals,
+  ] = await Promise.all([
+    prisma.followUpAction.count({ where: { account_id: accountId, assigned_rep_id: repId, due_date: { gte: dayStart } } }),
+    prisma.followUpAction.count({ where: { account_id: accountId, assigned_rep_id: repId, status: "COMPLETED", completed_at: { gte: dayStart } } }),
+    prisma.followUpAction.count({ where: { account_id: accountId, assigned_rep_id: repId, status: "OVERDUE" } }),
+    prisma.lead.count({ where: { account_id: accountId, assigned_rep_id: repId, last_action_at: { gte: dayStart } } }),
+    prisma.lead.count({ where: { account_id: accountId, assigned_rep_id: repId, grade: { in: ["A", "B"] }, imported_at: { gte: dayStart } } }),
+    prisma.lead.count({ where: { account_id: accountId, assigned_rep_id: repId, grade: { in: ["A", "B"] }, imported_at: { gte: dayStart }, first_contact_at: { not: null } } }),
+    prisma.signal.count({ where: { user_id: repId, created_at: { gte: dayStart }, lead: { account_id: accountId } } }),
+  ])
+  return {
+    fu_due_today:        fuDue,
+    fu_completed_today:  fuCompleted,
+    fu_overdue_now:      fuOverdue,
+    leads_touched_today: touched,
+    ab_leads_today:      abLeads,
+    ab_leads_contacted:  abContacted,
+    signals_today:       signals,
+    hour_ist:            hr,
+  }
+}
+
+/**
+ * Count leads that have ever entered the qualified stage this month, scoped
+ * to a single rep. Falls back to is_sql=true on the lead itself if the
+ * account has no explicit "qualified" pipeline stage configured (older
+ * accounts pre-PipelineStage).
+ */
+async function countQualifiedLeads(
+  accountId: string,
+  repId: string,
+  monthStart: Date,
+  qualifiedStageId: string | null,
+): Promise<number> {
+  if (qualifiedStageId) {
+    // Count distinct leads (assigned to rep) whose StageHistory shows entry
+    // into the qualified stage during this month.
+    const rows = await prisma.stageHistory.findMany({
+      where: {
+        to_stage_id: qualifiedStageId,
+        created_at:  { gte: monthStart },
+        lead:        { account_id: accountId, assigned_rep_id: repId },
+      },
+      select: { lead_id: true },
+      distinct: ["lead_id"],
+    })
+    return rows.length
+  }
+  // Fallback for accounts without an explicit qualified stage
+  return prisma.lead.count({
+    where: {
+      account_id: accountId, assigned_rep_id: repId,
+      is_sql: true,
+      // Use imported_at as "qualified-at" proxy when no StageHistory
+      imported_at: { gte: monthStart },
+    },
+  })
 }

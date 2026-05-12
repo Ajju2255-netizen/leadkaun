@@ -6,6 +6,14 @@ import { Skeleton } from "@/components/ui/skeleton"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+interface RepScoreComponents {
+  follow_up_pct:      number
+  speed_to_lead:      number
+  missed_value_recov: number
+  daily_execution:    number
+  conversion_rate:    number
+}
+
 interface RepStat {
   id:                       string
   first_name:               string
@@ -15,8 +23,27 @@ interface RepStat {
   revenue_recovered:        number
   response_time_seconds:    number | null
   follow_up_completion_pct: number | null
+  /** Legacy — same as follow_up_completion_pct. Will be removed after 1 week. */
   follow_up_score:          number | null
+  /** Daily Execution Score (today, 0..100). */
+  daily_execution_score:    number
+  /** Conversion rate MTD (won / qualified). null = no qualified yet. */
+  conversion_rate:          number | null
+  /** Missed-revenue recovered as % MTD. null = no missed pool. */
+  missed_recovery_pct:      number | null
+  /** 5-component Rep Score 0..100. */
+  rep_score:                number
+  rep_score_components:     RepScoreComponents
 }
+
+/** Maximum point contribution per Rep-Score component — mirrors REP_SCORE_WEIGHTS. */
+const REP_SCORE_MAX = {
+  follow_up_pct:      25,
+  speed_to_lead:      20,
+  missed_value_recov: 15,
+  daily_execution:    20,
+  conversion_rate:    20,
+} as const
 
 interface RepTrackingData {
   account: {
@@ -114,6 +141,37 @@ function PerfBar({ pct, color }: { pct: number; color: string }) {
   return (
     <div className="h-1 w-full rounded-full overflow-hidden mt-1.5" style={{ background: "rgba(15,23,42,0.06)" }}>
       <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: color }} />
+    </div>
+  )
+}
+
+// ── RepScoreBreakdown — 5-segment bar showing each component's contribution ──
+
+function RepScoreBreakdown({ components }: { components: RepScoreComponents }) {
+  const segments: { key: keyof RepScoreComponents; label: string; value: number; max: number }[] = [
+    { key: "follow_up_pct",      label: "FU%",        value: components.follow_up_pct,      max: REP_SCORE_MAX.follow_up_pct },
+    { key: "speed_to_lead",      label: "Speed",      value: components.speed_to_lead,      max: REP_SCORE_MAX.speed_to_lead },
+    { key: "missed_value_recov", label: "Recovered",  value: components.missed_value_recov, max: REP_SCORE_MAX.missed_value_recov },
+    { key: "daily_execution",    label: "Exec today", value: components.daily_execution,    max: REP_SCORE_MAX.daily_execution },
+    { key: "conversion_rate",    label: "Conversion", value: components.conversion_rate,    max: REP_SCORE_MAX.conversion_rate },
+  ]
+  return (
+    <div className="flex h-1 w-full rounded-full overflow-hidden mt-1.5 gap-[2px]">
+      {segments.map((s) => {
+        const fillRatio = s.max > 0 ? s.value / s.max : 0
+        return (
+          <div
+            key={s.key}
+            className="h-full"
+            title={`${s.label}: ${s.value}/${s.max}`}
+            style={{
+              width:      `${s.max}%`,
+              background: scoreColor(fillRatio * 100).bar,
+              opacity:    0.25 + 0.75 * fillRatio,
+            }}
+          />
+        )
+      })}
     </div>
   )
 }
@@ -298,7 +356,7 @@ export default function RepTrackingPage() {
           <span>₹ Recovered</span>
           <span>Grade A Response Time</span>
           <span>Follow-up Completion</span>
-          <span className="text-center">Follow-up Score</span>
+          <span className="text-center">Rep Score</span>
         </div>
 
         {/* Loading */}
@@ -357,7 +415,7 @@ export default function RepTrackingPage() {
               const respColor = scoreColor(respPct >= 80 ? 90 : respPct >= 60 ? 70 : respPct >= 40 ? 60 : 40).bar
               const fuColor   = scoreColor(fuPct).bar
 
-              const score = rep.follow_up_score ?? 0
+              const score = rep.rep_score ?? rep.follow_up_score ?? 0
 
               return (
                 <div
@@ -402,9 +460,12 @@ export default function RepTrackingPage() {
                     <PerfBar pct={fuPct} color={fuColor} />
                   </div>
 
-                  {/* Follow-up Score donut */}
-                  <div className="flex justify-center">
+                  {/* Rep Score donut + 5-component breakdown */}
+                  <div className="flex flex-col items-center gap-1.5">
                     <ScoreRing score={score} />
+                    {rep.rep_score_components && (
+                      <RepScoreBreakdown components={rep.rep_score_components} />
+                    )}
                   </div>
                 </div>
               )
