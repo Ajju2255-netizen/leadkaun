@@ -170,11 +170,11 @@ export default function PipelinePage() {
   const [moveLeadId,   setMoveLeadId]   = useState<string | null>(null)
   const [peekLeadId,   setPeekLeadId]   = useState<string | null>(null)
 
-  const stages = data?.stages ?? []
-  const allLeads = data?.leads ?? []
-  const activeStages = stages.filter((s) => !s.is_terminal)
-  const wonStage  = stages.find((s) => s.is_won)
-  const lostStage = stages.find((s) => s.is_lost)
+  const stages = useMemo(() => data?.stages ?? [], [data?.stages])
+  const allLeads = useMemo(() => data?.leads ?? [], [data?.leads])
+  const activeStages = useMemo(() => stages.filter((s) => !s.is_terminal), [stages])
+  const wonStage  = useMemo(() => stages.find((s) => s.is_won), [stages])
+  const lostStage = useMemo(() => stages.find((s) => s.is_lost), [stages])
 
   const leads = useMemo(() => {
     if (gradeFilter === "all") return allLeads

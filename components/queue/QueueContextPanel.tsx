@@ -90,13 +90,15 @@ export function QueueContextPanel({
   const [, setTick] = useState(0)
 
   const lead = (selectedId ? leads.find((l) => l.id === selectedId) : null) ?? leads[0]
+  const leadId = lead?.id
+  const isHotGrade = lead?.grade === "A" || lead?.grade === "B"
 
   // Live tick so countdown + urgency bar update in real-time for hot leads
   useEffect(() => {
-    if (!lead || (lead.grade !== "A" && lead.grade !== "B")) return
+    if (!leadId || !isHotGrade) return
     const id = setInterval(() => setTick((n) => n + 1), 30_000)
     return () => clearInterval(id)
-  }, [lead?.grade, lead?.id])
+  }, [leadId, isHotGrade])
 
   if (!lead) {
     return (

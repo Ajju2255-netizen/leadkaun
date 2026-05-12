@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect, useRef } from "react"
+import { useState, useCallback, useEffect, useMemo, useRef } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
@@ -689,15 +689,18 @@ export default function LeadsPage() {
   }, [isManager, queryClient])
 
   // Build params
-  const params: Record<string, string> = { page: String(page) }
-  if (search)              params.search    = search
-  if (grade !== "all")     params.grade     = grade
-  if (stageFilter  !== "all") params.stage  = stageFilter
-  if (sourceFilter !== "all") params.source = sourceFilter
-  if (repFilter    !== "all") params.rep    = repFilter
-  if (dateFrom)            params.date_from = dateFrom
-  if (dateTo)              params.date_to   = dateTo
-  if (batch !== "all")     params.batch     = batch
+  const params = useMemo<Record<string, string>>(() => {
+    const p: Record<string, string> = { page: String(page) }
+    if (search)              p.search    = search
+    if (grade !== "all")     p.grade     = grade
+    if (stageFilter  !== "all") p.stage  = stageFilter
+    if (sourceFilter !== "all") p.source = sourceFilter
+    if (repFilter    !== "all") p.rep    = repFilter
+    if (dateFrom)            p.date_from = dateFrom
+    if (dateTo)              p.date_to   = dateTo
+    if (batch !== "all")     p.batch     = batch
+    return p
+  }, [page, search, grade, stageFilter, sourceFilter, repFilter, dateFrom, dateTo, batch])
 
   // ── Data queries
   const { data, isLoading } = useQuery({
