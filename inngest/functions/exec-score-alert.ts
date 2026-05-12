@@ -142,43 +142,59 @@ export const execScoreAlertFn = inngest.createFunction(
     // ── Create notifications (idempotent per rep / day / manager) ────────────
     const created = await step.run("create-notifications", async () => {
       let count = 0
+      let migrationPending = false
       for (const { rep, score, components } of lowReps) {
         const targetManagerIds = managersByAccount.get(rep.account_id) ?? []
         if (targetManagerIds.length === 0) continue
 
         for (const managerId of targetManagerIds) {
-          // Idempotency check: one alert per (rep, manager, IST day)
-          const existing = await prisma.notification.findFirst({
-            where: {
-              account_id: rep.account_id,
-              user_id:    managerId,
-              type:       "EXEC_SCORE_LOW",
-              message:    { contains: rep.id },
-              created_at: { gte: dayStart },
-            },
-            select: { id: true },
-          })
-          if (existing) continue
+          try {
+            // Idempotency check: one alert per (rep, manager, IST day)
+            const existing = await prisma.notification.findFirst({
+              where: {
+                account_id: rep.account_id,
+                user_id:    managerId,
+                type:       "EXEC_SCORE_LOW",
+                message:    { contains: rep.id },
+                created_at: { gte: dayStart },
+              },
+              select: { id: true },
+            })
+            if (existing) continue
 
-          await prisma.notification.create({
-            data: {
-              account_id: rep.account_id,
-              user_id:    managerId,
-              lead_id:    null,
-              type:       "EXEC_SCORE_LOW",
-              title:      `${rep.first_name} at ${score}% — behind on today's plan`,
-              // Include rep.id in message for the idempotency selector above.
-              // (No FK on rep_id in Notification; embedding in message is the
-              // pragmatic dedupe key.)
-              message:    `Execution score ${score}/100 at ${Math.floor(hr)}:00 IST. ` +
-                          `FU ${components.followups_done_vs_due}, touches ${components.leads_touched}, ` +
-                          `speed ${components.speed_to_lead_today}, signals ${components.signals_logged}, ` +
-                          `overdue ${components.overdue_penalty}. ref:${rep.id}`,
-              priority:   "high",
-              action_url: `/rep-tracking#rep-${rep.id}`,
-            },
-          })
-          count++
+            await prisma.notification.create({
+              data: {
+                account_id: rep.account_id,
+                user_id:    managerId,
+                lead_id:    null,
+                type:       "EXEC_SCORE_LOW",
+                title:      `${rep.first_name} at ${score}% — behind on today's plan`,
+                // Include rep.id in message for the idempotency selector above.
+                // (No FK on rep_id in Notification; embedding in message is the
+                // pragmatic dedupe key.)
+                message:    `Execution score ${score}/100 at ${Math.floor(hr)}:00 IST. ` +
+                            `FU ${components.followups_done_vs_due}, touches ${components.leads_touched}, ` +
+                            `speed ${components.speed_to_lead_today}, signals ${components.signals_logged}, ` +
+                            `overdue ${components.overdue_penalty}. ref:${rep.id}`,
+                priority:   "high",
+                action_url: `/rep-tracking#rep-${rep.id}`,
+              },
+            })
+            count++
+          } catch (e) {
+            // Tolerate the deploy-before-migration case: if the NotifType
+            // enum doesn't yet have EXEC_SCORE_LOW in this database, log
+            // once and continue — alerts resume after `prisma migrate deploy`.
+            const msg = e instanceof Error ? e.message : String(e)
+            if (!migrationPending && msg.includes("EXEC_SCORE_LOW")) {
+              migrationPending = true
+              logger.warn(
+                "EXEC_SCORE_LOW enum not present — run `prisma migrate deploy`. Skipping further inserts this run.",
+              )
+            }
+            // For unrelated errors, surface them
+            if (!msg.includes("EXEC_SCORE_LOW")) throw e
+          }
         }
       }
       return count
