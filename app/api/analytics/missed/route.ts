@@ -43,11 +43,12 @@ export async function GET(_req: Request) {
       orderBy: { missed_at: "asc" },   // longest-missed first
     })
 
-    // Value recovered this week: A/B grade leads won in past 7 days
+    // Value recovered this week: any graded lead won in past 7 days
+    // (matches the 4-tier missed-opportunity model — A=24h, B=48h, C=7d, D=30d)
     const recoveredThisWeek = await prisma.lead.aggregate({
       where: {
         account_id: accountId,
-        grade:      { in: ["A", "B"] },
+        grade:      { in: ["A", "B", "C", "D"] },
         won_at:     { gte: weekAgo },
       },
       _sum: { won_value: true },
