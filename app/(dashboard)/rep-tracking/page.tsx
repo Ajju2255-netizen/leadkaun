@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { User, IndianRupee, Clock, CheckCircle, ArrowUp, ArrowDown, Trophy } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
+import { AvatarCircle } from "@/components/shared/AvatarCircle"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -82,22 +83,6 @@ function formatResponseTime(seconds: number | null): string {
     return `${h}h ${m % 60}m`
   }
   return `${m}m ${String(s).padStart(2, "0")}s`
-}
-
-// Same gradient palette used in /missed avatar circles — deterministic by initials
-const AVATAR_PALETTES = [
-  { bg: "linear-gradient(180deg, #6EE7B7 0%, #10B981 100%)" },
-  { bg: "linear-gradient(180deg, #38BDF8 0%, #0EA5E9 100%)" },
-  { bg: "linear-gradient(180deg, #C4B5FD 0%, #8B5CF6 100%)" },
-  { bg: "linear-gradient(180deg, #FDBA74 0%, #FB923C 100%)" },
-  { bg: "linear-gradient(180deg, #F0ABFC 0%, #D946EF 100%)" },
-  { bg: "linear-gradient(180deg, #67E8F9 0%, #06B6D4 100%)" },
-  { bg: "linear-gradient(180deg, #F472B6 0%, #EC4899 100%)" },
-  { bg: "linear-gradient(180deg, #FDE047 0%, #EAB308 100%)" },
-]
-function avatarPalette(seed: string) {
-  const code = seed.charCodeAt(0) || 0
-  return AVATAR_PALETTES[code % AVATAR_PALETTES.length]
 }
 
 // Score band → color (mirrors the leads-table bar coloring logic)
@@ -401,8 +386,6 @@ export default function RepTrackingPage() {
           <div className="divide-y" style={{ borderColor: "var(--hairline)" }}>
             {sortedReps.map((rep, idx) => {
               const fullName = `${rep.first_name} ${rep.last_name}`.trim()
-              const seed     = (rep.first_name[0] || "?").toUpperCase()
-              const palette  = avatarPalette(seed)
 
               const revPct      = (rep.revenue_recovered / maxRevenue) * 100
               const respPct     = rep.response_time_seconds != null
@@ -424,15 +407,7 @@ export default function RepTrackingPage() {
                 >
                   {/* Rep */}
                   <div className="flex items-center gap-3 min-w-0">
-                    <div
-                      className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 font-bold text-[13px] text-white"
-                      style={{
-                        background: palette.bg,
-                        boxShadow:  "inset 0 1px 0 rgba(255,255,255,0.45), 0 2px 6px rgba(15,23,42,0.10)",
-                      }}
-                    >
-                      {seed}
-                    </div>
+                    <AvatarCircle seed={rep.first_name} size="md" />
                     <p className="text-[14px] font-semibold text-ink truncate">{fullName}</p>
                   </div>
 
