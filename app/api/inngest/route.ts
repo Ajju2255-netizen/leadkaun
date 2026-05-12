@@ -6,6 +6,7 @@ import { followUpOverdueFn } from "@/inngest/functions/follow-up-overdue"
 import { morningBriefFn } from "@/inngest/functions/morning-brief"
 import { missedOpportunityFn } from "@/inngest/functions/missed-opportunity"
 import { sheetsSyncFn } from "@/inngest/functions/sheets-sync"
+import { execScoreAlertFn } from "@/inngest/functions/exec-score-alert"
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
@@ -16,5 +17,6 @@ export const { GET, POST, PUT } = serve({
     morningBriefFn,      // 5.4 — morning brief emails
     missedOpportunityFn, // 5.5 — missed opportunity checker
     sheetsSyncFn,        // 5.6 — Google Sheets sync
+    execScoreAlertFn,    // 5.7 — daily execution score alert (3pm IST)
   ],
 })

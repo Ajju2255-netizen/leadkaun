@@ -169,10 +169,12 @@ enum SignalType {
 }
 
 enum NotifType {
-  AT_RISK       // lead approaching missed threshold
-  FOLLOW_UP_DUE // follow-up action went overdue
-  MISSED        // lead was marked missed
-  RECOVERY      // missed lead with recovery potential
+  AT_RISK         // lead approaching missed threshold
+  FOLLOW_UP_DUE   // follow-up action went overdue
+  MISSED          // lead was marked missed
+  RECOVERY        // missed lead with recovery potential
+  EXEC_SCORE_LOW  // rep's daily execution score < 25% at 3pm IST
+  REP_SCORE_DROP  // rep's 5-component rep score dropped 10+ pts WoW (future use)
 }
 
 // ─────────────────────────────────────────────
