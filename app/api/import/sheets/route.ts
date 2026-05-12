@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { requireRole } from "@/lib/auth/middleware"
 import { handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError, parseBody } from "@/lib/api/response"
+import { encrypt } from "@/lib/crypto"
 
 /**
  * Google Sheets Integration Endpoints
@@ -70,7 +71,7 @@ export async function POST(req: Request) {
           data: {
             sheet_id:       sheetId,
             sheet_url:      data.sheet_url,
-            refresh_token:  data.refresh_token,   // TODO: encrypt in Phase 9
+            refresh_token:  encrypt(data.refresh_token),
             column_mapping: data.column_mapping,
             source_id:      data.source_id,
             stage_id:       data.stage_id,
@@ -88,7 +89,7 @@ export async function POST(req: Request) {
           account_id:     session.account.id,
           sheet_id:       sheetId,
           sheet_url:      data.sheet_url,
-          refresh_token:  data.refresh_token,
+          refresh_token:  encrypt(data.refresh_token),
           column_mapping: data.column_mapping,
           source_id:      data.source_id,
           stage_id:       data.stage_id,
