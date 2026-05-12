@@ -2,6 +2,10 @@ import { createServerClient, type CookieOptions } from "@supabase/auth-helpers-n
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
+// Dev-only auth bypass — see lib/auth/session.ts. Hard-guarded by NODE_ENV.
+const DEV_BYPASS =
+  process.env.NODE_ENV !== "production" && process.env.DEV_AUTH_BYPASS === "true"
+
 const DASHBOARD_PATHS = [
   "/dashboard",
   "/leads",
@@ -24,6 +28,19 @@ function isAuthPath(pathname: string) {
 
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next()
+
+  // Dev bypass: let everything through; rewrite auth-page visits to /queue
+  // so the local preview matches the post-login behaviour.
+  if (DEV_BYPASS) {
+    const { pathname } = req.nextUrl
+    if (isAuthPath(pathname)) {
+      const url = req.nextUrl.clone()
+      url.pathname = "/queue"
+      url.search = ""
+      return NextResponse.redirect(url)
+    }
+    return res
+  }
 
   // createServerClient in middleware context — reads/writes cookies on req/res
   const supabase = createServerClient(
