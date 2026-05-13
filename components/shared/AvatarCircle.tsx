@@ -1,14 +1,14 @@
+"use client"
+
 /**
- * AvatarCircle — gradient avatar with a single initial. Palette is
- * deterministic by seed so the same rep always lands on the same colour.
+ * AvatarCircle — gradient avatar with a single initial OR a real photo.
  *
- * Three sizes:
- *   sm  → 28px (for table rows, dense lists)
- *   md  → 36px (default — Top-N rows, /rep-tracking)
- *   lg  → 44px (for hero / detail headers)
+ * Pass `imageUrl` to render a portrait (cover-fit, ring outline). On image
+ * load error, falls back to the gradient + initial. Palette is deterministic
+ * by seed so the same person always lands on the same colour.
  */
 
-import { memo } from "react"
+import { useState } from "react"
 import { cn } from "@/lib/utils"
 
 const AVATAR_PALETTES = [
@@ -37,15 +37,38 @@ const SIZE_CLS: Record<Size, string> = {
 }
 
 export interface AvatarCircleProps {
-  /** Used to compute initial + colour. Pass full name or first name. */
+  /** Used to compute initial + colour palette. */
   seed: string
   size?: Size
   className?: string
+  /** Optional photo URL — pravatar/dicebear/etc. Falls back to initial on error. */
+  imageUrl?: string
 }
 
-function AvatarCircleImpl({ seed, size = "md", className }: AvatarCircleProps) {
+export function AvatarCircle({ seed, size = "md", className, imageUrl }: AvatarCircleProps) {
+  const [imgError, setImgError] = useState(false)
   const initial = (seed?.[0] ?? "?").toUpperCase()
   const palette = paletteFor(initial)
+  const showPhoto = !!imageUrl && !imgError
+
+  if (showPhoto) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={imageUrl}
+        alt=""
+        onError={() => setImgError(true)}
+        className={cn(
+          "rounded-full shrink-0 object-cover ring-2 ring-white/80 bg-slate-100",
+          SIZE_CLS[size],
+          className,
+        )}
+        style={{ boxShadow: "0 2px 6px rgba(15,23,42,0.10)" }}
+        aria-hidden="true"
+      />
+    )
+  }
+
   return (
     <div
       className={cn(
@@ -63,5 +86,3 @@ function AvatarCircleImpl({ seed, size = "md", className }: AvatarCircleProps) {
     </div>
   )
 }
-
-export const AvatarCircle = memo(AvatarCircleImpl)

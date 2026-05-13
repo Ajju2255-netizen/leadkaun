@@ -88,7 +88,12 @@ export function QueueLeadRow({ lead, onClick, rank }: QueueLeadRowProps) {
         />
       )}
 
-      <AvatarCircle seed={lead.first_name ?? "?"} size="lg" className={cn("self-center", rank == null && "ml-2")} />
+      <AvatarCircle
+        seed={lead.first_name ?? "?"}
+        size="lg"
+        imageUrl={`https://i.pravatar.cc/120?u=${lead.id}`}
+        className={cn("self-center", rank == null && "ml-2")}
+      />
 
       {/* Identity stack — 3 fixed lines, no wrap */}
       <div className="flex-1 min-w-0 self-center space-y-0.5">
