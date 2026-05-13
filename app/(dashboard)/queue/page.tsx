@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils"
 import { useQuery } from "@tanstack/react-query"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { useQueue } from "@/hooks/useQueue"
+import { useQueueRealtime } from "@/hooks/useQueueRealtime"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
 import { QueueLeadRow } from "@/components/queue/QueueLeadRow"
 import { QueueSidebar } from "@/components/queue/QueueSidebar"
@@ -90,6 +91,10 @@ export default function QueuePage() {
     staleTime: 5 * 60 * 1000,
   })
 
+  // Realtime updates — pushes invalidations when leads/signals change for
+  // this account. Throttled inside the hook. Falls back to 30s polling.
+  const realtimeStatus = useQueueRealtime(session?.account?.id)
+
   const leads = useMemo<QueueLead[]>(() => data?.leads ?? [], [data?.leads])
   const kpis  = data?.kpis
 
@@ -163,13 +168,38 @@ export default function QueuePage() {
 
           {/* Toolbar */}
           <div className="flex items-center gap-3 flex-wrap">
-            <p className="text-[12px] text-ink-muted">
+            <p className="text-[12px] text-ink-muted flex items-center gap-2">
               {isLoading ? "Loading…" : (
                 <>
                   <span className="font-bold text-slate-700 tabular-nums">{totalLeads}</span> active leads
                   {kpis ? <> · <span className="font-bold text-sky-700 tabular-nums">{kpis.high_priority_count}</span> high priority</> : null}
                 </>
               )}
+              <span
+                title={
+                  realtimeStatus === "live"
+                    ? "Live updates active — queue refreshes automatically"
+                    : realtimeStatus === "connecting"
+                      ? "Connecting to live updates…"
+                      : "Live updates offline — polling every 30s"
+                }
+                className={cn(
+                  "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                  realtimeStatus === "live"       && "text-emerald-700 bg-emerald-50",
+                  realtimeStatus === "connecting" && "text-amber-700 bg-amber-50",
+                  realtimeStatus === "offline"    && "text-slate-500 bg-slate-100",
+                )}
+              >
+                <span
+                  className={cn(
+                    "w-1.5 h-1.5 rounded-full",
+                    realtimeStatus === "live"       && "bg-emerald-500 animate-pulse",
+                    realtimeStatus === "connecting" && "bg-amber-500 animate-pulse",
+                    realtimeStatus === "offline"    && "bg-slate-400",
+                  )}
+                />
+                {realtimeStatus === "live" ? "Live" : realtimeStatus === "connecting" ? "Live…" : "Polling"}
+              </span>
             </p>
 
             <div className="flex items-center gap-2 ml-auto">
