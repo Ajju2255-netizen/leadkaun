@@ -26,7 +26,7 @@ export function QueueTopFive({ leads, onLeadClick }: QueueTopFiveProps) {
   }
 
   return (
-    <div id="queue-top-five" className="space-y-3">
+    <div id="queue-top-five" className="space-y-2">
       {leads.map((lead, idx) => (
         <QueueLeadRow key={lead.id} lead={lead} rank={idx + 1} onClick={onLeadClick} />
       ))}

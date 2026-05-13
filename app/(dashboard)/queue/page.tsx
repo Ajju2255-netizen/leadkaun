@@ -76,7 +76,7 @@ function GradeSection({
       </button>
 
       {open && (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {leads.map((lead) => (
             <QueueLeadRow key={lead.id} lead={lead} onClick={onSelect} />
           ))}
@@ -146,10 +146,19 @@ export default function QueuePage() {
         <QueueSidebar kpis={kpis} loading={isLoading} />
 
         {/* ── MAIN COLUMN ───────────────────────────────────────────────── */}
-        <div className="space-y-5 min-w-0">
+        <div className="space-y-4 min-w-0">
 
           {/* Toolbar */}
           <div className="flex items-center gap-3 flex-wrap">
+            <p className="text-[12px] text-ink-muted">
+              {isLoading ? "Loading…" : (
+                <>
+                  <span className="font-bold text-slate-700 tabular-nums">{totalLeads}</span> active leads
+                  {kpis ? <> · <span className="font-bold text-sky-700 tabular-nums">{kpis.high_priority_count}</span> high priority</> : null}
+                </>
+              )}
+            </p>
+
             <div className="flex items-center gap-2 ml-auto">
               {/* Search */}
               <div className="relative">
@@ -262,15 +271,8 @@ export default function QueuePage() {
           )}
 
           {/* Grade-grouped sections (existing pattern) */}
-          {!isLoading && totalLeads > 0 && (
-            <div className="space-y-6 pt-2">
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-ink-muted">
-                  Full queue · by grade
-                </span>
-                <div className="flex-1 h-px bg-slate-200" />
-              </div>
-
+          {!isLoading && totalLeads > 5 && (
+            <div className="space-y-5 pt-1">
               {SECTIONS.map((section) => {
                 const sectionLeads = grouped[section.grade] ?? []
                 const totalValue   = sectionLeads.reduce((s, l) => s + (l.expected_value ?? 0), 0)
