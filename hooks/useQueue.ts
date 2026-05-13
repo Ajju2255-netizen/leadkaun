@@ -29,6 +29,7 @@ export interface QueueLead {
   inquiry_text:   string | null
   next_action:    NextAction
   stage:          { id: string; name: string } | null
+  source:         { id: string; name: string; key: string } | null
   follow_up_actions:    { due_date: string; status: string }[]
   hours_since_import:   number | null
   last_action_at:           string | null

@@ -1,7 +1,9 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { cn } from "@/lib/utils"
 import { useQuery } from "@tanstack/react-query"
+import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { useQueue } from "@/hooks/useQueue"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
 import { QueueLeadRow } from "@/components/queue/QueueLeadRow"
@@ -9,6 +11,11 @@ import { QueueSidebar } from "@/components/queue/QueueSidebar"
 import { QueueTopFive } from "@/components/queue/QueueTopFive"
 import { CompleteActionsBanner } from "@/components/queue/CompleteActionsBanner"
 import { QueueGradeTabs, type GradeTab } from "@/components/queue/QueueGradeTabs"
+import {
+  QueueFilters,
+  filtersAreActive,
+  type QueueFiltersState,
+} from "@/components/queue/QueueFilters"
 import { LeadSlideOver } from "@/components/shared/LeadSlideOver"
 import { BackToTopButton } from "@/components/shared/BackToTopButton"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -16,6 +23,12 @@ import {
   CheckCircle2, Users, Search, X, ChevronDown, SlidersHorizontal,
 } from "lucide-react"
 import type { QueueLead } from "@/hooks/useQueue"
+
+async function fetchSources() {
+  const res = await fetch("/api/lead-sources", { credentials: "include" })
+  if (!res.ok) return { sources: [] }
+  return res.json() as Promise<{ sources: { id: string; name: string; key: string }[] }>
+}
 
 async function fetchTeam() {
   const res = await fetch("/api/team/members", { credentials: "include" })
@@ -28,11 +41,42 @@ async function fetchTeam() {
 export default function QueuePage() {
   const { data: session } = useCurrentUser()
   const isManager = session?.user.role === "ADMIN" || session?.user.role === "MANAGER"
-  const [repFilter,    setRepFilter]    = useState<string | undefined>(undefined)
-  const [sourceFilter, setSourceFilter] = useState<string>("all")
+  const searchParams = useSearchParams()
+  const router       = useRouter()
+  const pathname     = usePathname()
+
+  // Read initial state from URL search params so views are shareable
+  const [repFilter,    setRepFilter]    = useState<string | undefined>(searchParams.get("rep") ?? undefined)
+  const [sourceFilter, setSourceFilter] = useState<string>(searchParams.get("source") ?? "all")
   const [openLeadId,   setOpenLeadId]   = useState<string | null>(null)
-  const [search,       setSearch]       = useState("")
-  const [gradeTab,     setGradeTab]     = useState<GradeTab>("all")
+  const [search,       setSearch]       = useState(searchParams.get("q") ?? "")
+  const [gradeTab,     setGradeTab]     = useState<GradeTab>((searchParams.get("grade") as GradeTab) ?? "all")
+  const [filtersOpen,  setFiltersOpen]  = useState(false)
+  const [filters,      setFilters]      = useState<QueueFiltersState>(() => {
+    const channels = new Set<"whatsapp" | "phone">()
+    const ch = searchParams.get("channels")
+    if (ch) ch.split(",").forEach((c) => {
+      if (c === "whatsapp" || c === "phone") channels.add(c)
+    })
+    return {
+      channels,
+      hideContactedToday: searchParams.get("hideContacted") === "1",
+    }
+  })
+
+  // Persist filter state to URL — shareable / bookmarkable views
+  useEffect(() => {
+    const sp = new URLSearchParams()
+    if (search.trim())                sp.set("q",      search.trim())
+    if (gradeTab     !== "all")       sp.set("grade",  gradeTab)
+    if (sourceFilter !== "all")       sp.set("source", sourceFilter)
+    if (repFilter)                    sp.set("rep",    repFilter)
+    if (filters.channels.size > 0)    sp.set("channels", Array.from(filters.channels).join(","))
+    if (filters.hideContactedToday)   sp.set("hideContacted", "1")
+    const qs   = sp.toString()
+    const next = qs ? `${pathname}?${qs}` : pathname
+    router.replace(next, { scroll: false })
+  }, [pathname, router, search, gradeTab, sourceFilter, repFilter, filters])
 
   const { data, isLoading, error } = useQueue(repFilter)
   const { data: teamData } = useQuery({
@@ -40,11 +84,16 @@ export default function QueuePage() {
     queryFn:  fetchTeam,
     enabled:  isManager,
   })
+  const { data: sourcesData } = useQuery({
+    queryKey: ["lead-sources"],
+    queryFn:  fetchSources,
+    staleTime: 5 * 60 * 1000,
+  })
 
   const leads = useMemo<QueueLead[]>(() => data?.leads ?? [], [data?.leads])
   const kpis  = data?.kpis
 
-  // Filter by search + source (server-side leads are already ai_score sorted)
+  // Filter by search + source + advanced filters (server-side already ai_score sorted)
   const filteredLeads = useMemo(() => {
     let out = leads
     if (search.trim()) {
@@ -56,10 +105,20 @@ export default function QueuePage() {
       )
     }
     if (sourceFilter !== "all") {
-      out = out.filter((l) => l.stage?.id === sourceFilter)
+      out = out.filter((l) => l.source?.id === sourceFilter)
+    }
+    if (filters.channels.size > 0) {
+      out = out.filter((l) => l.channel && filters.channels.has(l.channel as "whatsapp" | "phone"))
+    }
+    if (filters.hideContactedToday) {
+      const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0)
+      out = out.filter((l) => {
+        if (!l.last_action_at) return true
+        return new Date(l.last_action_at).getTime() < startOfDay.getTime()
+      })
     }
     return out
-  }, [leads, search, sourceFilter])
+  }, [leads, search, sourceFilter, filters])
 
   const topFive = filteredLeads.slice(0, 5)
   const topFiveIds = useMemo(() => new Set(topFive.map((l) => l.id)), [topFive])
@@ -147,23 +206,46 @@ export default function QueuePage() {
                 </div>
               )}
 
-              {/* All Sources dropdown — stub */}
-              <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}
-                className="h-9 px-3 rounded-full glass-1 border border-white/70 text-[12px] font-semibold
-                           text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500/30
-                           focus:border-sky-400 appearance-none cursor-pointer transition-all">
-                <option value="all">All Sources</option>
-              </select>
+              {/* All Sources dropdown — wired to /api/lead-sources */}
+              <div className="relative">
+                <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}
+                  className="h-9 pl-3 pr-8 rounded-full glass-1 border border-white/70 text-[12px] font-semibold
+                             text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500/30
+                             focus:border-sky-400 appearance-none cursor-pointer transition-all max-w-[160px]">
+                  <option value="all">All Sources</option>
+                  {sourcesData?.sources.map((s) => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none z-10" />
+              </div>
 
-              {/* Filters button — future-stub */}
-              <button
-                disabled
-                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full glass-1 border border-white/70 text-[12px] font-semibold text-slate-500 opacity-70 cursor-not-allowed"
-                title="More filters coming soon"
-              >
-                <SlidersHorizontal className="w-3.5 h-3.5" />
-                Filters
-              </button>
+              {/* Filters button + popover */}
+              <div className="relative">
+                <button
+                  onClick={() => setFiltersOpen((o) => !o)}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 h-9 px-3 rounded-full glass-1 border text-[12px] font-semibold transition-all",
+                    filtersAreActive(filters)
+                      ? "bg-sky-50 border-sky-200 text-sky-700"
+                      : "border-white/70 text-slate-700 hover:bg-slate-50",
+                  )}
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                  Filters
+                  {filtersAreActive(filters) && (
+                    <span className="ml-0.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-sky-600 text-white text-[10px] font-bold tabular-nums">
+                      {filters.channels.size + (filters.hideContactedToday ? 1 : 0)}
+                    </span>
+                  )}
+                </button>
+                <QueueFilters
+                  open={filtersOpen}
+                  onClose={() => setFiltersOpen(false)}
+                  state={filters}
+                  onChange={setFilters}
+                />
+              </div>
             </div>
           </div>
 
