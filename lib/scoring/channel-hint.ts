@@ -24,10 +24,9 @@ export function channelFromSignal(signalType?: string | null): LeadChannel {
 }
 
 /**
- * Short signal-derived activity label. Mirrors the HOT_SIGNAL_LABEL +
- * SIGNAL_LABEL_SHORT maps in components/queue/QueueCard.tsx so both
- * surfaces stay aligned. Returns null when the signal is unknown or
- * uninteresting (so the hint pipeline can fall through to the next source).
+ * Short signal-derived activity label. Returns null when the signal is
+ * unknown or uninteresting so the hint pipeline can fall through to the
+ * next source (note-theme keyword, then stage name, then generic).
  */
 function signalLabel(signalType?: string | null): string | null {
   if (!signalType) return null
