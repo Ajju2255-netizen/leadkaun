@@ -4,14 +4,14 @@ import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { useQueue } from "@/hooks/useQueue"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
-import { QueueCard } from "@/components/queue/QueueCard"
+import { QueueLeadRow } from "@/components/queue/QueueLeadRow"
 import { QueueSidebar } from "@/components/queue/QueueSidebar"
 import { QueueTopFive } from "@/components/queue/QueueTopFive"
 import { CompleteActionsBanner } from "@/components/queue/CompleteActionsBanner"
 import { LeadSlideOver } from "@/components/shared/LeadSlideOver"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
-  CheckCircle2, Users, Search, X, ChevronDown, Sparkles, SlidersHorizontal,
+  CheckCircle2, Users, Search, X, ChevronDown, SlidersHorizontal,
 } from "lucide-react"
 import type { QueueLead } from "@/hooks/useQueue"
 
@@ -41,14 +41,13 @@ function formatValue(v: number): string {
 // ── Grade Section ─────────────────────────────────────────────────────────────
 
 function GradeSection({
-  label, leads, totalValue, defaultOpen, selectedId, onSelect, dot,
+  label, leads, totalValue, defaultOpen, onSelect, dot,
 }: {
   grade: string
   label: string
   leads: QueueLead[]
   totalValue: number
   defaultOpen: boolean
-  selectedId: string | null
   onSelect: (id: string) => void
   dot: string
 }) {
@@ -77,9 +76,9 @@ function GradeSection({
       </button>
 
       {open && (
-        <div className="space-y-2.5">
+        <div className="space-y-3">
           {leads.map((lead) => (
-            <QueueCard key={lead.id} lead={lead} isSelected={selectedId === lead.id} onSelect={onSelect} />
+            <QueueLeadRow key={lead.id} lead={lead} onClick={onSelect} />
           ))}
         </div>
       )}
@@ -151,11 +150,6 @@ export default function QueuePage() {
 
           {/* Toolbar */}
           <div className="flex items-center gap-3 flex-wrap">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full glass-1 border border-white/70 text-[12px] text-slate-700">
-              <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
-              Sorted by <span className="font-semibold">AI Score</span>
-            </span>
-
             <div className="flex items-center gap-2 ml-auto">
               {/* Search */}
               <div className="relative">
@@ -287,7 +281,6 @@ export default function QueuePage() {
                     leads={sectionLeads}
                     totalValue={totalValue}
                     defaultOpen={section.defaultOpen}
-                    selectedId={openLeadId}
                     onSelect={setOpenLeadId}
                     dot={section.dot} />
                 )
