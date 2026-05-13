@@ -31,13 +31,7 @@ export interface QueueGradeTabsProps {
 
 export function QueueGradeTabs({ active, onChange, counts }: QueueGradeTabsProps) {
   return (
-    <div
-      className="sticky top-0 z-20 -mx-1 px-1 py-2.5"
-      style={{
-        background: "linear-gradient(to bottom, rgba(248,250,252,0.97) 0%, rgba(248,250,252,0.85) 75%, rgba(248,250,252,0) 100%)",
-        backdropFilter: "saturate(150%) blur(6px)",
-      }}
-    >
+    <div className="-mx-1 px-1 py-1">
       <div className="flex items-center gap-1.5 flex-wrap">
         {TABS.map((t) => {
           const count = counts[t.key] ?? 0

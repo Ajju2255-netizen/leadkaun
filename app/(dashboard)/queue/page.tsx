@@ -91,13 +91,16 @@ export default function QueuePage() {
 
   return (
     <>
-      <div className="grid grid-cols-1 xl:grid-cols-[280px_1fr] gap-6 items-start">
+      {/* xl+: fixed-height layout where only the leads list scrolls.
+          Below xl: normal page scroll so cramped viewports get full height. */}
+      <div className="grid grid-cols-1 xl:grid-cols-[280px_1fr] gap-6 items-start
+                      xl:h-full xl:max-h-full xl:overflow-hidden">
 
         {/* ── LEFT SIDEBAR ──────────────────────────────────────────────── */}
         <QueueSidebar kpis={kpis} loading={isLoading} />
 
         {/* ── MAIN COLUMN ───────────────────────────────────────────────── */}
-        <div className="space-y-4 min-w-0">
+        <div className="flex flex-col gap-4 min-w-0 xl:h-full xl:min-h-0 xl:overflow-hidden">
 
           {/* Toolbar */}
           <div className="flex items-center gap-3 flex-wrap">
@@ -221,24 +224,28 @@ export default function QueuePage() {
             <CompleteActionsBanner topThreeRevenue={kpis.top_three_potential_revenue} />
           )}
 
-          {/* Grade tabs — sticky pill bar */}
+          {/* Grade tabs */}
           {!isLoading && totalLeads > 5 && (
             <QueueGradeTabs active={gradeTab} onChange={setGradeTab} counts={counts} />
           )}
 
-          {/* Filtered list below tabs */}
-          {!isLoading && belowList.length > 0 && (
-            <div className="space-y-2">
-              {belowList.map((lead) => (
-                <QueueLeadRow key={lead.id} lead={lead} onClick={setOpenLeadId} />
-              ))}
-            </div>
-          )}
-
-          {/* Empty tab state */}
-          {!isLoading && gradeTab !== "all" && belowList.length === 0 && totalLeads > 0 && (
-            <div className="rounded-2xl glass-1 px-5 py-8 text-center text-[13px] text-ink-muted">
-              No Grade {gradeTab} leads right now.
+          {/* Scrollable list area — only this scrolls on xl+ */}
+          {!isLoading && (belowList.length > 0 || gradeTab !== "all") && (
+            <div
+              data-queue-scroll
+              className="xl:flex-1 xl:min-h-0 xl:overflow-y-auto -mx-1 px-1 pb-3"
+            >
+              {belowList.length > 0 ? (
+                <div className="space-y-2">
+                  {belowList.map((lead) => (
+                    <QueueLeadRow key={lead.id} lead={lead} onClick={setOpenLeadId} />
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-2xl glass-1 px-5 py-8 text-center text-[13px] text-ink-muted">
+                  No Grade {gradeTab} leads right now.
+                </div>
+              )}
             </div>
           )}
 

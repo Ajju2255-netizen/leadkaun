@@ -26,7 +26,7 @@ export function QueueSidebar({ kpis, loading }: QueueSidebarProps) {
   const isUp = pct != null && pct >= 0
 
   return (
-    <aside className="xl:sticky xl:top-3 space-y-4">
+    <aside className="xl:h-full xl:overflow-y-auto xl:pr-1 xl:-mr-1 space-y-4">
 
       {/* Header */}
       <div className="flex items-start gap-3">

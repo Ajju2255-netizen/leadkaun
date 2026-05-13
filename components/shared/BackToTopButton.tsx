@@ -19,10 +19,12 @@ export function BackToTopButton({ threshold = 400 }: BackToTopButtonProps) {
   const [show, setShow] = useState(false)
 
   useEffect(() => {
-    // Find the closest scrollable ancestor — the dashboard shell often wraps
-    // pages in an overflow-y-auto container instead of letting window scroll.
+    // Look for the queue's own inner scroller first; fall back to any
+    // [data-scroll-container] hint, then <main>, then window scroll.
     function findScrollContainer(): HTMLElement | Window {
-      let el: HTMLElement | null = document.body.querySelector("[data-scroll-container]")
+      let el: HTMLElement | null = document.body.querySelector("[data-queue-scroll]")
+      if (el) return el
+      el = document.body.querySelector("[data-scroll-container]")
       if (el) return el
       el = document.body.querySelector("main") as HTMLElement | null
       if (el) {
@@ -50,6 +52,11 @@ export function BackToTopButton({ threshold = 400 }: BackToTopButtonProps) {
   }, [threshold])
 
   function scrollTop() {
+    const queueScroll = document.body.querySelector("[data-queue-scroll]") as HTMLElement | null
+    if (queueScroll) {
+      queueScroll.scrollTo({ top: 0, behavior: "smooth" })
+      return
+    }
     const container = document.body.querySelector("[data-scroll-container]") as HTMLElement | null
     if (container) {
       container.scrollTo({ top: 0, behavior: "smooth" })
