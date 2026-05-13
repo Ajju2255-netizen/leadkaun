@@ -211,13 +211,13 @@ export default function QueuePage() {
             </div>
           )}
 
-          {/* Top-5 ranked hero — visible on the default "All" tab only */}
-          {!isLoading && topFive.length > 0 && gradeTab === "all" && (
+          {/* Top-5 ranked hero — ALWAYS visible, anchors the page across tabs */}
+          {!isLoading && topFive.length > 0 && (
             <QueueTopFive leads={topFive} onLeadClick={setOpenLeadId} />
           )}
 
-          {/* CTA banner — also "All" tab only */}
-          {!isLoading && kpis && kpis.top_three_potential_revenue > 0 && gradeTab === "all" && (
+          {/* CTA banner — also always visible */}
+          {!isLoading && kpis && kpis.top_three_potential_revenue > 0 && (
             <CompleteActionsBanner topThreeRevenue={kpis.top_three_potential_revenue} />
           )}
 
