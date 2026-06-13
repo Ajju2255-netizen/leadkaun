@@ -233,10 +233,10 @@ export default function MissedPage() {
       </div>
 
       {/* ── KPI strip — Risk · Trend · Recovered · By Rep ────────────────────── */}
-      <div className="grid grid-cols-12 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4">
 
         {/* ₹ at Risk Today */}
-        <div className="col-span-3">
+        <div className="lg:col-span-3">
           <KpiShell
             label="₹ at risk today"
             icon={<IndianRupee className="w-4 h-4 text-rose-500" strokeWidth={2.5} />}
@@ -271,7 +271,7 @@ export default function MissedPage() {
         </div>
 
         {/* 7-day trend */}
-        <div className="col-span-4">
+        <div className="sm:col-span-2 lg:col-span-4">
           <KpiShell
             label="7-day trend"
             icon={<TrendingDown className="w-4 h-4 text-rose-500" strokeWidth={2.5} />}
@@ -301,7 +301,7 @@ export default function MissedPage() {
         </div>
 
         {/* Recovered this week */}
-        <div className="col-span-2">
+        <div className="lg:col-span-2">
           <KpiShell
             label="Recovered · 7d"
             icon={<Trophy className="w-4 h-4 text-emerald-500" strokeWidth={2.5} />}
@@ -319,7 +319,7 @@ export default function MissedPage() {
         </div>
 
         {/* By Rep — top offenders (managers only) */}
-        <div className="col-span-3">
+        <div className="sm:col-span-2 lg:col-span-3">
           <KpiShell
             label={isManager ? "Top stale by rep" : "By grade · top"}
             icon={<Users className="w-4 h-4 text-sky-500" strokeWidth={2.5} />}

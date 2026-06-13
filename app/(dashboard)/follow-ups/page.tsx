@@ -689,9 +689,9 @@ export default function FollowUpsPage() {
       </div>
 
       {/* ── KPI strip: Score · Active Leads · Week Consistency · Tip ──────── */}
-      <div className="grid grid-cols-12 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Score donut card */}
-        <div className="col-span-3 rounded-2xl glass-3 gloss-edge p-5 relative overflow-hidden">
+        <div className="lg:col-span-3 rounded-2xl glass-3 gloss-edge p-5 relative overflow-hidden">
           <div
             className="absolute -top-12 -right-10 w-40 h-40 rounded-full pointer-events-none"
             style={{ background: "radial-gradient(circle, rgba(110,231,183,0.55) 0%, rgba(110,231,183,0) 70%)" }}
@@ -708,7 +708,7 @@ export default function FollowUpsPage() {
         </div>
 
         {/* Active leads tile */}
-        <div className="col-span-3 rounded-2xl glass-3 gloss-edge p-5 relative overflow-hidden">
+        <div className="lg:col-span-3 rounded-2xl glass-3 gloss-edge p-5 relative overflow-hidden">
           <div
             className="absolute -top-12 -left-12 w-40 h-40 rounded-full pointer-events-none"
             style={{ background: "radial-gradient(circle, rgba(125,211,252,0.55) 0%, rgba(125,211,252,0) 70%)" }}
@@ -728,12 +728,12 @@ export default function FollowUpsPage() {
         </div>
 
         {/* Week consistency tile */}
-        <div className="col-span-4">
+        <div className="lg:col-span-4">
           <WeekConsistency days={engine?.week_consistency ?? Array.from({ length: 7 }, (_, i) => ({ date: String(i), weekday: ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][i], status: "empty" as const }))} />
         </div>
 
         {/* Stay consistent tip */}
-        <div className="col-span-2 rounded-2xl glass-3 gloss-edge p-5 relative overflow-hidden">
+        <div className="lg:col-span-2 rounded-2xl glass-3 gloss-edge p-5 relative overflow-hidden">
           <div
             className="absolute -bottom-10 -right-10 w-32 h-32 rounded-full pointer-events-none"
             style={{ background: "radial-gradient(circle, rgba(253,186,116,0.55) 0%, rgba(253,186,116,0) 70%)" }}
@@ -749,11 +749,11 @@ export default function FollowUpsPage() {
       </div>
 
       {/* ── Sequence funnel + Activity feed ──────────────────────────────── */}
-      <div className="grid grid-cols-12 gap-4">
-        <div className="col-span-7">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <div className="lg:col-span-7">
           <SequenceFunnel engine={engine} />
         </div>
-        <div className="col-span-5">
+        <div className="lg:col-span-5">
           <ActivityFeed items={engine?.recent_activity ?? []} />
         </div>
       </div>
