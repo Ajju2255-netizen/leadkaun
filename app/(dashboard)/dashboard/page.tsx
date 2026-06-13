@@ -310,7 +310,10 @@ export default function DashboardPage() {
         {/* Funnel — wider (3/5) */}
         <div className="lg:col-span-3 glass-2 gloss-edge rounded-2xl p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-[16px] font-semibold text-ink">Pipeline Funnel</h2>
+            <div className="flex items-baseline gap-2">
+              <h2 className="text-[16px] font-semibold text-ink">Pipeline Funnel</h2>
+              <span className="text-[10px] text-ink-muted font-medium uppercase tracking-[0.10em]">all-time</span>
+            </div>
             <span className="text-[11px] text-ink-muted font-mono uppercase tracking-[0.10em]">
               {funnel?.total_entered ?? 0} leads entered
             </span>
