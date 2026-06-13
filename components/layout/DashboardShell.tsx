@@ -236,7 +236,10 @@ export function DashboardShell({
       <div className="flex h-screen md:p-3 md:gap-3 overflow-hidden">
 
         {/* ── Mobile top-bar (hidden md+) ─────────────────────────────────── */}
-        <div className="md:hidden fixed top-0 left-0 right-0 z-30 h-14 flex items-center justify-between px-3 glass-1 gloss-edge border-b border-white/30">
+        {/* !fixed: `.gloss-edge` sets position:relative (for its ::before gloss),
+            which otherwise overrides Tailwind's `fixed` and drops this bar into
+            normal flow — shoving <main> to the right on mobile (audit: mobile shell). */}
+        <div className="md:hidden !fixed top-0 left-0 right-0 z-30 h-14 flex items-center justify-between px-3 glass-1 gloss-edge border-b border-white/30">
           <button
             onClick={() => setMobileOpen(true)}
             aria-label="Open navigation"
