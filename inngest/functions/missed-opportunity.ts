@@ -176,6 +176,38 @@ export const missedOpportunityFn = inngest.createFunction(
       }
     })
 
+    // ── Create RECOVERY notifications (audit B9) ──────────────────────────────
+    // A missed Grade A/B lead with an owner still has real recovery potential.
+    // Surface a rep-targeted, lead-specific "recover now" nudge (distinct from
+    // the account-wide MISSED feed). This is what the notifications UI's RECOVERY
+    // type + "Recover now" CTA were built for but never received.
+    await step.run("create-recovery-notifications", async () => {
+      const dedupeWindow = hoursAgo(now, 24)
+      const recoverable = allMissed.filter(
+        (l) => (l.grade === "A" || l.grade === "B") && l.assigned_rep_id,
+      )
+      for (const lead of recoverable) {
+        const existing = await prisma.notification.findFirst({
+          where: { lead_id: lead.id, type: "RECOVERY", created_at: { gte: dedupeWindow } },
+        })
+        if (existing) continue
+
+        const val = fmtValue(lead.expected_value)
+        await prisma.notification.create({
+          data: {
+            account_id: lead.account_id,
+            user_id:    lead.assigned_rep_id,   // rep-targeted, unlike MISSED
+            lead_id:    lead.id,
+            type:       "RECOVERY",
+            title:      val ? `Recover ${val} lead` : `Recover Grade ${lead.grade} lead`,
+            message:    `${lead.first_name} ${lead.last_name ?? ""} went cold but is still worth a call — reach out now to recover it`.trim(),
+            priority:   lead.grade === "A" ? "high" : "medium",
+            action_url: `/leads/${lead.id}`,
+          },
+        })
+      }
+    })
+
     // ── Group by account ──────────────────────────────────────────────────────
     const accountMap = new Map<string, typeof allMissed>()
     for (const lead of allMissed) {

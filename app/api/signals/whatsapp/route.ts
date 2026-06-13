@@ -7,6 +7,7 @@ import { SIGNAL_WEIGHTS } from "@/lib/scoring/signal-weights"
 import { applyAutoStage } from "@/lib/pipeline/auto-stage"
 import { scheduleFollowUp } from "@/lib/follow-ups/schedule"
 import { dispatchScoreAlerts } from "@/lib/realtime/score-alerts"
+import { sendSqlAlertEmail } from "@/lib/email/lead-alerts"
 import type { SignalType, WaStage } from "@prisma/client"
 
 const WA_SIGNAL_TYPES = [
@@ -55,7 +56,10 @@ export async function POST(req: Request) {
           ? { assigned_rep_id: session.user.id }
           : {}),
       },
-      include: { stage: true },
+      include: {
+        stage: true,
+        assigned_rep: { select: { email: true, first_name: true } },
+      },
     })
     if (!lead) return NOT_FOUND("Lead")
 
@@ -175,6 +179,21 @@ export async function POST(req: Request) {
       lastActionAt:  lead.last_action_at,
       importedAt:    lead.imported_at,
     })
+
+    // Email the assigned rep when the lead just became SQL (audit B8).
+    if (result.is_sql && !lead.is_sql && lead.assigned_rep) {
+      await sendSqlAlertEmail({
+        to:            lead.assigned_rep.email,
+        recipientName: lead.assigned_rep.first_name,
+        leadId:        lead.id,
+        leadFirstName: lead.first_name,
+        leadLastName:  lead.last_name,
+        leadCompany:   lead.company_name,
+        grade:         result.grade,
+        fitScore:      result.fit_score,
+        intentScore:   result.intent_score,
+      })
+    }
 
     return apiSuccess(result)
   } catch (e) {
