@@ -3,6 +3,7 @@ import { computeFitScore } from "./fit-score"
 import { computeIntentScore } from "./intent-score"
 import { computeQualityScore } from "./quality-score"
 import { assignGrade, checkSqlThreshold } from "./grade"
+import { inferIndustry, mapCityToState } from "@/lib/import/enrich-lead"
 import type { ScoringResult, SignalRecord } from "./types"
 
 type TxClient = Omit<
@@ -56,8 +57,12 @@ export async function processSignalAndUpdateScores(
   // ── 3. Compute Fit Score ─────────────────────────────────────────────────
   const fitResult = computeFitScore({
     lead: {
-      industry:       lead.company_name ?? undefined,  // industry inferred from company
-      state:          lead.state ?? undefined,
+      // Engine is the single source of truth: infer industry from company name
+      // and fall back to city→state mapping for geography, exactly as the CSV
+      // import does. This keeps import-time scoring identical to every later
+      // recompute (audit B1/B2).
+      industry:       inferIndustry(lead.company_name) ?? undefined,
+      state:          lead.state ?? mapCityToState(lead.city) ?? undefined,
       city:           lead.city ?? undefined,
       company_name:   lead.company_name ?? undefined,
       designation:    lead.designation ?? undefined,
@@ -92,7 +97,19 @@ export async function processSignalAndUpdateScores(
   })
 
   // ── 6. Assign grade and check SQL threshold ──────────────────────────────
-  const newGrade = assignGrade(fitResult.total, intentScore, qualityResult.total)
+  // Pre-execution = the rep has not logged any real activity yet. Import-time
+  // signals (SOURCE_BASELINE + IMPORT_*) don't count as execution; a CALL_*/WA_*
+  // /REP_* signal does. Grading the same way at import and on recompute means a
+  // lead's grade no longer silently shifts the moment the engine re-runs.
+  const hasExecutionActivity = lead.signals.some(
+    (s) => s.signal_type !== "SOURCE_BASELINE" && !String(s.signal_type).startsWith("IMPORT_"),
+  )
+  const newGrade = assignGrade(
+    fitResult.total,
+    intentScore,
+    qualityResult.total,
+    !hasExecutionActivity,
+  )
   const isSql = checkSqlThreshold(
     fitResult.total,
     intentScore,

@@ -5,11 +5,7 @@ import { apiSuccess, apiError } from "@/lib/api/response"
 import { mapHeader } from "@/lib/import/column-map"
 import { validateRow } from "@/lib/import/validate-row"
 import { generateImportSignals } from "@/lib/import/generate-signals"
-import { mapCityToState, inferIndustry } from "@/lib/import/enrich-lead"
-import { computeFitScore } from "@/lib/scoring/fit-score"
-import { computeQualityScore } from "@/lib/scoring/quality-score"
-import { assignGrade } from "@/lib/scoring/grade"
-import { scoreNotesIntent, getNotesGradeOverride } from "@/lib/scoring/notes-intent"
+import { processSignalAndUpdateScores } from "@/lib/scoring/orchestrator"
 import Papa from "papaparse"
 
 // Vercel Pro max function duration — allows processing large CSVs inline
@@ -107,20 +103,6 @@ export async function POST(req: Request) {
       console.warn(`CSV parse warnings (${parsed.errors.length}):`, parsed.errors.slice(0, 5))
     }
 
-    // ── Fetch account ICP config once — used for fit score on every row ──────
-    const account = await prisma.account.findUniqueOrThrow({
-      where: { id: session.account.id },
-      select: {
-        icp_configured:    true,
-        icp_industries:    true,
-        icp_states:        true,
-        icp_business_types:true,
-        icp_roles:         true,
-        icp_budget_min:    true,
-        icp_budget_max:    true,
-      },
-    })
-
     // ── Auto-generate session name if not provided ──────────────────────────
     const dateStr = new Date().toLocaleDateString("en-IN", {
       day: "2-digit", month: "short", year: "numeric",
@@ -189,111 +171,71 @@ export async function POST(req: Request) {
           continue
         }
 
-        // ── Compute scores from validated data (no DB round-trip needed) ────
+        // ── Generate import-inferred signals (intent derives from these) ────
         const inferredSignals = generateImportSignals({
           interest_level:    vr.interest_level,
           last_contact_days: vr.last_contact_days,
           notes:             vr.inquiry_text,
         })
 
-        // Intent = baseline + structured signal boosts + keyword boost from notes
-        // Floor at max(baseline, 10) — intent is never 0 for a real lead
-        const signalBoost    = inferredSignals.reduce((acc, s) => acc + s.signal_value, 0)
-        const notesBoost     = scoreNotesIntent(vr.inquiry_text)
-        const baseIntent     = Math.min(
-          100,
-          Math.max(Math.max(source.intent_baseline, 10), source.intent_baseline + signalBoost + notesBoost),
-        )
-        // 2× multiplier for leads with any real signal — widens the A–E spread
-        const intentScore    = baseIntent > 20 ? Math.min(100, baseIntent * 2) : baseIntent
-
-        // Enrich: fill state from city if state column absent; infer industry from company name
-        const enrichedState    = vr.state ?? mapCityToState(vr.city)
-        const enrichedIndustry = inferIndustry(vr.company_name)
-
-        const fitResult = computeFitScore({
-          lead: {
-            industry:       enrichedIndustry ?? undefined,
-            state:          enrichedState ?? undefined,
-            city:           vr.city ?? undefined,
-            company_name:   vr.company_name ?? undefined,
-            designation:    vr.designation ?? undefined,
-            expected_value: vr.expected_value ?? undefined,
-          },
-          icp: account,
-        })
-
-        const qualityResult = computeQualityScore({
-          phone:              vr.phone,
-          email:              vr.email,
-          company_name:       vr.company_name,
-          inquiry_text:       vr.inquiry_text,
-          source_reliability: source.reliability_score,
-          junk_flags:         [],
-          is_junk:            false,
-        })
-
-        // Pre-execution: no calls logged yet — use fit+quality-primary thresholds
-        const computedGrade  = assignGrade(fitResult.total, intentScore, qualityResult.total, true)
-        // Hard override: notes keywords win over threshold math
-        const override       = getNotesGradeOverride(vr.inquiry_text)
-        const grade          = override?.grade       ?? computedGrade
-        const finalIntent    = override?.intentScore ?? intentScore
-
-        console.log(`[scoring:row${rowIndex}]`, {
-          fit_score:     fitResult.total,
-          quality_score: qualityResult.total,
-          intent_score:  finalIntent,
-          grade,
-          override:      override ?? null,
-          fit_breakdown:     fitResult.breakdown,
-          quality_breakdown: qualityResult.breakdown,
-        })
-
-        // ── Create lead + SOURCE_BASELINE + initial scores (atomic) ──────────
+        // ── Create lead + signals, then let the scoring engine assign the
+        //    canonical fit/intent/quality/grade. The orchestrator is the single
+        //    source of truth (audit B2): no import-only 2× multiplier or notes
+        //    grade override, so the grade here is identical to every later
+        //    recompute. Notes intent is captured via the IMPORT_* signals that
+        //    generateImportSignals() already derives from the notes text. ──────
         try {
-          await prisma.$transaction(async (tx) => {
-            await tx.lead.create({
+          const scoring = await prisma.$transaction(async (tx) => {
+            const created = await tx.lead.create({
               data: {
-                account_id:              session.account.id,
-                first_name:              vr.first_name,
-                last_name:               vr.last_name,
-                phone:                   vr.phone,
-                phone_raw:               vr.phone_raw,
-                email:                   vr.email,
-                company_name:            vr.company_name,
-                designation:             vr.designation,
-                city:                    vr.city,
-                state:                   vr.state,
-                pincode:                 vr.pincode,
-                source_id:               sourceId,
-                stage_id:                stageId,
-                import_job_id:           job.id,
-                inquiry_text:            vr.inquiry_text,
-                expected_value:          vr.expected_value,
-                // Scores written at creation — no separate update needed
-                fit_score:               fitResult.total,
-                intent_score:            finalIntent,
-                quality_score:           qualityResult.total,
-                grade,
-                fit_score_breakdown:     fitResult.breakdown as object,
-                quality_score_breakdown: qualityResult.breakdown as object,
+                account_id:     session.account.id,
+                first_name:     vr.first_name,
+                last_name:      vr.last_name,
+                phone:          vr.phone,
+                phone_raw:      vr.phone_raw,
+                email:          vr.email,
+                company_name:   vr.company_name,
+                designation:    vr.designation,
+                city:           vr.city,
+                state:          vr.state,
+                pincode:        vr.pincode,
+                source_id:      sourceId,
+                stage_id:       stageId,
+                import_job_id:  job.id,
+                inquiry_text:   vr.inquiry_text,
+                expected_value: vr.expected_value,
                 signals: {
-                  create: {
-                    account_id:           session.account.id,
-                    signal_type:          "SOURCE_BASELINE",
-                    signal_value:         source.intent_baseline,
-                    raw_value:            { source_key: source.key, import_job_id: job.id },
-                    lead_grade_at_signal: grade,
-                    intent_score_before:  0,
-                    intent_score_after:   intentScore,
-                  },
+                  // SOURCE_BASELINE + every import-inferred signal. computeIntentScore
+                  // sums ALL persisted signal_values, so persisting these keeps the
+                  // intent reproducible on every recompute/decay (audit B2).
+                  create: [
+                    {
+                      account_id:           session.account.id,
+                      signal_type:          "SOURCE_BASELINE" as const,
+                      signal_value:         source.intent_baseline,
+                      raw_value:            { source_key: source.key, import_job_id: job.id },
+                      lead_grade_at_signal: "E" as const,
+                      intent_score_before:  0,
+                      intent_score_after:   source.intent_baseline,
+                    },
+                    ...inferredSignals.map((s) => ({
+                      account_id:           session.account.id,
+                      signal_type:          s.signal_type,
+                      signal_value:         s.signal_value,
+                      raw_value:            { source: "import_inference", import_job_id: job.id },
+                      lead_grade_at_signal: "E" as const,
+                      intent_score_before:  source.intent_baseline,
+                      intent_score_after:   source.intent_baseline,
+                    })),
+                  ],
                 },
               },
+              select: { id: true },
             })
+            return processSignalAndUpdateScores(created.id, session.account.id, tx)
           })
           // Track high-intent leads and total value
-          if (grade === "A" || grade === "B") highIntentCount++
+          if (scoring.grade === "A" || scoring.grade === "B") highIntentCount++
           if (vr.expected_value) totalValue += vr.expected_value
         } catch (rowErr) {
           const reason = `Row ${rowIndex} ("${vr.first_name}" / ${vr.phone}): DB error — ${String(rowErr)}`
@@ -315,75 +257,21 @@ export async function POST(req: Request) {
     }
 
     // ── Regrade any stale E leads in this account (catches pre-fix imports) ──
+    //    Routes through the same orchestrator as everything else so grades are
+    //    computed identically (audit B2 — single source of truth).
     try {
       const staleLeads = await prisma.lead.findMany({
         where: { account_id: session.account.id, grade: "E", is_junk: false },
         select: { id: true },
       })
-      for (const lead of staleLeads) {
-        const signals = await prisma.signal.findMany({
-          where: { lead_id: lead.id },
-          select: { signal_type: true, signal_value: true },
-        })
-        const leadData = await prisma.lead.findUniqueOrThrow({
-          where: { id: lead.id },
-          include: { source: true },
-        })
-
-        // Pre-execution: lead has only SOURCE_BASELINE (no calls or WA yet)
-        const hasActivity   = signals.some((s) => s.signal_type !== "SOURCE_BASELINE")
-        const rawIntent     = signals.reduce((acc, s) => acc + s.signal_value, leadData.source.intent_baseline)
-          + scoreNotesIntent(leadData.inquiry_text)
-        const baseIntent    = Math.min(100, Math.max(Math.max(leadData.source.intent_baseline, 10), rawIntent))
-        const sweepIntent   = baseIntent > 20 ? Math.min(100, baseIntent * 2) : baseIntent
-
-        const fitResult     = computeFitScore({
-          lead: {
-            industry:       inferIndustry(leadData.company_name) ?? undefined,
-            state:          leadData.state ?? mapCityToState(leadData.city) ?? undefined,
-            city:           leadData.city ?? undefined,
-            company_name:   leadData.company_name ?? undefined,
-            designation:    leadData.designation ?? undefined,
-            expected_value: leadData.expected_value ?? undefined,
-          },
-          icp: account,
-        })
-        const qualityResult = computeQualityScore({
-          phone:              leadData.phone,
-          email:              leadData.email,
-          company_name:       leadData.company_name,
-          inquiry_text:       leadData.inquiry_text,
-          source_reliability: leadData.source.reliability_score,
-          junk_flags:         leadData.junk_flags as string[],
-          is_junk:            leadData.is_junk,
-        })
-
-        const computedSweepGrade = assignGrade(fitResult.total, sweepIntent, qualityResult.total, !hasActivity)
-        const sweepOverride      = getNotesGradeOverride(leadData.inquiry_text)
-        const newGrade           = sweepOverride?.grade       ?? computedSweepGrade
-        const newIntent          = sweepOverride?.intentScore ?? sweepIntent
-
-        console.log(`[regrade:${lead.id}]`, {
-          fit_score:    fitResult.total,
-          quality_score: qualityResult.total,
-          intent_score:  newIntent,
-          pre_execution: !hasActivity,
-          grade:         newGrade,
-          override:      sweepOverride ?? null,
-        })
-
-        // Always update — this sweep exists to fix stale E grades
-        await prisma.lead.update({
-          where: { id: lead.id },
-          data: {
-            grade:                   newGrade,
-            fit_score:               fitResult.total,
-            intent_score:            newIntent,
-            quality_score:           qualityResult.total,
-            fit_score_breakdown:     fitResult.breakdown as object,
-            quality_score_breakdown: qualityResult.breakdown as object,
-          },
-        })
+      for (const stale of staleLeads) {
+        try {
+          await prisma.$transaction((tx) =>
+            processSignalAndUpdateScores(stale.id, session.account.id, tx),
+          )
+        } catch (e) {
+          console.warn(`[import] Regrade failed for ${stale.id}:`, String(e))
+        }
       }
     } catch (regradeErr) {
       console.warn("[import] Regrade sweep failed:", String(regradeErr))
