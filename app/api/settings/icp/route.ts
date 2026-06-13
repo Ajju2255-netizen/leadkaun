@@ -1,10 +1,14 @@
 import { z } from "zod"
-import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
+import { inngest } from "@/inngest/client"
 import { requireAuth, requireRole } from "@/lib/auth/middleware"
 import { handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError, parseBody } from "@/lib/api/response"
 
+// NOTE: per-account `weight_overrides` (signal-weight tuning) is deferred — it
+// was never wired into the scoring engine and has no UI. The Account column
+// remains for future use, but the API no longer accepts/returns it so we don't
+// surface a non-functional feature (audit B6).
 const IcpSchema = z.object({
   icp_industries:      z.array(z.string()).optional(),
   icp_states:          z.array(z.string()).optional(),
@@ -16,7 +20,6 @@ const IcpSchema = z.object({
   icp_configured:      z.boolean().optional(),
   sql_fit_threshold:   z.number().int().min(0).max(100).optional(),
   sql_intent_threshold: z.number().int().min(0).max(100).optional(),
-  weight_overrides:    z.record(z.string(), z.number()).nullable().optional(),
 })
 
 /**
@@ -40,7 +43,6 @@ export async function GET(_req: Request) {
         icp_sales_cycle:      true,
         sql_fit_threshold:    true,
         sql_intent_threshold: true,
-        weight_overrides:     true,
       },
     })
 
@@ -55,9 +57,9 @@ export async function GET(_req: Request) {
 /**
  * PUT /api/settings/icp
  *
- * Updates ICP config. After saving, fires async fit-score recompute
- * by updating all active leads' fit_score via processSignalAndUpdateScores.
- * Returns { updated: count } after recompute.
+ * Updates ICP config, then fires the `account/icp.updated` Inngest event which
+ * regrades every active lead through the scoring engine (fit depends on ICP).
+ * Returns { queued: count } — the lead count that will be regraded async.
  *
  * Admin only.
  */
@@ -81,22 +83,28 @@ export async function PUT(req: Request) {
         ...(data.icp_configured      !== undefined ? { icp_configured:      data.icp_configured      } : {}),
         ...(data.sql_fit_threshold   !== undefined ? { sql_fit_threshold:   data.sql_fit_threshold   } : {}),
         ...(data.sql_intent_threshold !== undefined ? { sql_intent_threshold: data.sql_intent_threshold } : {}),
-        ...(data.weight_overrides !== undefined
-          ? { weight_overrides: data.weight_overrides === null ? Prisma.DbNull : data.weight_overrides }
-          : {}),
       },
     })
 
-    // Count active leads for the "X leads regraded" banner
+    // Count active leads that the regrade will touch (for the banner).
     const activeLeadCount = await prisma.lead.count({
       where: { account_id: session.account.id, is_junk: false, won_at: null, lost_at: null },
     })
 
-    // Regrade happens async via Inngest event (or nightly decay).
-    // We fire an immediate signal to trigger a recompute pass.
-    // Full async regrade is implemented in the background jobs.
+    // Fire the real async regrade (audit B7). Fit scores depend on the ICP, so a
+    // change must re-run the scoring engine over every active lead. Guarded so a
+    // missing/unreachable Inngest never fails the settings save — the nightly
+    // decay run is the backstop.
+    try {
+      await inngest.send({
+        name: "account/icp.updated",
+        data: { account_id: session.account.id },
+      })
+    } catch (e) {
+      console.warn("[icp] failed to enqueue regrade event:", String(e))
+    }
 
-    return apiSuccess({ updated: activeLeadCount, message: `${activeLeadCount} leads queued for regrading` })
+    return apiSuccess({ queued: activeLeadCount, message: `Regrading ${activeLeadCount} leads…` })
   } catch (err) {
     const authResponse = handleAuthError(err)
     if (authResponse) return authResponse

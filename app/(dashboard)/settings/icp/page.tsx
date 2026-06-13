@@ -51,7 +51,6 @@ interface IcpData {
   icp_sales_cycle:      string | null
   sql_fit_threshold:    number
   sql_intent_threshold: number
-  weight_overrides:     Record<string, number> | null
 }
 
 interface SuggestionItem {
