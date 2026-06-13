@@ -135,7 +135,10 @@ export async function GET(req: Request) {
     ])
 
     const totalForScore = completedThisWeek + overdueOpen
-    const score         = totalForScore > 0 ? Math.round((completedThisWeek / totalForScore) * 100) : 100
+    // null = no follow-up activity yet → the UI shows a neutral empty state.
+    // (Previously defaulted to 100, so an inactive account scored "100%
+    // Excellent / You're doing great" — misleading. Audit P0.)
+    const score         = totalForScore > 0 ? Math.round((completedThisWeek / totalForScore) * 100) : null
 
     // Build per-day status for last 7 days (oldest first)
     const days: { date: string; weekday: string; status: "done" | "missed" | "today" | "future" | "empty" }[] = []

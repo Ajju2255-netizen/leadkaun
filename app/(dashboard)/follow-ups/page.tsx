@@ -62,7 +62,7 @@ interface EngineUpcoming {
 }
 
 interface EngineData {
-  score:               number
+  score:               number | null
   completed_this_week: number
   overdue_open:        number
   active_leads:        number
@@ -156,17 +156,21 @@ async function fetchTeam(): Promise<{ members: { id: string; first_name: string;
 
 // ── Score Donut ───────────────────────────────────────────────────────────────
 
-function ScoreDonut({ value }: { value: number }) {
+function ScoreDonut({ value }: { value: number | null }) {
   const r = 56
   const c = 2 * Math.PI * r
-  const offset = c * (1 - Math.max(0, Math.min(100, value)) / 100)
-  const tone = scoreLabel(value).tone
-  const ringColor = {
-    mint:  "#10B981",
-    sky:   "#0EA5E9",
-    peach: "#FB923C",
-    rose:  "#F43F5E",
-  }[tone]
+  const empty = value === null
+  const v = empty ? 0 : value
+  const offset = c * (1 - Math.max(0, Math.min(100, v)) / 100)
+  const tone = empty ? null : scoreLabel(v).tone
+  const ringColor = empty
+    ? "rgba(15,23,42,0.14)"
+    : {
+        mint:  "#10B981",
+        sky:   "#0EA5E9",
+        peach: "#FB923C",
+        rose:  "#F43F5E",
+      }[tone!]
 
   return (
     <div className="relative w-[140px] h-[140px]">
@@ -188,13 +192,22 @@ function ScoreDonut({ value }: { value: number }) {
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <p className="text-[28px] font-extrabold tabular-nums leading-none text-slate-900">{value}<span className="text-[18px] text-slate-400">%</span></p>
-        <p className={`text-[11px] font-bold mt-1 tracking-wide uppercase ${
-          tone === "mint"  ? "text-emerald-600" :
-          tone === "sky"   ? "text-sky-600"     :
-          tone === "peach" ? "text-orange-600"  :
-                              "text-rose-600"
-        }`}>{scoreLabel(value).word}</p>
+        {empty ? (
+          <>
+            <p className="text-[28px] font-extrabold leading-none text-slate-300">—</p>
+            <p className="text-[11px] font-bold mt-1 tracking-wide uppercase text-slate-400">No data</p>
+          </>
+        ) : (
+          <>
+            <p className="text-[28px] font-extrabold tabular-nums leading-none text-slate-900">{v}<span className="text-[18px] text-slate-400">%</span></p>
+            <p className={`text-[11px] font-bold mt-1 tracking-wide uppercase ${
+              tone === "mint"  ? "text-emerald-600" :
+              tone === "sky"   ? "text-sky-600"     :
+              tone === "peach" ? "text-orange-600"  :
+                                  "text-rose-600"
+            }`}>{scoreLabel(v).word}</p>
+          </>
+        )}
       </div>
     </div>
   )
@@ -689,9 +702,9 @@ export default function FollowUpsPage() {
       </div>
 
       {/* ── KPI strip: Score · Active Leads · Week Consistency · Tip ──────── */}
-      <div className="grid grid-cols-12 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Score donut card */}
-        <div className="col-span-3 rounded-2xl glass-3 gloss-edge p-5 relative overflow-hidden">
+        <div className="lg:col-span-3 rounded-2xl glass-3 gloss-edge p-5 relative overflow-hidden">
           <div
             className="absolute -top-12 -right-10 w-40 h-40 rounded-full pointer-events-none"
             style={{ background: "radial-gradient(circle, rgba(110,231,183,0.55) 0%, rgba(110,231,183,0) 70%)" }}
@@ -701,14 +714,28 @@ export default function FollowUpsPage() {
             <p className="text-[12px] font-bold text-slate-700">Follow-up score</p>
           </div>
           <div className="flex items-center justify-center relative">
-            <ScoreDonut value={engine?.score ?? 0} />
+            <ScoreDonut value={engine?.score ?? null} />
           </div>
-          <p className="text-[12px] font-semibold text-slate-700 text-center mt-2">You&apos;re doing great!</p>
-          <p className="text-[11px] text-slate-400 text-center">Keep up the consistency.</p>
+          {engine?.score == null ? (
+            <>
+              <p className="text-[12px] font-semibold text-slate-700 text-center mt-2">No follow-up activity yet</p>
+              <p className="text-[11px] text-slate-400 text-center">Complete calls &amp; messages to build your streak.</p>
+            </>
+          ) : engine.score >= 70 ? (
+            <>
+              <p className="text-[12px] font-semibold text-slate-700 text-center mt-2">You&apos;re doing great!</p>
+              <p className="text-[11px] text-slate-400 text-center">Keep up the consistency.</p>
+            </>
+          ) : (
+            <>
+              <p className="text-[12px] font-semibold text-slate-700 text-center mt-2">Catch up on follow-ups</p>
+              <p className="text-[11px] text-slate-400 text-center">Clear overdue actions to lift your score.</p>
+            </>
+          )}
         </div>
 
         {/* Active leads tile */}
-        <div className="col-span-3 rounded-2xl glass-3 gloss-edge p-5 relative overflow-hidden">
+        <div className="lg:col-span-3 rounded-2xl glass-3 gloss-edge p-5 relative overflow-hidden">
           <div
             className="absolute -top-12 -left-12 w-40 h-40 rounded-full pointer-events-none"
             style={{ background: "radial-gradient(circle, rgba(125,211,252,0.55) 0%, rgba(125,211,252,0) 70%)" }}
@@ -728,12 +755,12 @@ export default function FollowUpsPage() {
         </div>
 
         {/* Week consistency tile */}
-        <div className="col-span-4">
+        <div className="lg:col-span-4">
           <WeekConsistency days={engine?.week_consistency ?? Array.from({ length: 7 }, (_, i) => ({ date: String(i), weekday: ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][i], status: "empty" as const }))} />
         </div>
 
         {/* Stay consistent tip */}
-        <div className="col-span-2 rounded-2xl glass-3 gloss-edge p-5 relative overflow-hidden">
+        <div className="lg:col-span-2 rounded-2xl glass-3 gloss-edge p-5 relative overflow-hidden">
           <div
             className="absolute -bottom-10 -right-10 w-32 h-32 rounded-full pointer-events-none"
             style={{ background: "radial-gradient(circle, rgba(253,186,116,0.55) 0%, rgba(253,186,116,0) 70%)" }}
@@ -749,11 +776,11 @@ export default function FollowUpsPage() {
       </div>
 
       {/* ── Sequence funnel + Activity feed ──────────────────────────────── */}
-      <div className="grid grid-cols-12 gap-4">
-        <div className="col-span-7">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <div className="lg:col-span-7">
           <SequenceFunnel engine={engine} />
         </div>
-        <div className="col-span-5">
+        <div className="lg:col-span-5">
           <ActivityFeed items={engine?.recent_activity ?? []} />
         </div>
       </div>

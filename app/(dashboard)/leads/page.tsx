@@ -852,7 +852,7 @@ export default function LeadsPage() {
       )}
 
       {/* ── Leads table ───────────────────────────────────────────────────── */}
-      <div className="rounded-2xl glass-2 gloss-edge overflow-hidden">
+      <div className="rounded-2xl glass-2 gloss-edge overflow-x-auto">
 
         {/* Bulk action bar */}
         {checkedIds.size > 0 && (
@@ -895,7 +895,7 @@ export default function LeadsPage() {
         )}
 
         {/* Column headers — 10 columns: ☐ · Lead · Score · Grade · Fit · Intent · Quality · Stage · Rep · Last activity */}
-        <div className="grid grid-cols-[32px_1fr_56px_48px_88px_88px_88px_130px_36px_92px] gap-x-3 px-5 py-2.5 border-b border-slate-100">
+        <div className="grid grid-cols-[32px_1fr_56px_48px_88px_88px_88px_130px_36px_92px] gap-x-3 min-w-[900px] px-5 py-2.5 border-b border-slate-100">
           <div className="flex items-center">
             <input
               type="checkbox"
@@ -929,7 +929,7 @@ export default function LeadsPage() {
         {isLoading ? (
           <div className="divide-y divide-slate-50">
             {[...Array(8)].map((_, i) => (
-              <div key={i} className="grid grid-cols-[32px_1fr_56px_48px_88px_88px_88px_130px_36px_92px] gap-x-3 px-5 py-3.5 items-center">
+              <div key={i} className="grid grid-cols-[32px_1fr_56px_48px_88px_88px_88px_130px_36px_92px] gap-x-3 min-w-[900px] px-5 py-3.5 items-center">
                 <Skeleton className="h-3.5 w-3.5 rounded" />
                 <div className="space-y-1.5">
                   <Skeleton className="h-4 w-32" />
@@ -985,7 +985,7 @@ export default function LeadsPage() {
                 <div
                   key={lead.id}
                   onClick={() => setSelectedId(lead.id)}
-                  className={`grid grid-cols-[32px_1fr_56px_48px_88px_88px_88px_130px_36px_92px] gap-x-3 px-5 py-3.5 items-center cursor-pointer transition-colors group ${checkedIds.has(lead.id) ? "bg-sky-50/50" : "hover:bg-sky-50/40"}`}
+                  className={`grid grid-cols-[32px_1fr_56px_48px_88px_88px_88px_130px_36px_92px] gap-x-3 min-w-[900px] px-5 py-3.5 items-center cursor-pointer transition-colors group ${checkedIds.has(lead.id) ? "bg-sky-50/50" : "hover:bg-sky-50/40"}`}
                 >
                   {/* Checkbox */}
                   <div onClick={e => { e.stopPropagation(); toggleCheck(lead.id) }} className="flex items-center">
