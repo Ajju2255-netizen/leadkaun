@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import localFont from "next/font/local"
 import "./globals.css"
 import { QueryProvider } from "@/components/providers/QueryProvider"
+import { Toaster } from "@/components/ui/sonner"
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -28,6 +29,9 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <QueryProvider>{children}</QueryProvider>
+        {/* sonner toast renderer — was never mounted, so every toast() in the
+            app (settings saves, errors, realtime alerts) silently did nothing. */}
+        <Toaster richColors position="top-right" />
       </body>
     </html>
   )
