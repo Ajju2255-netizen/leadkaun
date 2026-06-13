@@ -4,12 +4,14 @@ import { useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
+import Link from "next/link"
 import {
   Phone, MessageCircle, Trophy, X, MoreHorizontal,
   MapPin, Building2, Briefcase, Clock, Zap, ChevronLeft,
-  PhoneOff, TrendingDown, FileText, UserCheck, type LucideIcon,
+  PhoneOff, TrendingDown, FileText, UserCheck, SearchX, type LucideIcon,
 } from "lucide-react"
 import { GradeBadge } from "@/components/shared/GradeBadge"
+import { EmptyState } from "@/components/shared/EmptyState"
 import { ScoreBar } from "@/components/shared/ScoreBar"
 import { LeadRealtimeListener } from "@/components/leads/LeadRealtimeListener"
 import { LogCallModal } from "@/components/queue/LogCallModal"
@@ -220,12 +222,21 @@ export default function LeadRecordPage() {
   )
 
   if (error || !lead) return (
-    <div className="max-w-2xl space-y-3">
-      <button onClick={() => router.back()}
-        className="flex items-center gap-1.5 text-[13px] text-slate-500 hover:text-slate-900 transition-colors">
-        <ChevronLeft className="w-4 h-4" /> Back
-      </button>
-      <div className="glass-card px-5 py-8 text-center text-slate-500 text-[14px]">Lead not found.</div>
+    <div className="max-w-2xl">
+      <EmptyState
+        icon={SearchX}
+        title="Lead not found"
+        description="This lead may have been removed, or it belongs to a different account."
+        action={
+          <Link
+            href="/leads"
+            className="h-9 px-5 rounded-full bg-sky-600 hover:bg-sky-700 text-white text-[13px] font-semibold inline-flex items-center transition-all active:scale-[0.97]"
+          >
+            Back to All Leads
+          </Link>
+        }
+        className="glass-card mt-2"
+      />
     </div>
   )
 

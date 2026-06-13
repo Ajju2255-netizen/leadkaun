@@ -14,13 +14,13 @@ import { cn } from "@/lib/utils"
 
 export type GradeTab = "all" | "A" | "B" | "C" | "D" | "E"
 
-const TABS: { key: GradeTab; label: string; dot?: string }[] = [
-  { key: "all", label: "All leads" },
-  { key: "A",   label: "Grade A", dot: "bg-emerald-500" },
-  { key: "B",   label: "Grade B", dot: "bg-sky-500"     },
-  { key: "C",   label: "Grade C", dot: "bg-orange-400"  },
-  { key: "D",   label: "Grade D", dot: "bg-amber-500"   },
-  { key: "E",   label: "Grade E", dot: "bg-rose-500"    },
+const TABS: { key: GradeTab; label: string; dot?: string; activeBg: string }[] = [
+  { key: "all", label: "All leads",                          activeBg: "bg-sky-600"     },
+  { key: "A",   label: "Grade A", dot: "bg-emerald-500", activeBg: "bg-emerald-500" },
+  { key: "B",   label: "Grade B", dot: "bg-sky-500",     activeBg: "bg-sky-600"     },
+  { key: "C",   label: "Grade C", dot: "bg-orange-400",  activeBg: "bg-orange-500"  },
+  { key: "D",   label: "Grade D", dot: "bg-amber-500",   activeBg: "bg-amber-500"   },
+  { key: "E",   label: "Grade E", dot: "bg-rose-500",    activeBg: "bg-rose-500"    },
 ]
 
 export interface QueueGradeTabsProps {
@@ -44,11 +44,11 @@ export function QueueGradeTabs({ active, onChange, counts }: QueueGradeTabsProps
               className={cn(
                 "inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full text-[12px] font-semibold transition-all",
                 isActive
-                  ? "bg-sky-600 text-white shadow-[0_1px_2px_rgba(14,165,233,0.25),inset_0_1px_0_rgba(255,255,255,0.45)]"
-                  : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50",
+                  ? cn(t.activeBg, "text-white shadow-[0_1px_2px_rgba(15,23,42,0.18),inset_0_1px_0_rgba(255,255,255,0.45)]")
+                  : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300",
               )}
             >
-              {t.dot && <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", t.dot)} />}
+              {t.dot && !isActive && <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", t.dot)} />}
               {t.label}
               <span
                 className={cn(
