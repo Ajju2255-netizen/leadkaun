@@ -94,7 +94,9 @@ function scoreBusinessType(
   if (!companyName) return 3              // ICP set, but no company data
   const name = companyName.toLowerCase()
   const match = icpBusinessTypes.some((bt) => name.includes(bt.toLowerCase().trim()))
-  return match ? 20 : 0
+  // Match → full; mismatch but company present → 5 (knowing the business name
+  // is still more signal than not knowing it at all).
+  return match ? 20 : 5
 }
 
 function scoreRole(

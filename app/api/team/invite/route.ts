@@ -52,7 +52,9 @@ export async function POST(req: Request) {
       return apiError(inviteError.message, "INVITE_FAILED", 500)
     }
 
-    // Create placeholder user record (auth_id will be linked on first login)
+    // Create placeholder user record. auth_id is linked now (Supabase issues it
+    // at invite time); is_active flips true when the invitee accepts the magic
+    // link and hits /auth/callback (see app/api/auth/callback/route.ts).
     await prisma.user.create({
       data: {
         account_id: session.account.id,
@@ -61,7 +63,7 @@ export async function POST(req: Request) {
         first_name: data.email.split("@")[0],
         last_name:  "",
         role:       data.role,
-        is_active:  false,          // becomes true on first login
+        is_active:  false,          // activated on invite acceptance (auth/callback)
         invited_by: session.user.id,
         invited_at: new Date(),
       },

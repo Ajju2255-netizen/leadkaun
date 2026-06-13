@@ -51,7 +51,6 @@ interface IcpData {
   icp_sales_cycle:      string | null
   sql_fit_threshold:    number
   sql_intent_threshold: number
-  weight_overrides:     Record<string, number> | null
 }
 
 interface SuggestionItem {
@@ -429,18 +428,20 @@ export default function IcpPage() {
     <div className="max-w-2xl mx-auto space-y-5">
 
       {/* ── Header ────────────────────────────────────────────────────── */}
-      <div>
-        <div className="flex items-center gap-2.5 mb-1">
-          <div className="w-8 h-8 rounded-xl bg-sky-600 flex items-center justify-center">
-            <Target className="w-4 h-4 text-white" />
-          </div>
-          <h1 className="text-[22px] font-bold text-slate-900 tracking-tight">Best Customers</h1>
-          <span className="text-[13px] text-slate-400 font-normal mt-0.5">ICP Settings</span>
+      <div className="flex items-start gap-3">
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_6px_18px_rgba(14,165,233,0.32)] shrink-0">
+          <Target className="w-6 h-6 text-white" strokeWidth={2.4} />
         </div>
-        <p className="text-[13px] text-slate-400 leading-relaxed max-w-xl">
-          Tell us who your best customers are — the industries, locations, and roles that close best.
-          The more you define, the smarter your lead scoring gets.
-        </p>
+        <div>
+          <div className="flex items-baseline gap-2">
+            <h1 className="text-[26px] font-extrabold text-slate-900 tracking-tight leading-tight">Best Customers</h1>
+            <span className="text-[13px] text-slate-400 font-normal">ICP Settings</span>
+          </div>
+          <p className="text-[13px] text-slate-500 mt-0.5 leading-relaxed max-w-xl">
+            Tell us who your best customers are — the industries, locations, and roles that close best.
+            The more you define, the smarter your lead scoring gets.
+          </p>
+        </div>
       </div>
 
       {/* ── Suggestions panel ────────────────────────────────────────── */}

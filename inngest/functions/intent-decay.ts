@@ -2,9 +2,15 @@ import { inngest } from "@/inngest/client"
 import { prisma } from "@/lib/prisma"
 import { computeIntentScore } from "@/lib/scoring/intent-score"
 import { assignGrade, checkSqlThreshold } from "@/lib/scoring/grade"
+import { sendGradeDropEmail } from "@/lib/email/lead-alerts"
 import type { SignalRecord } from "@/lib/scoring/types"
+import type { LeadGrade } from "@prisma/client"
 
 const BATCH_SIZE = 200
+
+// Higher = better grade; a "drop" is new rank < old rank.
+const GRADE_RANK: Record<LeadGrade, number> = { A: 6, B: 5, C: 4, D: 3, E: 2, F: 1 }
+const MS_PER_DAY = 1000 * 60 * 60 * 24
 
 /**
  * Nightly intent decay job.
@@ -51,6 +57,7 @@ export const intentDecayFn = inngest.createFunction(
                 sql_intent_threshold: true,
               },
             },
+            assigned_rep: { select: { email: true, first_name: true } },
             signals: {
               orderBy: { created_at: "desc" },
               take: 100,
@@ -110,6 +117,26 @@ export const intentDecayFn = inngest.createFunction(
               },
             })
           })
+
+          // Email the assigned rep on a genuine grade DROP (audit B8). This is
+          // the highest-value path for GradeDrop — the rep is offline at 02:00
+          // IST, so the email (not the realtime toast) is what reaches them.
+          if (gradeChanged && GRADE_RANK[newGrade] < GRADE_RANK[lead.grade] && lead.assigned_rep) {
+            const anchor = lead.last_action_at ?? lead.imported_at
+            await sendGradeDropEmail({
+              to:                lead.assigned_rep.email,
+              recipientName:     lead.assigned_rep.first_name,
+              leadId:            lead.id,
+              leadFirstName:     lead.first_name,
+              leadLastName:      lead.last_name,
+              leadCompany:       lead.company_name,
+              gradeFrom:         lead.grade,
+              gradeTo:           newGrade,
+              expectedValue:     lead.expected_value,
+              daysSinceContact:  Math.max(0, Math.floor((Date.now() - anchor.getTime()) / MS_PER_DAY)),
+              reason:            "Intent decayed from inactivity — no recent engagement.",
+            })
+          }
 
           count++
         }

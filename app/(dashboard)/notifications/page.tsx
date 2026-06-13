@@ -207,9 +207,9 @@ export default function NotificationsPage() {
 
   const [filter, setFilter] = useState<Filter>("all")
 
-  const items   = data?.items ?? []
-  const unread  = items.filter((i) => !i.is_read)
-  const highPri = unread.filter((i) => i.priority === "high")
+  const items   = useMemo(() => data?.items ?? [], [data?.items])
+  const unread  = useMemo(() => items.filter((i) => !i.is_read), [items])
+  const highPri = useMemo(() => unread.filter((i) => i.priority === "high"), [unread])
 
   const counts = useMemo(() => {
     const out = { AT_RISK: 0, FOLLOW_UP_DUE: 0, MISSED: 0, RECOVERY: 0 } as Record<NotifItem["type"], number>

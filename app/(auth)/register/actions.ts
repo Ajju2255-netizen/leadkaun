@@ -2,6 +2,7 @@
 
 import { createSupabaseAdminClient } from "@/lib/supabase/admin"
 import { prisma } from "@/lib/prisma"
+import { sendWelcomeAdminEmail } from "@/lib/email/lead-alerts"
 
 type RegisterInput = {
   orgName: string
@@ -108,6 +109,9 @@ export async function registerAction(input: RegisterInput): Promise<RegisterResu
     console.error("Register DB error:", dbError)
     return { success: false, error: "Account creation failed. Please try again." }
   }
+
+  // Send the admin welcome email (audit B8). Guarded — never blocks/fails signup.
+  await sendWelcomeAdminEmail({ to: email, adminFirstName: firstName, orgName })
 
   return { success: true, redirectTo: "/onboarding" }
 }

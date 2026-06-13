@@ -76,7 +76,7 @@ export default function SecurityPage() {
         <button
           onClick={handleChangePassword}
           disabled={saving || !newPassword || !confirmPassword || newPassword !== confirmPassword}
-          className="h-9 px-5 rounded-full bg-slate-900 hover:bg-slate-700 disabled:opacity-50
+          className="h-9 px-5 rounded-full bg-sky-600 hover:bg-sky-700 disabled:opacity-50
                      text-white text-[13px] font-semibold transition-all active:scale-[0.97]"
         >
           {saving ? "Updating…" : "Update password"}

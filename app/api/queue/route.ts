@@ -2,6 +2,12 @@ import { prisma } from "@/lib/prisma"
 import { requireAuth, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
 import { getNextAction, buildActionReason } from "@/lib/scoring/next-action"
+import { computeAiScore } from "@/lib/scoring/ai-score"
+import {
+  channelFromSignal,
+  activityHintFor,
+  activeMinutesSince,
+} from "@/lib/scoring/channel-hint"
 import type { SignalType } from "@prisma/client"
 
 const OUTREACH_SIGNAL_TYPES: SignalType[] = [
@@ -88,7 +94,7 @@ export async function GET(req: Request) {
       },
     })
 
-    // Attach next_action + signal intelligence to each lead
+    // Attach next_action + signal intelligence + new ranking fields to each lead
     const now = Date.now()
     const enriched = leads.map((lead) => {
       const latestSignal    = lead.signals[0] ?? null
@@ -98,6 +104,19 @@ export async function GET(req: Request) {
         && HOT_SIGNAL_TYPES.includes(latestSignal.signal_type as SignalType)
         && msSinceSignal != null
         && msSinceSignal < HOT_WINDOW_MS
+
+      const aiScore        = computeAiScore({
+        fit:     lead.fit_score,
+        intent:  lead.intent_score,
+        quality: lead.quality_score,
+      })
+      const channel        = channelFromSignal(latestSignal?.signal_type)
+      const activityHint   = activityHintFor({
+        inquiry_text:     lead.inquiry_text,
+        last_signal_type: latestSignal?.signal_type ?? null,
+        stage_name:       lead.stage?.name ?? null,
+      })
+      const activeMinutes  = activeMinutesSince(lead.last_action_at, lead.imported_at)
 
       return {
         ...lead,
@@ -111,6 +130,10 @@ export async function GET(req: Request) {
             inquiry_text:  lead.inquiry_text,
           }),
         },
+        ai_score:                 aiScore,
+        channel:                  channel,
+        activity_hint:            activityHint,
+        active_minutes_ago:       activeMinutes,
         hours_since_import:       lead.imported_at
           ? Math.floor((now - new Date(lead.imported_at).getTime()) / 3_600_000)
           : null,
@@ -122,6 +145,10 @@ export async function GET(req: Request) {
         is_hot_signal:            isHotSignal,
       }
     })
+
+    // Sort the flat list by ai_score DESC — this is the order the Top-N hero
+    // consumes. Grade-grouped buckets below still respect grade priority.
+    enriched.sort((a, b) => b.ai_score - a.ai_score)
 
     // Count outreach signals logged today (any call attempt = "contacted")
     const todayStart = new Date()
@@ -156,12 +183,46 @@ export async function GET(req: Request) {
       action:     getNextAction(grade),
     }))
 
+    // ── KPIs for the new left sidebar ─────────────────────────────────────────
+    const highPriority    = enriched.filter((l) => l.grade === "A" || l.grade === "B")
+    const highPriorityNow = highPriority.length
+    const estRevenue      = highPriority.reduce((s, l) => s + (l.expected_value ?? 0), 0)
+    const top3Revenue     = enriched.slice(0, 3).reduce((s, l) => s + (l.expected_value ?? 0), 0)
+
+    // 7-day delta — count high-priority leads that already existed 7 days ago
+    // and weren't won/lost since. Single additional query, indexed.
+    const sevenDaysAgo = new Date(now - 7 * 24 * 60 * 60 * 1000)
+    const highPrioritySevenDaysAgo = await prisma.lead.count({
+      where: {
+        account_id: session.account.id,
+        grade:      { in: ["A", "B"] },
+        is_junk:    false,
+        is_missed:  false,
+        lost_at:    null,
+        imported_at: { lt: sevenDaysAgo },
+        OR: [
+          { won_at: null },
+          { won_at: { gt: sevenDaysAgo } },
+        ],
+        ...repFilter,
+      },
+    })
+    const pctChange = highPrioritySevenDaysAgo > 0
+      ? Math.round(((highPriorityNow - highPrioritySevenDaysAgo) / highPrioritySevenDaysAgo) * 100)
+      : null
+
     return apiSuccess({
-      leads:          enriched,
+      leads:           enriched,
       grouped,
       summary,
-      total:          enriched.length,
+      total:           enriched.length,
       contacted_today: contactedToday,
+      kpis: {
+        high_priority_count:            highPriorityNow,
+        high_priority_count_pct_change: pctChange,
+        est_revenue_potential:          estRevenue,
+        top_three_potential_revenue:    top3Revenue,
+      },
     })
   } catch (e) {
     return handleAuthError(e) ?? apiError("Internal server error", "SERVER_ERROR", 500)
