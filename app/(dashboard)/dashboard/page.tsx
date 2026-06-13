@@ -147,7 +147,10 @@ function KpiCard({
 function HealthDonut({ pct, total }: { pct: number; total: number }) {
   // 36px radius circumference = 226.19; we reveal `pct` of it
   const C = 2 * Math.PI * 36
-  const offset = C - (pct / 100) * C
+  // With no active leads there's nothing to score — show a neutral empty ring
+  // instead of "0% / At risk", which falsely reads as a problem.
+  const empty = total <= 0
+  const offset = empty ? C : C - (pct / 100) * C
   const ringColor =
     pct >= 80 ? "text-emerald-500" :
     pct >= 60 ? "text-sky-500" :
@@ -163,20 +166,29 @@ function HealthDonut({ pct, total }: { pct: number; total: number }) {
     <div className="relative w-[120px] h-[120px] mx-auto">
       <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
         <circle cx="50" cy="50" r="36" fill="none" stroke="#E2E8F0" strokeWidth="9" />
-        <circle
-          cx="50" cy="50" r="36" fill="none" strokeWidth="9"
-          strokeLinecap="round"
-          strokeDasharray={C}
-          strokeDashoffset={offset}
-          className={ringColor}
-          stroke="currentColor"
-        />
+        {!empty && (
+          <circle
+            cx="50" cy="50" r="36" fill="none" strokeWidth="9"
+            strokeLinecap="round"
+            strokeDasharray={C}
+            strokeDashoffset={offset}
+            className={ringColor}
+            stroke="currentColor"
+          />
+        )}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <div className="text-[24px] font-bold text-ink tabular-nums leading-none">{pct}%</div>
-        <div className="text-[11px] text-ink-muted mt-1">{headline}</div>
-        {total > 0 && (
-          <div className="text-[10px] text-ink-faint mt-0.5">{total} active</div>
+        {empty ? (
+          <>
+            <div className="text-[24px] font-bold text-ink-faint tabular-nums leading-none">—</div>
+            <div className="text-[11px] text-ink-muted mt-1">No active leads</div>
+          </>
+        ) : (
+          <>
+            <div className="text-[24px] font-bold text-ink tabular-nums leading-none">{pct}%</div>
+            <div className="text-[11px] text-ink-muted mt-1">{headline}</div>
+            <div className="text-[10px] text-ink-faint mt-0.5">{total} active</div>
+          </>
         )}
       </div>
     </div>
@@ -518,7 +530,15 @@ export default function DashboardPage() {
                 <BandRow color="bg-red-500"     label="Missed"   count={health.missed.count}   pct={health.missed.pct}   icon={<ArrowUpRight  className="w-3.5 h-3.5 text-red-500"     strokeWidth={2.5} />} />
                 <BandRow color="bg-slate-300"   label="Cold"     count={health.cold.count}     pct={health.cold.pct}     icon={<Snowflake     className="w-3.5 h-3.5 text-slate-500"   strokeWidth={2.5} />} />
               </ul>
-              {health.headline_pct >= 60 ? (
+              {health.total <= 0 ? (
+                <div className="mt-4 flex items-start gap-2 rounded-xl px-3 py-2.5 bg-sky-50/70 border border-sky-100">
+                  <Activity className="w-4 h-4 text-sky-500 shrink-0 mt-0.5" strokeWidth={2.5} />
+                  <p className="text-[12px] text-ink leading-snug">
+                    <span className="font-semibold text-sky-700">No active leads yet.</span>{" "}
+                    Add <Link href="/leads" className="text-sky-600 font-semibold underline">leads</Link> to start tracking behaviour health.
+                  </p>
+                </div>
+              ) : health.headline_pct >= 60 ? (
                 <div className="mt-4 flex items-start gap-2 rounded-xl px-3 py-2.5 bg-emerald-50/70 border border-emerald-100">
                   <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" strokeWidth={2.5} />
                   <p className="text-[12px] text-ink leading-snug">
