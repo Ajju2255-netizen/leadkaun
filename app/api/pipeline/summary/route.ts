@@ -130,6 +130,17 @@ export async function GET() {
     const winRateThis = wonThis + lostThis > 0 ? Math.round((wonThis / (wonThis + lostThis)) * 100) : 0
     const winRateLast = wonLast + lostLast > 0 ? Math.round((wonLast / (wonLast + lostLast)) * 100) : 0
 
+    // KPI headline values are ALL-TIME stock metrics so they match the board
+    // (which shows every lead regardless of date); the delta chip below still
+    // reflects this-month-vs-last-month movement. Previously the headline used
+    // the this-month counts, so seed/older leads made every KPI read 0 next to
+    // a populated board (audit P0 data-contradiction).
+    const totalAll   = allLeads.length
+    const openAll    = allLeads.filter((l) => !terminalIds.has(l.stage_id)).length
+    const wonAll     = allLeads.filter((l) => !!l.won_at).length
+    const lostAll    = allLeads.filter((l) => !!l.lost_at).length
+    const winRateAll = wonAll + lostAll > 0 ? Math.round((wonAll / (wonAll + lostAll)) * 100) : 0
+
     // 7-day sparklines
     const spark7 = (predicate: (l: typeof allLeads[number], dayStart: Date, dayEnd: Date) => boolean): number[] => {
       const out: number[] = []
@@ -193,11 +204,11 @@ export async function GET() {
 
     return apiSuccess({
       kpis: {
-        total: { value: totalThis, delta_pct: deltaPct(totalThis, totalLast), spark: sparkTotal },
-        open:  { value: openThis,  delta_pct: deltaPct(openThis,  openLast),  spark: sparkOpen  },
-        won:   { value: wonThis,   delta_pct: deltaPct(wonThis,   wonLast),   spark: sparkWon   },
-        lost:  { value: lostThis,  delta_pct: deltaPct(lostThis,  lostLast),  spark: sparkLost  },
-        win_rate: { value: winRateThis, delta_pct: deltaPct(winRateThis, winRateLast), spark: sparkWinRate },
+        total: { value: totalAll,   delta_pct: deltaPct(totalThis, totalLast), spark: sparkTotal },
+        open:  { value: openAll,    delta_pct: deltaPct(openThis,  openLast),  spark: sparkOpen  },
+        won:   { value: wonAll,     delta_pct: deltaPct(wonThis,   wonLast),   spark: sparkWon   },
+        lost:  { value: lostAll,    delta_pct: deltaPct(lostThis,  lostLast),  spark: sparkLost  },
+        win_rate: { value: winRateAll, delta_pct: deltaPct(winRateThis, winRateLast), spark: sparkWinRate },
       },
       value_trend:  valueTrend,
       total_value:  valueTrend.reduce((a, b) => a + b.value, 0),

@@ -34,7 +34,7 @@ export default function SourcesPage() {
   const [adding,   setAdding]     = useState(false)
   const [showForm, setShowForm]   = useState(false)
 
-  const { data, isLoading } = useQuery<{ data: { sources: LeadSource[] } }>({
+  const { data, isLoading } = useQuery<{ sources: LeadSource[] }>({
     queryKey: ["lead-sources"],
     queryFn:  async () => {
       const res = await fetch("/api/lead-sources", { credentials: "include" })
@@ -43,7 +43,9 @@ export default function SourcesPage() {
     },
   })
 
-  const sources  = data?.data?.sources ?? []
+  // API returns the payload directly ({ sources }), NOT wrapped in { data } —
+  // reading data.data.sources left the card permanently empty (audit P0).
+  const sources  = data?.sources ?? []
   const defaults = sources.filter((s) => !s.is_custom)
   const custom   = sources.filter((s) => s.is_custom)
 
