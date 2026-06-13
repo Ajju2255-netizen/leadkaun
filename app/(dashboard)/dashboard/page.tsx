@@ -3,13 +3,14 @@
 import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
 import {
-  ArrowDown, ArrowUp, ArrowUpRight, Plus, Calendar,
+  ArrowUpRight, Plus, Calendar,
   Users, Send, CheckCircle2, Trophy, IndianRupee,
   Phone, MessageSquare, Mail, Upload, Cog, Sparkles,
   Activity, AlertTriangle, Snowflake,
   LayoutDashboard,
 } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
+import { DeltaChip } from "@/components/shared/DeltaChip"
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -112,12 +113,6 @@ function KpiCard({
   iconColor: string
   invertDelta?: boolean
 }) {
-  const positive = pctChange == null
-    ? null
-    : invertDelta
-      ? pctChange < 0
-      : pctChange > 0
-
   return (
     <div className="glass-2 gloss-edge rounded-2xl p-5">
       <div className="flex items-start gap-3">
@@ -135,17 +130,12 @@ function KpiCard({
       <div className="mt-3 text-[28px] md:text-[30px] font-bold tabular-nums leading-none text-ink">
         {value}
       </div>
-      <div className="mt-2 flex items-center gap-1">
+      <div className="mt-2 flex items-center gap-1.5">
         {pctChange == null ? (
           <span className="text-[12px] text-ink-muted">— vs last month</span>
         ) : (
           <>
-            {positive
-              ? <ArrowUp   className="w-3 h-3 text-emerald-500" strokeWidth={2.5} />
-              : <ArrowDown className="w-3 h-3 text-red-500"     strokeWidth={2.5} />}
-            <span className={`text-[12px] font-semibold tabular-nums ${positive ? "text-emerald-600" : "text-red-500"}`}>
-              {pctChange > 0 ? "+" : ""}{pctChange}%
-            </span>
+            <DeltaChip delta={pctChange} invert={invertDelta} />
             <span className="text-[12px] text-ink-muted">vs last month</span>
           </>
         )}

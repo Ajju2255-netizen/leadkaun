@@ -6,10 +6,11 @@ import { toast } from "sonner"
 import Link from "next/link"
 import {
   ArrowRight, Trophy, X, MoveRight, Clock, Flame, Settings2,
-  KanbanSquare, TrendingUp, TrendingDown, MoreHorizontal,
+  KanbanSquare, MoreHorizontal,
   Phone, MessageSquare, Mail, Sparkles, Activity,
 } from "lucide-react"
 import { GradeBadge } from "@/components/shared/GradeBadge"
+import { DeltaChip } from "@/components/shared/DeltaChip"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
 
@@ -433,12 +434,6 @@ function KpiCard({
   }
   const a = ACCENT[accent]
 
-  const trending = (delta ?? 0) >= 0
-  // For "Lost" we invert so up is bad
-  const isPositive = invertDelta ? !trending : trending
-  const Arrow = isPositive ? TrendingUp : TrendingDown
-  const deltaColor = isPositive ? "text-emerald-600" : "text-rose-500"
-
   return (
     <div className="rounded-2xl glass-2 gloss-edge p-4 flex flex-col gap-3 min-h-[132px] transition-all duration-200 hover:translate-y-[-2px] hover:shadow-[0_12px_32px_rgba(15,23,42,0.08)]">
       <div className="flex items-start justify-between">
@@ -451,12 +446,7 @@ function KpiCard({
         <p className="text-[28px] font-bold text-slate-900 tabular-nums leading-none">
           {value.toLocaleString("en-IN")}{suffix ?? ""}
         </p>
-        {delta !== undefined && (
-          <div className={`inline-flex items-center gap-0.5 text-[11px] font-bold ${deltaColor} mb-0.5`}>
-            <Arrow className="w-3 h-3" />
-            {Math.abs(delta).toFixed(1)}%
-          </div>
-        )}
+        <DeltaChip delta={delta} invert={invertDelta} className="mb-0.5" />
       </div>
       <p className="text-[10px] text-slate-400 -mt-1">vs {lastLabel ?? "last month"}</p>
       {spark && spark.length >= 2 && <Sparkline points={spark} stroke={a.stroke} fill={a.fill} />}
