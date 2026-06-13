@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { LeadkaunMark } from "@/components/shared/LeadkaunMark"
+import { Target, ListChecks, AlertCircle } from "lucide-react"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { registerAction } from "./actions"
 
@@ -59,7 +60,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-10 relative overflow-hidden">
+    <div className="min-h-screen flex relative overflow-hidden">
 
       {/* Mesh background */}
       <div
@@ -76,10 +77,37 @@ export default function RegisterPage() {
       <div className="blob blob-lg blob-sky -top-32 -left-40 absolute" aria-hidden />
       <div className="blob blob-lg blob-peach -bottom-32 -right-32 absolute" style={{ animationDelay: "3s" }} aria-hidden />
 
-      <div className="w-full max-w-[400px] space-y-7 relative z-10">
+      {/* ── Left value-prop panel (lg+) ──────────────────────────────────── */}
+      <div className="hidden lg:flex lg:w-1/2 flex-col justify-center px-14 xl:px-20 relative z-10">
+        <LeadkaunMark size={48} gloss />
+        <h2 className="mt-8 text-[38px] font-extrabold text-ink tracking-tight leading-[1.12] max-w-md">
+          Know who to call next — every morning.
+        </h2>
+        <p className="mt-4 text-[15px] text-ink-soft max-w-md leading-relaxed">
+          Leadkaun scores every lead on fit, intent &amp; quality and ranks your day — so reps stop guessing and start closing.
+        </p>
+        <ul className="mt-8 space-y-3.5 max-w-md">
+          {[
+            { Icon: Target,      text: "Every lead graded A–F on fit, intent & quality" },
+            { Icon: ListChecks,  text: "A priority queue that tells reps who to call next" },
+            { Icon: AlertCircle, text: "Catch missed opportunities before they go cold" },
+          ].map(({ Icon, text }) => (
+            <li key={text} className="flex items-start gap-3">
+              <span className="w-7 h-7 rounded-lg bg-sky-100 flex items-center justify-center shrink-0 mt-0.5">
+                <Icon className="w-4 h-4 text-sky-600" strokeWidth={2.2} />
+              </span>
+              <span className="text-[14px] text-ink-soft leading-snug pt-1">{text}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
 
-        {/* ── Brand mark ──────────────────────────────────────────────────── */}
-        <div className="flex flex-col items-center gap-3">
+      {/* ── Right: form column ───────────────────────────────────────────── */}
+      <div className="flex-1 flex items-center justify-center px-4 py-10 relative z-10">
+      <div className="w-full max-w-[400px] space-y-7">
+
+        {/* ── Brand mark (mobile only — left panel covers desktop) ─────────── */}
+        <div className="flex flex-col items-center gap-3 lg:hidden">
           <LeadkaunMark size={44} gloss />
           <div className="text-center">
             <h1 className="text-[22px] font-bold text-ink tracking-[-0.025em]">Leadkaun</h1>
@@ -193,6 +221,7 @@ export default function RegisterPage() {
           </Link>
         </p>
 
+      </div>
       </div>
     </div>
   )
