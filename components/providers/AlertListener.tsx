@@ -2,7 +2,7 @@
 
 import { useEffect } from "react"
 import { toast } from "sonner"
-import { createBrowserClient } from "@supabase/auth-helpers-nextjs"
+import { createClient } from "@supabase/supabase-js"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
 import { useQueryClient } from "@tanstack/react-query"
 
@@ -34,7 +34,7 @@ export function AlertListener() {
     if (!session?.user?.id) return
 
     const userId  = session.user.id
-    const supabase = createBrowserClient(
+    const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     )
