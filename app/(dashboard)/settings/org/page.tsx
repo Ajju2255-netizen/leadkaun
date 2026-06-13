@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Building2 } from "lucide-react"
+import { NativeSelect } from "@/components/shared/NativeSelect"
 
 const TEAM_SIZE_OPTIONS = [
   { value: "SOLO",       label: "Solo (just me)"    },
@@ -129,16 +130,14 @@ export default function OrgPage() {
 
         <div className="grid grid-cols-2 gap-3">
           <Field label="Team size">
-            <select value={teamSize} onChange={(e) => setTeamSize(e.target.value)}
-              className={`${inputCls} bg-white`}>
+            <NativeSelect value={teamSize} onChange={(e) => setTeamSize(e.target.value)}>
               {TEAM_SIZE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
+            </NativeSelect>
           </Field>
           <Field label="Monthly lead volume">
-            <select value={leadVol} onChange={(e) => setLeadVol(e.target.value)}
-              className={`${inputCls} bg-white`}>
+            <NativeSelect value={leadVol} onChange={(e) => setLeadVol(e.target.value)}>
               {LEAD_VOL_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
+            </NativeSelect>
           </Field>
         </div>
 
