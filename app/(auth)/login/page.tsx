@@ -11,6 +11,7 @@
 import { Suspense, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
+import { Eye, EyeOff } from "lucide-react"
 import { LeadkaunMark } from "@/components/shared/LeadkaunMark"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 
@@ -21,6 +22,7 @@ function LoginForm() {
 
   const [email,    setEmail]    = useState("")
   const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const [error,    setError]    = useState<string | null>(null)
   const [loading,  setLoading]  = useState(false)
 
@@ -86,24 +88,46 @@ function LoginForm() {
 
         {/* Password */}
         <div className="space-y-1.5">
-          <label htmlFor="password" className="text-[12px] font-semibold text-ink-soft block">
-            Password
-          </label>
-          <input
-            id="password"
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            className="
-              w-full h-10 px-3 rounded-xl glass-1 gloss-edge
-              border border-white/70
-              text-[13px] text-ink placeholder:text-ink-faint
-              outline-none focus:border-sky-400 focus:[background:rgba(255,255,255,0.92)]
-              transition-all
-            "
-          />
+          <div className="flex items-center justify-between">
+            <label htmlFor="password" className="text-[12px] font-semibold text-ink-soft block">
+              Password
+            </label>
+            <Link
+              href="/forgot-password"
+              className="text-[11px] font-medium text-sky-600 hover:text-sky-500 transition-colors underline-offset-4 hover:underline"
+            >
+              Forgot password?
+            </Link>
+          </div>
+          <div className="relative">
+            <input
+              id="password"
+              type={showPassword ? "text" : "password"}
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="
+                w-full h-10 pl-3 pr-10 rounded-xl glass-1 gloss-edge
+                border border-white/70
+                text-[13px] text-ink placeholder:text-ink-faint
+                outline-none focus:border-sky-400 focus:[background:rgba(255,255,255,0.92)]
+                transition-all
+              "
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              tabIndex={-1}
+              className="
+                absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-md
+                text-ink-faint hover:text-ink-soft transition-colors
+              "
+            >
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
         </div>
 
         {/* Error */}
