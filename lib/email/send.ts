@@ -1,8 +1,6 @@
 import { Resend } from "resend"
 import * as React from "react"
 
-const resend = new Resend(process.env.RESEND_API_KEY)
-
 const FROM_ADDRESS = process.env.RESEND_FROM_EMAIL ?? "noreply@leadkaun.com"
 
 interface SendEmailOptions {
@@ -19,7 +17,20 @@ interface SendEmailResult {
 }
 
 export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult> {
+  // Construct the client lazily, at send time — NOT at module load. The Resend
+  // constructor throws when the API key is missing, and importing this module is
+  // unavoidable during `next build` (route page-data collection). Eager
+  // construction made the whole build fail whenever RESEND_API_KEY was absent
+  // from the build env (e.g. Vercel Preview scope). Guarding here keeps the build
+  // env-independent — a missing key just means emails no-op.
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) {
+    console.warn("sendEmail skipped — RESEND_API_KEY not configured")
+    return { success: false, error: "RESEND_API_KEY not configured" }
+  }
+
   try {
+    const resend = new Resend(apiKey)
     const { data, error } = await resend.emails.send({
       from:     FROM_ADDRESS,
       to:       opts.to,
