@@ -169,6 +169,7 @@ export default function PipelinePage() {
   const [wonLeadId,    setWonLeadId]    = useState<string | null>(null)
   const [lostLeadId,   setLostLeadId]   = useState<string | null>(null)
   const [moveLeadId,   setMoveLeadId]   = useState<string | null>(null)
+  const [dragOverStageId, setDragOverStageId] = useState<string | null>(null)
   const [peekLeadId,   setPeekLeadId]   = useState<string | null>(null)
 
   const stages = useMemo(() => data?.stages ?? [], [data?.stages])
@@ -204,6 +205,35 @@ export default function PipelinePage() {
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ["pipeline"] })
     queryClient.invalidateQueries({ queryKey: ["pipeline-summary"] })
+  }
+
+  // Drag-and-drop: move a card to another (non-terminal) stage. Optimistically
+  // moves the card, then POSTs the stage change. Backward moves send a default
+  // note (the API requires one). Won/Lost go through their own modals, so
+  // terminal columns are not drop targets.
+  async function handleCardDrop(leadId: string, fromStageId: string, toStage: Stage) {
+    setDragOverStageId(null)
+    if (!leadId || toStage.id === fromStageId || toStage.is_terminal) return
+    const fromStage  = stages.find((s) => s.id === fromStageId)
+    const isBackward = fromStage ? toStage.order < fromStage.order : false
+
+    queryClient.setQueryData<PipelineData>(["pipeline"], (prev) =>
+      prev
+        ? { ...prev, leads: prev.leads.map((l) => l.id === leadId
+            ? { ...l, stage_id: toStage.id, stage_entered_at: new Date().toISOString() }
+            : l) }
+        : prev,
+    )
+
+    const res = await fetch(`/api/leads/${leadId}/stage`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body:    JSON.stringify({ stage_id: toStage.id, note: isBackward ? `Moved back to "${toStage.name}" on the pipeline board` : null }),
+    })
+    if (res.ok) toast.success(`Moved to ${toStage.name}`)
+    else { const e = await res.json().catch(() => ({})); toast.error(e.error ?? "Couldn't move the deal") }
+    invalidate()
   }
 
   if (isLoading) return (
@@ -286,8 +316,14 @@ export default function PipelinePage() {
               return (b.expected_value ?? 0) - (a.expected_value ?? 0)
             })
 
+            const droppable = !stage.is_terminal
             return (
-              <div key={stage.id} className="w-[270px] shrink-0 flex flex-col rounded-2xl glass-2 gloss-edge p-3 max-h-[640px]">
+              <div
+                key={stage.id}
+                onDragOver={droppable ? (e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverStageId(stage.id) } : undefined}
+                onDragLeave={droppable ? (e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverStageId(null) } : undefined}
+                onDrop={droppable ? (e) => { e.preventDefault(); handleCardDrop(e.dataTransfer.getData("text/lead-id"), e.dataTransfer.getData("text/from-stage"), stage) } : undefined}
+                className={`w-[270px] shrink-0 flex flex-col rounded-2xl glass-2 gloss-edge p-3 max-h-[640px] transition-all ${dragOverStageId === stage.id ? "ring-2 ring-sky-400 bg-sky-50/50" : ""}`}>
 
                 {/* Column header */}
                 <div className="flex items-center justify-between px-1 pt-0.5 pb-2.5">
@@ -481,6 +517,7 @@ function PipelineLeadCard({
   onPeek: () => void; onWon: () => void; onLost: () => void; onMove: () => void; onMoved: () => void
 }) {
   const [movingForward, setMovingForward] = useState(false)
+  const [dragging, setDragging] = useState(false)
   const days      = daysInStage(lead.stage_entered_at)
   const threshold = stuckThreshold(stageKey)
   const isStuck   = days >= threshold && !isWonColumn
@@ -502,10 +539,21 @@ function PipelineLeadCard({
   }
 
   return (
-    <div onClick={onPeek}
-      className={`group rounded-xl glass-1 px-3 py-2.5 cursor-pointer
+    <div
+      onClick={onPeek}
+      draggable={!isWonColumn}
+      onDragStart={(e) => {
+        e.dataTransfer.setData("text/lead-id", lead.id)
+        e.dataTransfer.setData("text/from-stage", lead.stage_id)
+        e.dataTransfer.effectAllowed = "move"
+        setDragging(true)
+      }}
+      onDragEnd={() => setDragging(false)}
+      className={`group rounded-xl glass-1 px-3 py-2.5
+                  ${isWonColumn ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"}
                   transition-all duration-200 hover:-translate-y-[1px]
                   hover:shadow-[0_8px_22px_rgba(15,23,42,0.08)]
+                  ${dragging ? "opacity-40" : ""}
                   ${isHot ? "ring-1 ring-sky-200/60" : ""}`}>
 
       {/* Top: name + value */}
