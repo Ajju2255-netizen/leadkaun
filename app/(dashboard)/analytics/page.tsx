@@ -189,7 +189,6 @@ export default function AnalyticsPage() {
   const wonByGrade  = data?.won_by_grade       ?? []
 
   const days     = pred?.days ?? []
-  const maxDay   = Math.max(...days.map((d) => d.missed_value), 1)
   const today7   = days[days.length - 1]?.missed_value ?? 0
   const today6   = days[days.length - 2]?.missed_value ?? 0
   const trendUp  = today7 > today6
@@ -324,33 +323,7 @@ export default function AnalyticsPage() {
             <h2 className="text-[15px] font-semibold text-ink">Daily Miss Trend</h2>
             <p className="text-[11px] font-mono uppercase tracking-[0.10em] text-ink-muted">₹ missed per day</p>
           </div>
-          <div className="flex items-end gap-2 h-24">
-            {days.map((d) => {
-              const pct     = Math.round((d.missed_value / maxDay) * 100)
-              const isToday = d.date === new Date().toISOString().slice(0, 10)
-              const dow     = new Date(d.date + "T00:00:00").toLocaleDateString("en-IN", { weekday: "short" })
-              return (
-                <div key={d.date} className="flex-1 flex flex-col items-center gap-1.5"
-                  title={`${d.date}: ${formatValue(d.missed_value)}`}>
-                  <div className="w-full flex items-end h-16">
-                    <div
-                      className={`w-full rounded-t-lg transition-all duration-500 ${
-                        isToday ? "bg-red-500" : d.missed_value > 0 ? "bg-red-200" : "bg-slate-100"
-                      }`}
-                      style={{
-                        height:    `${Math.max(pct, d.missed_value > 0 ? 10 : 4)}%`,
-                        boxShadow: d.missed_value > 0 ? "inset 0 1px 0 rgba(255,255,255,0.4)" : "none",
-                      }}
-                    />
-                  </div>
-                  <span className={`text-[10.5px] font-medium tabular-nums ${isToday ? "text-ink font-bold" : "text-ink-muted"}`}>{dow}</span>
-                  {d.missed_value > 0 && (
-                    <span className="text-[9.5px] text-ink-muted tabular-nums">{formatValue(d.missed_value)}</span>
-                  )}
-                </div>
-              )
-            })}
-          </div>
+          <MissTrendChart days={days} />
         </div>
       )}
 
@@ -806,6 +779,52 @@ function SpeedRow({ label, value, pct, color, textColor }: {
       </div>
       <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
         <div className={`h-full rounded-full transition-all duration-700 ${color}`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  )
+}
+
+// ── Daily Miss Trend — area + line time-series (₹ missed per day) ──────────────
+function MissTrendChart({ days }: { days: { date: string; missed_value: number }[] }) {
+  const W = 720, H = 96, padTop = 12, padBottom = 6, padX = 4
+  const max = Math.max(1, ...days.map((d) => d.missed_value))
+  const span = Math.max(1, days.length - 1)
+  const X = (i: number) => padX + (i * (W - padX * 2)) / span
+  const Y = (v: number) => padTop + (1 - v / max) * (H - padTop - padBottom)
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const pts = days.map((d, i) => `${X(i).toFixed(1)},${Y(d.missed_value).toFixed(1)}`)
+  const line = pts.map((p, i) => `${i ? "L" : "M"}${p}`).join(" ")
+  const base = (H - padBottom).toFixed(1)
+  const area = days.length ? `M${X(0).toFixed(1)},${base} L${pts.join(" L")} L${X(days.length - 1).toFixed(1)},${base} Z` : ""
+
+  return (
+    <div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="miss-fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#fb7185" stopOpacity="0.28" />
+            <stop offset="100%" stopColor="#fb7185" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {area && <path d={area} fill="url(#miss-fill)" />}
+        <path d={line} fill="none" stroke="#f43f5e" strokeWidth="2.5" strokeLinejoin="round"
+          strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+        {days.map((d, i) => (
+          <circle key={d.date} cx={X(i)} cy={Y(d.missed_value)} r={d.date === todayStr ? 5 : 3}
+            fill={d.date === todayStr ? "#e11d48" : "#ffffff"} stroke="#f43f5e" strokeWidth="2"
+            vectorEffect="non-scaling-stroke" />
+        ))}
+      </svg>
+      <div className="flex justify-between mt-1.5 px-0.5">
+        {days.map((d) => {
+          const isToday = d.date === todayStr
+          const dow = new Date(d.date + "T00:00:00").toLocaleDateString("en-IN", { weekday: "short" })
+          return (
+            <span key={d.date} className={`text-[10px] tabular-nums ${isToday ? "text-ink font-bold" : "text-ink-muted"}`}>
+              {dow}
+            </span>
+          )
+        })}
       </div>
     </div>
   )
