@@ -366,9 +366,14 @@ export default function PipelinePage() {
                     />
                   ))}
                   {sorted.length === 0 && (
-                    <div className="rounded-xl border border-dashed border-slate-200/80 bg-white/40
-                                    h-16 flex items-center justify-center">
-                      <p className="text-[11px] font-medium text-slate-400">No deals here yet</p>
+                    <div className={`rounded-xl border border-dashed h-16 flex items-center justify-center transition-colors ${
+                      dragOverStageId === stage.id
+                        ? "border-sky-300 bg-sky-50/70"
+                        : "border-slate-200/80 bg-white/40"
+                    }`}>
+                      <p className={`text-[11px] font-medium ${dragOverStageId === stage.id ? "text-sky-600" : "text-slate-400"}`}>
+                        {dragOverStageId === stage.id ? "Drop to move here" : droppable ? "Drag a deal here" : "No deals here yet"}
+                      </p>
                     </div>
                   )}
                 </div>
@@ -581,13 +586,15 @@ function PipelineLeadCard({
       {/* Pills row */}
       <div className="flex items-center gap-1.5 mt-2 flex-wrap">
         <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
-          isStuck
-            ? "bg-rose-100 text-rose-700 border border-rose-200/60"
-            : "bg-white/70 text-slate-500 border border-slate-200/60"
+          !isStuck
+            ? "bg-white/70 text-slate-500 border border-slate-200/60"
+            : days >= 30
+              ? "bg-rose-100 text-rose-700 border border-rose-200/60"
+              : "bg-amber-100 text-amber-700 border border-amber-200/60"
         }`}>
           <Clock className="w-2.5 h-2.5" />
           {days === 0 ? "Today" : `${days}d`}
-          {isStuck && " · stuck"}
+          {isStuck && (days >= 30 ? " · stuck" : " · slowing")}
         </span>
         {isHot && !isWonColumn && (
           <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full
