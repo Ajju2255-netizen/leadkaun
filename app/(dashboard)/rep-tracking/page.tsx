@@ -189,7 +189,7 @@ function StatCard({
   invertDelta?:  boolean
 }) {
   return (
-    <div className="glass-2 gloss-edge rounded-2xl p-6">
+    <div className="glass-3 gloss-edge rounded-2xl p-6">
       <p className="text-[12px] font-semibold text-ink-soft">{label}</p>
       <div className="mt-3 flex items-end justify-between gap-3">
         <div>

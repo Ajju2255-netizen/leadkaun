@@ -435,7 +435,7 @@ function KpiCard({
   const a = ACCENT[accent]
 
   return (
-    <div className="rounded-2xl glass-2 gloss-edge p-4 flex flex-col gap-3 min-h-[132px] transition-all duration-200 hover:translate-y-[-2px] hover:shadow-[0_12px_32px_rgba(15,23,42,0.08)]">
+    <div className="rounded-2xl glass-3 gloss-edge p-4 flex flex-col gap-3 min-h-[132px] transition-all duration-200 hover:translate-y-[-2px] hover:shadow-[0_12px_32px_rgba(15,23,42,0.08)]">
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-1.5">
           <span className={`w-1.5 h-1.5 rounded-full ${a.dot}`} />

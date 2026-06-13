@@ -114,7 +114,7 @@ function KpiCard({
   invertDelta?: boolean
 }) {
   return (
-    <div className="glass-2 gloss-edge rounded-2xl p-5">
+    <div className="glass-3 gloss-edge rounded-2xl p-5">
       <div className="flex items-start gap-3">
         <div
           className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
