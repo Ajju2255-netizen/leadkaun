@@ -6,6 +6,7 @@ import { processSignalAndUpdateScores } from "@/lib/scoring/orchestrator"
 import { SIGNAL_WEIGHTS } from "@/lib/scoring/signal-weights"
 import { applyAutoStage } from "@/lib/pipeline/auto-stage"
 import { scheduleFollowUp } from "@/lib/follow-ups/schedule"
+import { dispatchScoreAlerts } from "@/lib/realtime/score-alerts"
 import type { SignalType, WaStage } from "@prisma/client"
 
 const WA_SIGNAL_TYPES = [
@@ -157,6 +158,22 @@ export async function POST(req: Request) {
       }
 
       return processSignalAndUpdateScores(data.lead_id, session.account.id, tx)
+    })
+
+    // After commit: realtime toast to the assigned rep on SQL crossing / grade
+    // drop (audit B3). `lead` is the pre-update snapshot; `result` is new.
+    await dispatchScoreAlerts({
+      assignedRepId: lead.assigned_rep_id,
+      leadId:        lead.id,
+      leadName:      `${lead.first_name} ${lead.last_name ?? ""}`.trim(),
+      companyName:   lead.company_name,
+      previousGrade: lead.grade,
+      newGrade:      result.grade,
+      wasSql:        lead.is_sql,
+      isSql:         result.is_sql,
+      expectedValue: lead.expected_value,
+      lastActionAt:  lead.last_action_at,
+      importedAt:    lead.imported_at,
     })
 
     return apiSuccess(result)

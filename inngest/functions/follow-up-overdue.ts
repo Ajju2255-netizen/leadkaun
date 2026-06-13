@@ -1,5 +1,6 @@
 import { inngest } from "@/inngest/client"
 import { prisma } from "@/lib/prisma"
+import { broadcastToUser } from "@/lib/realtime/broadcast"
 
 /**
  * Follow-up overdue checker.
@@ -94,20 +95,17 @@ export const followUpOverdueFn = inngest.createFunction(
       repMap.get(repId)!.push(action)
     }
 
-    // Fire alert events for each rep (picked up by Realtime in Phase 6)
-    await step.run("fire-rep-alerts", async () => {
-      const events = Array.from(repMap.entries()).map(([repId, actions]) => ({
-        name: "alerts/follow-up.overdue",
-        data: {
-          rep_id:        repId,
+    // Broadcast a realtime toast to each affected rep (audit B3). Previously this
+    // fired an `alerts/follow-up.overdue` Inngest event that had NO consumer, so
+    // the AlertListener's `follow_up_overdue` toast never showed. Broadcasting
+    // directly to `alerts:{repId}` is what the client actually listens for.
+    await step.run("broadcast-rep-alerts", async () => {
+      for (const [repId, actions] of Array.from(repMap.entries())) {
+        await broadcastToUser(repId, "follow_up_overdue", {
           overdue_count: actions.length,
           grade_a_count: actions.filter((a) => a.lead.grade === "A").length,
           lead_ids:      actions.map((a) => a.lead.id),
-        },
-      }))
-
-      if (events.length > 0) {
-        await inngest.send(events)
+        })
       }
     })
 
