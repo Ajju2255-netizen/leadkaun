@@ -91,7 +91,6 @@ export function QueueLeadRow({ lead, onClick, rank }: QueueLeadRowProps) {
       <AvatarCircle
         seed={lead.first_name ?? "?"}
         size="lg"
-        imageUrl={`https://i.pravatar.cc/120?u=${lead.id}`}
         className={cn("self-center", rank == null && "ml-2")}
       />
 

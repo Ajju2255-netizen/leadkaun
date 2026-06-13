@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -12,6 +12,7 @@ import {
   Sparkles, RotateCw,
 } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
+import { EmptyState } from "@/components/shared/EmptyState"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -218,12 +219,13 @@ function ImportFromCard({
 function UploadForm({
   sources, stages, sourceId, stageId, sessionName,
   setSourceId, setStageId, setSessionName,
-  uploading,
+  uploading, metaError, onRetryMeta,
 }: {
   sources: LeadSource[]; stages: PipelineStage[]
   sourceId: string; stageId: string; sessionName: string
   setSourceId: (v: string) => void; setStageId: (v: string) => void; setSessionName: (v: string) => void
   uploading: boolean
+  metaError: boolean; onRetryMeta: () => void
 }) {
   const inputCls = "w-full h-10 px-3 rounded-lg border border-hairline-strong bg-white text-[13px] text-ink outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 transition-colors disabled:opacity-50"
   return (
@@ -264,7 +266,7 @@ function UploadForm({
             disabled={!sources.length || uploading}
             className={inputCls + " cursor-pointer"}
           >
-            {sources.length === 0 && <option value="">Loading…</option>}
+            {sources.length === 0 && <option value="">{metaError ? "Couldn't load" : "Loading…"}</option>}
             {sources.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </div>
@@ -276,11 +278,24 @@ function UploadForm({
             disabled={!stages.length || uploading}
             className={inputCls + " cursor-pointer"}
           >
-            {stages.length === 0 && <option value="">Loading…</option>}
+            {stages.length === 0 && <option value="">{metaError ? "Couldn't load" : "Loading…"}</option>}
             {stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </div>
       </div>
+
+      {metaError && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-rose-100 bg-rose-50/60 px-3.5 py-2.5">
+          <p className="text-[12px] text-rose-600">Couldn&apos;t load sources or stages.</p>
+          <button
+            onClick={onRetryMeta}
+            disabled={uploading}
+            className="h-7 px-3 rounded-full bg-sky-600 hover:bg-sky-700 text-white text-[12px] font-semibold transition-all active:scale-[0.97] disabled:opacity-50"
+          >
+            Retry
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -436,11 +451,14 @@ export default function ImportPage() {
   const fileRef     = useRef<HTMLInputElement>(null)
   const [refreshKey, setRefreshKey] = useState(0)
 
-  // Load sources + stages
-  useEffect(() => {
+  // Load sources + stages (retryable, so a failed fetch doesn't leave the
+  // Source/Stage selects stuck on "Loading…" forever — audit B8 dead-end).
+  const [metaError, setMetaError] = useState(false)
+  const loadMeta = useCallback(() => {
+    setMetaError(false)
     Promise.all([
-      fetch("/api/lead-sources",    { credentials: "include" }).then((r) => r.json()),
-      fetch("/api/pipeline/stages", { credentials: "include" }).then((r) => r.json()),
+      fetch("/api/lead-sources",    { credentials: "include" }).then((r) => { if (!r.ok) throw new Error(); return r.json() }),
+      fetch("/api/pipeline/stages", { credentials: "include" }).then((r) => { if (!r.ok) throw new Error(); return r.json() }),
     ]).then(([srcData, stgData]) => {
       const srcs = (srcData.sources ?? []) as LeadSource[]
       const stgs = (stgData.stages  ?? []) as PipelineStage[]
@@ -448,8 +466,12 @@ export default function ImportPage() {
       setStages(stgs.sort((a, b) => a.order - b.order))
       if (srcs.length) setSourceId(srcs[0].id)
       if (stgs.length) setStageId(stgs[0].id)
-    }).catch(() => toast.error("Failed to load lead sources or pipeline stages"))
+    }).catch(() => {
+      setMetaError(true)
+      toast.error("Failed to load lead sources or pipeline stages")
+    })
   }, [])
+  useEffect(() => { loadMeta() }, [loadMeta])
 
   // History
   const { data: historyData, isLoading: historyLoading } = useQuery<{ jobs: ImportJob[] }>({
@@ -611,6 +633,7 @@ export default function ImportPage() {
                 sourceId={sourceId} stageId={stageId} sessionName={sessionName}
                 setSourceId={setSourceId} setStageId={setStageId} setSessionName={setSessionName}
                 uploading={uploading}
+                metaError={metaError} onRetryMeta={loadMeta}
               />
             ) : stage === "complete" && result ? (
               <div className="rounded-xl bg-white/60 border border-hairline p-5">
@@ -709,7 +732,7 @@ export default function ImportPage() {
             {[1,2,3].map((i) => <Skeleton key={i} className="h-12 w-full rounded-lg" />)}
           </div>
         ) : jobs.length === 0 ? (
-          <p className="text-[13px] text-ink-muted py-6 text-center">No imports yet.</p>
+          <EmptyState icon={CloudUpload} title="No imports yet" description="Upload a CSV above — your import history will appear here." />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">

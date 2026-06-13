@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Lightbulb, Trophy, ChevronDown, ChevronUp, Sparkles, Target, Save } from "lucide-react"
+import { NativeSelect } from "@/components/shared/NativeSelect"
 
 // ── Options ───────────────────────────────────────────────────────────────────
 
@@ -541,18 +542,16 @@ export default function IcpPage() {
         </Section>
 
         <Section title="Typical Sales Cycle" desc="Used to calibrate intent decay speed">
-          <select
+          <NativeSelect
             value={salesCycle}
             onChange={(e) => setSalesCycle(e.target.value)}
-            className="w-60 px-3.5 py-2.5 rounded-xl border border-slate-200 text-[13px] text-slate-900
-                       focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-400
-                       bg-white transition-all"
+            wrapperClassName="w-60"
           >
             <option value="">Select…</option>
             {SALES_CYCLE_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
-          </select>
+          </NativeSelect>
         </Section>
 
         {/* SQL Thresholds */}

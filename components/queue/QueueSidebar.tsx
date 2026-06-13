@@ -23,7 +23,6 @@ export interface QueueSidebarProps {
 
 export function QueueSidebar({ kpis, loading }: QueueSidebarProps) {
   const pct = kpis?.high_priority_count_pct_change ?? null
-  const isUp = pct != null && pct >= 0
 
   return (
     <aside className="xl:h-full xl:overflow-y-auto xl:pr-1 xl:-mr-1 space-y-4">
@@ -50,12 +49,12 @@ export function QueueSidebar({ kpis, loading }: QueueSidebarProps) {
       <div className="glass-card px-4 py-4">
         <div className="flex items-center gap-1.5">
           <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-sky-700">High Priority</p>
-          {pct != null && (
+          {pct != null && pct !== 0 && (
             <span
               className={`inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-auto
-                ${isUp ? "text-emerald-700 bg-emerald-50" : "text-rose-700 bg-rose-50"}`}
+                ${pct > 0 ? "text-emerald-700 bg-emerald-50" : "text-rose-700 bg-rose-50"}`}
             >
-              {isUp ? <ArrowUp className="w-2.5 h-2.5" /> : <ArrowDown className="w-2.5 h-2.5" />}
+              {pct > 0 ? <ArrowUp className="w-2.5 h-2.5" /> : <ArrowDown className="w-2.5 h-2.5" />}
               {Math.abs(pct)}%
             </span>
           )}

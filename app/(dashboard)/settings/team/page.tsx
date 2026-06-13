@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { UserPlus, Users, X, ShieldCheck, UserCog } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
+import { NativeSelect } from "@/components/shared/NativeSelect"
 
 interface Member {
   id: string
@@ -162,16 +163,14 @@ export default function TeamPage() {
             <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
               Role
             </label>
-            <select
+            <NativeSelect
               value={inviteRole}
               onChange={(e) => setInviteRole(e.target.value as "REP" | "MANAGER")}
-              className="w-full h-[42px] px-3 rounded-xl border border-slate-200 bg-white text-[13px]
-                         text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500/30
-                         focus:border-sky-400 transition-all"
+              className="h-[42px] py-0"
             >
               <option value="REP">Rep</option>
               <option value="MANAGER">Manager</option>
-            </select>
+            </NativeSelect>
           </div>
           <button
             type="submit"
@@ -292,18 +291,16 @@ export default function TeamPage() {
                 <label className="text-[12px] font-semibold text-slate-500 uppercase tracking-wider">
                   Reassign leads to
                 </label>
-                <select
+                <NativeSelect
                   value={reassignTo}
                   onChange={(e) => setReassignTo(e.target.value)}
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-[13px]
-                             text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500/30
-                             focus:border-sky-400 transition-all"
+                  className="h-10 py-0"
                 >
                   <option value="">Select a rep…</option>
                   {activeReps.filter((r) => r.id !== deactivateTarget.id).map((r) => (
                     <option key={r.id} value={r.id}>{r.first_name} {r.last_name}</option>
                   ))}
-                </select>
+                </NativeSelect>
               </div>
             )}
             <div className="flex gap-2 pt-1">
@@ -342,16 +339,14 @@ export default function TeamPage() {
             </p>
             <div className="space-y-1.5">
               <label className="text-[12px] font-semibold text-slate-500 uppercase tracking-wider">New Role</label>
-              <select
+              <NativeSelect
                 value={newRole}
                 onChange={(e) => setNewRole(e.target.value as "REP" | "MANAGER")}
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-[13px]
-                           text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500/30
-                           focus:border-sky-400 transition-all"
+                className="h-10 py-0"
               >
                 <option value="REP">Rep</option>
                 <option value="MANAGER">Manager</option>
-              </select>
+              </NativeSelect>
             </div>
             <div className="flex gap-2 pt-1">
               <button onClick={() => setRoleTarget(null)}

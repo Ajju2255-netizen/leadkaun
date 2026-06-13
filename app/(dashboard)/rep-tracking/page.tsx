@@ -1,7 +1,8 @@
 "use client"
 
 import { useQuery } from "@tanstack/react-query"
-import { User, IndianRupee, Clock, CheckCircle, ArrowUp, ArrowDown, Trophy } from "lucide-react"
+import { User, IndianRupee, Clock, CheckCircle, Trophy } from "lucide-react"
+import { DeltaChip } from "@/components/shared/DeltaChip"
 import { Skeleton } from "@/components/ui/skeleton"
 import { AvatarCircle } from "@/components/shared/AvatarCircle"
 
@@ -187,15 +188,8 @@ function StatCard({
   valueColor:    string
   invertDelta?:  boolean
 }) {
-  // For invertDelta (response time), a negative real delta is good
-  const isImprovement = delta == null
-    ? null
-    : invertDelta
-      ? delta < 0
-      : delta > 0
-
   return (
-    <div className="glass-2 gloss-edge rounded-2xl p-6">
+    <div className="glass-3 gloss-edge rounded-2xl p-6">
       <p className="text-[12px] font-semibold text-ink-soft">{label}</p>
       <div className="mt-3 flex items-end justify-between gap-3">
         <div>
@@ -212,21 +206,12 @@ function StatCard({
         </div>
       </div>
       {/* vs last month line */}
-      <div className="mt-4 flex items-center gap-1">
+      <div className="mt-4 flex items-center gap-1.5">
         {delta == null ? (
           <span className="text-[12px] text-ink-muted">No prior month data</span>
         ) : (
           <>
-            {invertDelta
-              ? (delta < 0
-                  ? <ArrowDown className="w-3.5 h-3.5 text-emerald-500" strokeWidth={2.5} />
-                  : <ArrowUp   className="w-3.5 h-3.5 text-red-500"      strokeWidth={2.5} />)
-              : (delta > 0
-                  ? <ArrowUp   className="w-3.5 h-3.5 text-emerald-500" strokeWidth={2.5} />
-                  : <ArrowDown className="w-3.5 h-3.5 text-red-500"     strokeWidth={2.5} />)}
-            <span className={`text-[13px] font-semibold tabular-nums ${isImprovement ? "text-emerald-600" : "text-red-500"}`}>
-              {Math.abs(delta)}%
-            </span>
+            <DeltaChip delta={delta} invert={invertDelta} />
             <span className="text-[12px] text-ink-muted ml-1">vs last month</span>
           </>
         )}
