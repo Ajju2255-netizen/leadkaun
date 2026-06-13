@@ -175,6 +175,18 @@ export function DashboardShell({
     return () => { document.body.style.overflow = "" }
   }, [mobileOpen])
 
+  // Onboarding is a focused, gated first-run flow — render it without the
+  // dashboard nav chrome so users complete setup instead of bypassing it
+  // (audit: onboarding leaked the full sidebar/top-bar). Auth still runs in the
+  // (dashboard) layout, so this only strips the visual shell.
+  if (pathname.startsWith("/onboarding")) {
+    return (
+      <TooltipProvider>
+        <div className="min-h-screen overflow-y-auto">{children}</div>
+      </TooltipProvider>
+    )
+  }
+
   function SidebarBody({ onItemClick }: { onItemClick?: () => void }) {
     return (
       <>

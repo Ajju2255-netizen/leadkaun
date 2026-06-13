@@ -125,7 +125,7 @@ export function QueueLeadRow({ lead, onClick, rank }: QueueLeadRowProps) {
             "inline-flex items-center justify-center h-9 px-5 rounded-full text-[12px] font-semibold transition-all whitespace-nowrap",
             isTopRanked
               ? "bg-sky-600 text-white shadow-[0_1px_2px_rgba(14,165,233,0.25),inset_0_1px_0_rgba(255,255,255,0.45)]"
-              : "border border-slate-200 text-slate-700 bg-white hover:bg-slate-50",
+              : "border border-sky-200 text-sky-700 bg-sky-50/70 hover:bg-sky-50 hover:border-sky-300",
           )}
         >
           {action}
