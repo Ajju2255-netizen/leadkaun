@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma"
-import { requireAuth, handleAuthError } from "@/lib/auth/middleware"
+import { requireWorkspace, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
 
 /**
@@ -11,10 +11,10 @@ import { apiSuccess, apiError } from "@/lib/api/response"
  */
 export async function GET() {
   try {
-    const session = await requireAuth()
+    const session = await requireWorkspace()
 
     const jobs = await prisma.importJobStatus.findMany({
-      where:   { account_id: session.account.id },
+      where:   { account_id: session.account.id, workspace_id: session.workspace.id },
       orderBy: { created_at: "desc" },
       take:    50,
       select: {
@@ -40,7 +40,7 @@ export async function GET() {
     const sourceIds = Array.from(new Set(jobs.map((j) => j.source_id).filter(Boolean))) as string[]
     const sources   = sourceIds.length
       ? await prisma.leadSource.findMany({
-          where:  { id: { in: sourceIds }, account_id: session.account.id },
+          where:  { id: { in: sourceIds }, account_id: session.account.id, workspace_id: session.workspace.id },
           select: { id: true, name: true },
         })
       : []

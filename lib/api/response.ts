@@ -12,7 +12,7 @@ export function apiSuccess<T>(data: T, status = 200) {
 export function apiError(
   message: string,
   code: string,
-  status: 400 | 401 | 403 | 404 | 409 | 422 | 500 = 400,
+  status: 400 | 401 | 403 | 404 | 409 | 422 | 429 | 500 = 400,
 ) {
   return NextResponse.json({ error: message, code }, { status })
 }

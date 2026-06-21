@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
-import { requireAuth, handleAuthError } from "@/lib/auth/middleware"
+import { requireWorkspace, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
+import { rateLimited, LIMITS } from "@/lib/rate-limit"
 import { computeFitScore } from "@/lib/scoring/fit-score"
 import { computeQualityScore } from "@/lib/scoring/quality-score"
 import { assignGrade } from "@/lib/scoring/grade"
@@ -18,7 +19,10 @@ export const maxDuration = 300
  */
 export async function POST() {
   try {
-    const session = await requireAuth()
+    const session = await requireWorkspace()
+
+    const _rl = await rateLimited(`admin:regrade:${session.account.id}`, LIMITS.importOneShot)
+    if (_rl) return _rl
 
     if (session.user.role === "REP") {
       return apiError("Only Admins and Managers can regrade leads", "FORBIDDEN", 403)
@@ -39,7 +43,7 @@ export async function POST() {
 
     const leads = await prisma.lead.findMany({
       where: {
-        account_id: session.account.id,
+        account_id: session.account.id, workspace_id: session.workspace.id,
         is_junk:    false,
       },
       include: {

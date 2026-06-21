@@ -1,7 +1,8 @@
 import { z } from "zod"
 import { prisma } from "@/lib/prisma"
-import { requireAuth, handleAuthError } from "@/lib/auth/middleware"
+import { requireWorkspace, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError, parseBody, NOT_FOUND } from "@/lib/api/response"
+import { rateLimited, LIMITS } from "@/lib/rate-limit"
 import { processSignalAndUpdateScores } from "@/lib/scoring/orchestrator"
 import { SIGNAL_WEIGHTS } from "@/lib/scoring/signal-weights"
 import { applyAutoStage } from "@/lib/pipeline/auto-stage"
@@ -35,14 +36,18 @@ const CallSignalSchema = z.object({
  */
 export async function POST(req: Request) {
   try {
-    const session = await requireAuth()
+    const session = await requireWorkspace()
+
+    const limited = await rateLimited(`signal:${session.user.id}`, LIMITS.heavyWrite)
+    if (limited) return limited
+
     const { data, error } = await parseBody(req, CallSignalSchema)
     if (error) return error
 
     const lead = await prisma.lead.findFirst({
       where: {
         id:         data.lead_id,
-        account_id: session.account.id,
+        account_id: session.account.id, workspace_id: session.workspace.id,
         ...(session.user.role === "REP"
           ? { assigned_rep_id: session.user.id }
           : {}),

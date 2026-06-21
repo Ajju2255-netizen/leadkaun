@@ -8,14 +8,16 @@ import Link from "next/link"
 import {
   Phone, MessageCircle, Trophy, X, MoreHorizontal,
   MapPin, Building2, Briefcase, Clock, Zap, ChevronLeft,
-  PhoneOff, TrendingDown, FileText, UserCheck, SearchX, type LucideIcon,
+  PhoneOff, TrendingDown, FileText, UserCheck, SearchX, Ban, type LucideIcon,
 } from "lucide-react"
 import { GradeBadge } from "@/components/shared/GradeBadge"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { ScoreBar } from "@/components/shared/ScoreBar"
 import { LeadRealtimeListener } from "@/components/leads/LeadRealtimeListener"
-import { LogCallModal } from "@/components/queue/LogCallModal"
 import { LogWhatsAppModal } from "@/components/queue/LogWhatsAppModal"
+import { ContactActions } from "@/components/shared/ContactActions"
+import { ThemedSelect } from "@/components/shared/ThemedSelect"
+import { ModalPortal } from "@/components/shared/ModalPortal"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { timeAgo, formatDuration } from "@/lib/format"
@@ -102,7 +104,6 @@ export default function LeadRecordPage() {
   const queryClient = useQueryClient()
   const isManager   = useHasRole("ADMIN", "MANAGER")
 
-  const [callOpen,     setCallOpen]     = useState(false)
   const [waOpen,       setWaOpen]       = useState(false)
   const [markingWon,   setMarkingWon]   = useState(false)
   const [markingLost,  setMarkingLost]  = useState(false)
@@ -118,6 +119,8 @@ export default function LeadRecordPage() {
   const [reassignOpen,   setReassignOpen]   = useState(false)
   const [reassignRepId,  setReassignRepId]  = useState("")
   const [reassigning,    setReassigning]    = useState(false)
+  const [junkConfirm,    setJunkConfirm]    = useState(false)
+  const [junking,        setJunking]        = useState(false)
 
   const { data: lead, isLoading, error } = useQuery({
     queryKey: ["lead", leadId],
@@ -157,10 +160,12 @@ export default function LeadRecordPage() {
   }
 
   async function handleMarkJunk() {
-    setMoreOpen(false)
+    setJunking(true)
     const res = await fetch(`/api/leads/${leadId}/junk`, { method: "POST", credentials: "include" })
+    setJunking(false)
     if (res.ok) {
       toast.success("Lead marked as junk")
+      setJunkConfirm(false)
       queryClient.invalidateQueries({ queryKey: ["lead", leadId] })
     } else {
       toast.error("Failed to mark as junk")
@@ -230,7 +235,7 @@ export default function LeadRecordPage() {
         action={
           <Link
             href="/leads"
-            className="h-9 px-5 rounded-full bg-sky-600 hover:bg-sky-700 text-white text-[13px] font-semibold inline-flex items-center transition-all active:scale-[0.97]"
+            className="h-9 px-5 rounded-full bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)] text-white text-[13px] font-semibold inline-flex items-center transition-all active:scale-[0.97]"
           >
             Back to All Leads
           </Link>
@@ -243,7 +248,6 @@ export default function LeadRecordPage() {
   const fullName    = [lead.first_name, lead.last_name].filter(Boolean).join(" ")
   const actionStyle = ACTION_STYLES[lead.grade] ?? ACTION_STYLES["D"]
   const action      = lead.next_action
-  const isHot       = lead.grade === "A" || lead.grade === "B"
 
   return (
     <>
@@ -269,7 +273,7 @@ export default function LeadRecordPage() {
             <div className="flex items-start gap-3 min-w-0">
               <GradeBadge grade={lead.grade} size="lg" />
               <div className="min-w-0">
-                <h1 className="text-[20px] font-bold text-slate-900 leading-tight">{fullName}</h1>
+                <h1 className="text-[28px] font-bold text-ink tracking-[-0.02em] leading-tight">{fullName}</h1>
                 <div className="flex items-center gap-2 flex-wrap mt-1">
                   {lead.company_name && (
                     <span className="inline-flex items-center gap-1 text-[12px] text-slate-500">
@@ -315,7 +319,7 @@ export default function LeadRecordPage() {
             <div className="shrink-0 flex flex-col items-end gap-2">
               {lead.expected_value ? (
                 <div className="text-right">
-                  <p className="text-[22px] font-black tabular-nums text-slate-900 leading-none">
+                  <p className="text-[24px] font-black tabular-nums text-slate-900 leading-none">
                     {formatValue(lead.expected_value)}
                   </p>
                   <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide mt-0.5">
@@ -368,7 +372,7 @@ export default function LeadRecordPage() {
                       )}
                       <div className="my-1 border-t border-slate-200/40" />
                       <button
-                        onClick={handleMarkJunk}
+                        onClick={() => { setMoreOpen(false); setJunkConfirm(true) }}
                         className="w-full flex items-center gap-2.5 px-3.5 py-2 text-[13px] text-rose-600
                                    hover:bg-rose-50/60 transition-colors"
                       >
@@ -391,40 +395,25 @@ export default function LeadRecordPage() {
             )}
           </div>
 
-          {/* Action buttons */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setCallOpen(true)}
-              className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-full text-white
-                         bg-gradient-to-b from-sky-400 to-sky-500
-                         shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)]
-                         hover:from-sky-500 hover:to-sky-600
-                         text-[13px] font-semibold active:scale-[0.98] transition-all"
-            >
-              <Phone className="w-4 h-4" strokeWidth={2.5} />
-              {isHot ? "Call Now" : "Log Call"}
-            </button>
-            <button
-              onClick={() => setWaOpen(true)}
-              className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-full
-                         glass-1 border border-white/70
-                         text-slate-700 hover:text-slate-900 text-[13px] font-semibold
-                         active:scale-[0.98] transition-all"
-            >
-              <MessageCircle className="w-4 h-4 text-emerald-600" strokeWidth={2} />
-              {isHot ? "WhatsApp" : "Log WA"}
-            </button>
-            <button
-              onClick={() => setScheduleOpen(true)}
-              title="Schedule follow-up"
-              className="flex items-center justify-center w-10 h-10 rounded-full
-                         glass-1 border border-white/70
-                         text-slate-500 hover:text-slate-800
-                         active:scale-[0.98] transition-all"
-            >
-              <Clock className="w-4 h-4" strokeWidth={2} />
-            </button>
-          </div>
+          {/* Action buttons — shared Call / WhatsApp + one-tap outcome */}
+          <ContactActions
+            leadId={leadId}
+            leadName={fullName}
+            phone={lead.phone}
+            variant="panel"
+            trailing={
+              <button
+                onClick={() => setScheduleOpen(true)}
+                title="Schedule follow-up"
+                className="flex items-center justify-center w-10 h-10 rounded-full
+                           glass-1 border border-white/70
+                           text-slate-500 hover:text-slate-800
+                           active:scale-[0.98] transition-all"
+              >
+                <Clock className="w-4 h-4" strokeWidth={2} />
+              </button>
+            }
+          />
         </div>
 
         {/* ── Next Action ──────────────────────────────────────────────── */}
@@ -621,16 +610,16 @@ export default function LeadRecordPage() {
       </div>
 
       {/* Modals */}
-      <LogCallModal     open={callOpen} onClose={() => setCallOpen(false)} leadId={leadId} leadName={fullName} />
       <LogWhatsAppModal open={waOpen}   onClose={() => setWaOpen(false)}   leadId={leadId} leadName={fullName} />
 
       {/* Schedule follow-up modal */}
       {scheduleOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
+        <ModalPortal>
+        <div className="fixed inset-0 bg-slate-900/55 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
           <div className="rounded-2xl glass-3 gloss-edge p-6 w-full max-w-sm space-y-4
                           shadow-[0_24px_48px_rgba(15,23,42,0.18)]">
             <div className="flex items-center justify-between">
-              <h2 className="text-[17px] font-bold text-slate-900">Schedule Follow-up</h2>
+              <h2 className="text-[16px] font-bold text-slate-900">Schedule Follow-up</h2>
               <button onClick={() => setScheduleOpen(false)}
                 className="w-7 h-7 flex items-center justify-center rounded-full text-slate-400
                            hover:text-slate-700 hover:bg-white/70 transition-all">
@@ -700,6 +689,7 @@ export default function LeadRecordPage() {
             </button>
           </div>
         </div>
+        </ModalPortal>
       )}
 
       {markingWon && (
@@ -715,29 +705,24 @@ export default function LeadRecordPage() {
 
       {/* ── Reassign modal ──────────────────────────────────────────────── */}
       {reassignOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+        <ModalPortal>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-slate-900/55 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-2xl glass-3 gloss-edge p-6 space-y-4
                           shadow-[0_24px_48px_rgba(15,23,42,0.18)]">
             <div className="flex items-center justify-between">
-              <p className="text-[17px] font-bold text-slate-900">Reassign rep</p>
+              <p className="text-[16px] font-bold text-slate-900">Reassign rep</p>
               <button onClick={() => setReassignOpen(false)}
                 className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/70 text-slate-400 transition-colors">
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <select
+            <ThemedSelect
               value={reassignRepId}
-              onChange={e => setReassignRepId(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-[13px] text-slate-900 bg-white/80
-                         focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-400 transition-all"
-            >
-              <option value="">Select rep…</option>
-              {teamMembers.map(m => (
-                <option key={m.id} value={m.id}>
-                  {m.first_name}{m.last_name ? ` ${m.last_name}` : ""}
-                </option>
-              ))}
-            </select>
+              onValueChange={setReassignRepId}
+              options={teamMembers.map(m => ({ value: m.id, label: `${m.first_name}${m.last_name ? ` ${m.last_name}` : ""}` }))}
+              placeholder="Select rep…"
+              aria-label="Reassign rep"
+            />
             <button
               onClick={handleReassign}
               disabled={!reassignRepId || reassigning}
@@ -750,6 +735,46 @@ export default function LeadRecordPage() {
             </button>
           </div>
         </div>
+        </ModalPortal>
+      )}
+
+      {/* Mark-as-junk confirmation — destructive, so never one-click */}
+      {junkConfirm && (
+        <ModalPortal>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-slate-900/55 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl glass-3 gloss-edge p-6 space-y-4
+                          shadow-[0_24px_48px_rgba(15,23,42,0.18)]">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center shrink-0">
+                <Ban className="w-5 h-5 text-rose-600" strokeWidth={2.2} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[16px] font-bold text-slate-900 leading-tight">Mark as junk?</p>
+                <p className="text-[12px] text-slate-500 mt-0.5">This removes the lead from your active queue and pipeline.</p>
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => setJunkConfirm(false)}
+                className="flex-1 h-10 rounded-full border border-slate-200/70 text-[13px] font-semibold
+                           text-slate-600 hover:bg-white/70 transition-all bg-white/40"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleMarkJunk}
+                disabled={junking}
+                className="flex-1 h-10 rounded-full text-white text-[13px] font-semibold transition-all
+                           bg-gradient-to-b from-rose-500 to-rose-600
+                           shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_4px_12px_rgba(244,63,94,0.32)]
+                           disabled:opacity-50 active:scale-[0.98]"
+              >
+                {junking ? "Marking…" : "Mark as junk"}
+              </button>
+            </div>
+          </div>
+        </div>
+        </ModalPortal>
       )}
     </>
   )
@@ -895,11 +920,12 @@ function WonModal({ leadId, onClose, onSuccess }: { leadId: string; onClose: () 
   }
 
   return (
-    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
+    <ModalPortal>
+    <div className="fixed inset-0 bg-slate-900/55 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
       <div className="rounded-2xl glass-3 gloss-edge p-6 w-full max-w-sm space-y-4
                       shadow-[0_24px_48px_rgba(15,23,42,0.18)]">
         <div className="flex items-center justify-between">
-          <h2 className="text-[17px] font-bold text-slate-900">Mark as Won</h2>
+          <h2 className="text-[16px] font-bold text-slate-900">Mark as Won</h2>
           <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full
                                                text-slate-400 hover:text-slate-700 hover:bg-white/70 transition-all">
             <X className="w-4 h-4" />
@@ -922,20 +948,20 @@ function WonModal({ leadId, onClose, onSuccess }: { leadId: string; onClose: () 
           <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
             Win Reason <span className="text-rose-500">*</span>
           </label>
-          <select
-            className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-[14px] bg-white/80
-                       focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+          <ThemedSelect
             value={reason}
-            onChange={(e) => setReason(e.target.value)}
-          >
-            <option value="">Select reason…</option>
-            <option value="PRICE_MATCH">Price Match</option>
-            <option value="PRODUCT_FIT">Product Fit</option>
-            <option value="RELATIONSHIP">Relationship</option>
-            <option value="COMPETITOR_LOST">Competitor Lost</option>
-            <option value="URGENCY">Urgency</option>
-            <option value="OTHER">Other</option>
-          </select>
+            onValueChange={setReason}
+            options={[
+              { value: "PRICE_MATCH", label: "Price Match" },
+              { value: "PRODUCT_FIT", label: "Product Fit" },
+              { value: "RELATIONSHIP", label: "Relationship" },
+              { value: "COMPETITOR_LOST", label: "Competitor Lost" },
+              { value: "URGENCY", label: "Urgency" },
+              { value: "OTHER", label: "Other" },
+            ]}
+            placeholder="Select reason…"
+            aria-label="Win reason"
+          />
         </div>
         <div className="flex gap-2 pt-1">
           <button
@@ -958,6 +984,7 @@ function WonModal({ leadId, onClose, onSuccess }: { leadId: string; onClose: () 
         </div>
       </div>
     </div>
+    </ModalPortal>
   )
 }
 
@@ -981,11 +1008,12 @@ function LostModal({ leadId, onClose, onSuccess }: { leadId: string; onClose: ()
   }
 
   return (
-    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
+    <ModalPortal>
+    <div className="fixed inset-0 bg-slate-900/55 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
       <div className="rounded-2xl glass-3 gloss-edge p-6 w-full max-w-sm space-y-4
                       shadow-[0_24px_48px_rgba(15,23,42,0.18)]">
         <div className="flex items-center justify-between">
-          <h2 className="text-[17px] font-bold text-slate-900">Mark as Lost</h2>
+          <h2 className="text-[16px] font-bold text-slate-900">Mark as Lost</h2>
           <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full
                                                text-slate-400 hover:text-slate-700 hover:bg-white/70 transition-all">
             <X className="w-4 h-4" />
@@ -995,21 +1023,21 @@ function LostModal({ leadId, onClose, onSuccess }: { leadId: string; onClose: ()
           <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
             Loss Reason <span className="text-rose-500">*</span>
           </label>
-          <select
-            className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-[14px] bg-white/80
-                       focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+          <ThemedSelect
             value={reason}
-            onChange={(e) => setReason(e.target.value)}
-          >
-            <option value="">Select reason…</option>
-            <option value="PRICE_TOO_HIGH">Price Too High</option>
-            <option value="WENT_TO_COMPETITOR">Went to Competitor</option>
-            <option value="NO_BUDGET">No Budget</option>
-            <option value="NO_REQUIREMENT">No Requirement</option>
-            <option value="NO_RESPONSE">No Response</option>
-            <option value="TIMING">Wrong Timing</option>
-            <option value="OTHER">Other</option>
-          </select>
+            onValueChange={setReason}
+            options={[
+              { value: "PRICE_TOO_HIGH", label: "Price Too High" },
+              { value: "WENT_TO_COMPETITOR", label: "Went to Competitor" },
+              { value: "NO_BUDGET", label: "No Budget" },
+              { value: "NO_REQUIREMENT", label: "No Requirement" },
+              { value: "NO_RESPONSE", label: "No Response" },
+              { value: "TIMING", label: "Wrong Timing" },
+              { value: "OTHER", label: "Other" },
+            ]}
+            placeholder="Select reason…"
+            aria-label="Loss reason"
+          />
         </div>
         <div className="flex gap-2 pt-1">
           <button
@@ -1032,5 +1060,6 @@ function LostModal({ leadId, onClose, onSuccess }: { leadId: string; onClose: ()
         </div>
       </div>
     </div>
+    </ModalPortal>
   )
 }

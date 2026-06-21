@@ -12,12 +12,16 @@ import {
   BarChart2,
   AlertTriangle,
   Trophy,
+  Activity,
   Bell,
+  Upload,
   LogOut,
   Menu,
   X,
+  Layers,
   type LucideIcon,
 } from "lucide-react"
+import { ThemedSelect } from "@/components/shared/ThemedSelect"
 import { useQuery } from "@tanstack/react-query"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { LeadkaunMark } from "@/components/shared/LeadkaunMark"
@@ -32,16 +36,49 @@ type NavItem = {
   roles: UserRole[]
 }
 
-const NAV_ITEMS: NavItem[] = [
-  { href: "/queue",         label: "Priority Queue", icon: Zap,             roles: ["ADMIN","MANAGER","REP"] },
-  { href: "/dashboard",     label: "Dashboard",      icon: LayoutDashboard, roles: ["ADMIN","MANAGER","REP"] },
-  { href: "/leads",         label: "All Leads",      icon: Users,           roles: ["ADMIN","MANAGER","REP"] },
-  { href: "/pipeline",      label: "Pipeline",       icon: Columns2,        roles: ["ADMIN","MANAGER","REP"] },
-  { href: "/follow-ups",    label: "Follow-ups",     icon: CalendarCheck,   roles: ["ADMIN","MANAGER","REP"] },
-  { href: "/analytics",     label: "Analytics",      icon: BarChart2,       roles: ["ADMIN","MANAGER"]       },
-  { href: "/rep-tracking",  label: "Rep Tracking",   icon: Trophy,          roles: ["ADMIN","MANAGER"]       },
-  { href: "/missed",        label: "Missed Opps",    icon: AlertTriangle,   roles: ["ADMIN","MANAGER"]       },
-  { href: "/notifications", label: "Notifications",  icon: Bell,            roles: ["ADMIN","MANAGER","REP"] },
+type NavGroup = {
+  /** Section header. `null` = utility group, rendered without a label. */
+  label: string | null
+  items: NavItem[]
+}
+
+// Ordered by the actual selling workflow, not by feature inventory:
+//   Execute (the daily driver) → Leads (the data) → Insights (oversight).
+// Login lands on /queue, so the Priority Queue is the home and leads the list.
+// Headers auto-hide when a role can't see any item in the group (e.g. a Rep
+// sees only "All Leads" under Leads, only "Dashboard" under Insights).
+const NAV_GROUPS: NavGroup[] = [
+  {
+    label: "Execute",
+    items: [
+      { href: "/queue",      label: "Priority Queue", icon: Zap,           roles: ["ADMIN","MANAGER","REP"] },
+      { href: "/follow-ups", label: "Follow-ups",     icon: CalendarCheck, roles: ["ADMIN","MANAGER","REP"] },
+      { href: "/pipeline",   label: "Pipeline",       icon: Columns2,      roles: ["ADMIN","MANAGER","REP"] },
+    ],
+  },
+  {
+    label: "Leads",
+    items: [
+      { href: "/leads",        label: "All Leads",    icon: Users,  roles: ["ADMIN","MANAGER","REP"] },
+      { href: "/leads/import", label: "Import Leads", icon: Upload, roles: ["ADMIN","MANAGER"]       },
+    ],
+  },
+  {
+    label: "Insights",
+    items: [
+      { href: "/dashboard",    label: "Dashboard",    icon: LayoutDashboard, roles: ["ADMIN","MANAGER","REP"] },
+      { href: "/activity",     label: "Activity",     icon: Activity,        roles: ["ADMIN","MANAGER","REP"] },
+      { href: "/analytics",    label: "Analytics",    icon: BarChart2,       roles: ["ADMIN","MANAGER"]       },
+      { href: "/rep-tracking", label: "Rep Tracking", icon: Trophy,          roles: ["ADMIN","MANAGER"]       },
+      { href: "/missed",       label: "Missed Opps",  icon: AlertTriangle,   roles: ["ADMIN","MANAGER"]       },
+    ],
+  },
+  {
+    label: null,
+    items: [
+      { href: "/notifications", label: "Notifications", icon: Bell, roles: ["ADMIN","MANAGER","REP"] },
+    ],
+  },
 ]
 
 const ROLE_LABEL: Record<UserRole, string> = {
@@ -101,7 +138,12 @@ export function DashboardShell({
   const missedCount = useMissedCount(isManager)
   const notifCount  = useNotifCount()
 
-  const mainNav = NAV_ITEMS.filter((i) => i.roles.includes(user.role))
+  // Filter each group's items by role, drop now-empty groups, and keep a flat
+  // list for active-state resolution + the mobile top-bar title.
+  const visibleGroups = NAV_GROUPS
+    .map((g) => ({ ...g, items: g.items.filter((i) => i.roles.includes(user.role)) }))
+    .filter((g) => g.items.length > 0)
+  const mainNav = visibleGroups.flatMap((g) => g.items)
 
   const initials = [user.firstName, user.lastName]
     .filter(Boolean)
@@ -116,8 +158,30 @@ export function DashboardShell({
     router.refresh()
   }
 
+  const [switching, setSwitching] = useState(false)
+  async function switchWorkspace(id: string) {
+    if (!id || id === session.workspace?.id || switching) return
+    setSwitching(true)
+    try {
+      await fetch("/api/workspaces/switch", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspace_id: id }),
+      })
+      router.refresh()
+    } finally {
+      setSwitching(false)
+    }
+  }
+
   function NavLink({ item }: { item: NavItem }) {
-    const isActive   = pathname === item.href || pathname.startsWith(item.href + "/")
+    const matches    = pathname === item.href || pathname.startsWith(item.href + "/")
+    // Defer to a more specific nav item that also matches (e.g. /leads/import
+    // should light up "Import Leads", not its parent "All Leads").
+    const isActive   = matches && !mainNav.some(
+      (o) => o.href.length > item.href.length &&
+        (pathname === o.href || pathname.startsWith(o.href + "/")),
+    )
     const Icon       = item.icon
     const showMissed = item.href === "/missed"        && missedCount > 0
     const showNotif  = item.href === "/notifications" && notifCount  > 0
@@ -197,13 +261,53 @@ export function DashboardShell({
           style={{ borderBottom: "1px solid var(--hairline)" }}
         >
           <LeadkaunMark size={26} gloss className="transition-transform group-hover:scale-[1.06]" />
-          <span className="text-[15px] font-semibold text-ink tracking-[-0.025em] leading-none">
+          <span className="text-[16px] font-semibold text-ink tracking-[-0.025em] leading-none">
             Leadkaun
           </span>
         </Link>
 
-        <nav className="flex-1 px-2 pt-3 pb-2 space-y-1 overflow-y-auto" onClick={onItemClick}>
-          {mainNav.map((item) => <NavLink key={item.href} item={item} />)}
+        {/* Workspace switcher — the active lead-intelligence environment */}
+        {session.workspace && (
+          <div className="px-3 py-2.5 border-b border-hairline">
+            <p className="text-[9px] font-semibold text-ink-faint uppercase tracking-[0.12em] mb-1.5 px-1">Workspace</p>
+            {session.workspaces.length > 1 ? (
+              <ThemedSelect
+                value={session.workspace.id}
+                onValueChange={switchWorkspace}
+                options={session.workspaces.map((w) => ({ value: w.id, label: w.name }))}
+                leadingIcon={<Layers className="w-3.5 h-3.5 text-sky-500 shrink-0" />}
+                disabled={switching}
+                aria-label="Switch workspace"
+              />
+            ) : (
+              <div className="flex items-center gap-2 px-3 h-9 rounded-lg bg-white border border-hairline-strong">
+                <Layers className="w-3.5 h-3.5 text-sky-500 shrink-0" />
+                <span className="text-[13px] font-medium text-ink truncate">{session.workspace.name}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        <nav className="flex-1 px-2 pt-3 pb-2 overflow-y-auto" onClick={onItemClick}>
+          {visibleGroups.map((group, gi) => (
+            <div
+              key={group.label ?? "utility"}
+              className={
+                gi === 0 ? ""
+                  : group.label ? "mt-4"
+                  : "mt-3 pt-3 border-t border-hairline"   // utility group — set apart
+              }
+            >
+              {group.label && (
+                <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-faint select-none">
+                  {group.label}
+                </p>
+              )}
+              <div className="space-y-0.5">
+                {group.items.map((item) => <NavLink key={item.href} item={item} />)}
+              </div>
+            </div>
+          ))}
         </nav>
 
         <div className="px-3 py-3" style={{ borderTop: "1px solid var(--hairline)" }}>
@@ -219,7 +323,7 @@ export function DashboardShell({
                 <span className="text-[11px] font-bold text-sky-700">{initials}</span>
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[12.5px] font-semibold text-ink truncate leading-tight group-hover:text-sky-600 transition-colors">
+                <p className="text-[12px] font-semibold text-ink truncate leading-tight group-hover:text-sky-600 transition-colors">
                   {user.firstName} {user.lastName}
                 </p>
                 <p className="text-[10px] text-ink-muted truncate leading-tight mt-0.5 font-mono uppercase tracking-[0.10em]">

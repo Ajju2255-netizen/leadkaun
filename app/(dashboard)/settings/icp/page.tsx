@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Lightbulb, Trophy, ChevronDown, ChevronUp, Sparkles, Target, Save } from "lucide-react"
-import { NativeSelect } from "@/components/shared/NativeSelect"
+import { ThemedSelect } from "@/components/shared/ThemedSelect"
 
 // ── Options ───────────────────────────────────────────────────────────────────
 
@@ -435,7 +435,7 @@ export default function IcpPage() {
         </div>
         <div>
           <div className="flex items-baseline gap-2">
-            <h1 className="text-[26px] font-extrabold text-slate-900 tracking-tight leading-tight">Best Customers</h1>
+            <h1 className="text-[28px] font-bold text-ink tracking-[-0.02em] leading-tight">Best Customers</h1>
             <span className="text-[13px] text-slate-400 font-normal">ICP Settings</span>
           </div>
           <p className="text-[13px] text-slate-500 mt-0.5 leading-relaxed max-w-xl">
@@ -542,16 +542,14 @@ export default function IcpPage() {
         </Section>
 
         <Section title="Typical Sales Cycle" desc="Used to calibrate intent decay speed">
-          <NativeSelect
+          <ThemedSelect
             value={salesCycle}
-            onChange={(e) => setSalesCycle(e.target.value)}
-            wrapperClassName="w-60"
-          >
-            <option value="">Select…</option>
-            {SALES_CYCLE_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </NativeSelect>
+            onValueChange={setSalesCycle}
+            options={SALES_CYCLE_OPTIONS}
+            placeholder="Select…"
+            className="w-60"
+            aria-label="Typical sales cycle"
+          />
         </Section>
 
         {/* SQL Thresholds */}
@@ -613,7 +611,7 @@ export default function IcpPage() {
           <button
             type="submit"
             disabled={saving}
-            className="flex items-center gap-2 h-11 px-6 rounded-full bg-sky-600 hover:bg-sky-700
+            className="flex items-center gap-2 h-11 px-6 rounded-full bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)]
                        text-white text-[14px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed
                        active:scale-[0.97] transition-all
                        shadow-[0_2px_8px_rgba(14, 165, 233,0.3),inset_0_1px_0_rgba(255,255,255,0.12)]"

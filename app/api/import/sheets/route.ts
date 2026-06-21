@@ -1,8 +1,9 @@
 import { z } from "zod"
 import { prisma } from "@/lib/prisma"
-import { requireRole } from "@/lib/auth/middleware"
+import { requireWorkspace } from "@/lib/auth/middleware"
 import { handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError, parseBody } from "@/lib/api/response"
+import { rateLimited, LIMITS } from "@/lib/rate-limit"
 import { encrypt } from "@/lib/crypto"
 
 /**
@@ -39,7 +40,10 @@ function extractSheetId(url: string): string | null {
 // ── POST /api/import/sheets ────────────────────────────────────────────────
 export async function POST(req: Request) {
   try {
-    const session = await requireRole("ADMIN", "MANAGER")
+    const session = await requireWorkspace("ADMIN", "MANAGER")
+
+    const _rl = await rateLimited(`import:sheets:${session.account.id}`, LIMITS.write)
+    if (_rl) return _rl
 
     const { data, error } = await parseBody(req, ConnectSchema)
     if (error) return error
@@ -51,8 +55,8 @@ export async function POST(req: Request) {
 
     // Validate source and stage
     const [source, stage] = await Promise.all([
-      prisma.leadSource.findFirst({ where: { id: data.source_id, account_id: session.account.id } }),
-      prisma.pipelineStage.findFirst({ where: { id: data.stage_id, account_id: session.account.id } }),
+      prisma.leadSource.findFirst({ where: { id: data.source_id, account_id: session.account.id, workspace_id: session.workspace.id } }),
+      prisma.pipelineStage.findFirst({ where: { id: data.stage_id, account_id: session.account.id, workspace_id: session.workspace.id } }),
     ])
     if (!source) return apiError("Lead source not found", "NOT_FOUND", 404)
     if (!stage)  return apiError("Pipeline stage not found", "NOT_FOUND", 404)
@@ -60,7 +64,7 @@ export async function POST(req: Request) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const existing = await (prisma as any).googleSheetsConfig.findFirst({
-        where: { account_id: session.account.id, is_active: true },
+        where: { account_id: session.account.id, workspace_id: session.workspace.id, is_active: true },
       })
 
       if (existing) {
@@ -127,12 +131,12 @@ export async function POST(req: Request) {
 // ── GET /api/import/sheets ─────────────────────────────────────────────────
 export async function GET(_req: Request) {
   try {
-    const session = await requireRole("ADMIN", "MANAGER")
+    const session = await requireWorkspace("ADMIN", "MANAGER")
 
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const config = await (prisma as any).googleSheetsConfig.findFirst({
-        where: { account_id: session.account.id, is_active: true },
+        where: { account_id: session.account.id, workspace_id: session.workspace.id, is_active: true },
         select: {
           id:             true,
           sheet_url:      true,
@@ -159,12 +163,15 @@ export async function GET(_req: Request) {
 // ── DELETE /api/import/sheets ──────────────────────────────────────────────
 export async function DELETE(_req: Request) {
   try {
-    const session = await requireRole("ADMIN", "MANAGER")
+    const session = await requireWorkspace("ADMIN", "MANAGER")
+
+    const _rl = await rateLimited(`import:sheets:${session.account.id}`, LIMITS.write)
+    if (_rl) return _rl
 
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const config = await (prisma as any).googleSheetsConfig.findFirst({
-        where: { account_id: session.account.id, is_active: true },
+        where: { account_id: session.account.id, workspace_id: session.workspace.id, is_active: true },
       })
 
       if (!config) return apiError("No active Google Sheets connection found", "NOT_FOUND", 404)

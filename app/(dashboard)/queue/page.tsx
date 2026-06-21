@@ -7,10 +7,8 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { useQueue } from "@/hooks/useQueue"
 import { useQueueRealtime } from "@/hooks/useQueueRealtime"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
-import { QueueLeadRow } from "@/components/queue/QueueLeadRow"
-import { QueueSidebar } from "@/components/queue/QueueSidebar"
-import { QueueTopFive } from "@/components/queue/QueueTopFive"
-import { CompleteActionsBanner } from "@/components/queue/CompleteActionsBanner"
+import { QueueLeadRow, QUEUE_GRID } from "@/components/queue/QueueLeadRow"
+import { QueueHeroCard } from "@/components/queue/QueueHeroCard"
 import { QueueGradeTabs, type GradeTab } from "@/components/queue/QueueGradeTabs"
 import {
   QueueFilters,
@@ -18,10 +16,12 @@ import {
   type QueueFiltersState,
 } from "@/components/queue/QueueFilters"
 import { LeadSlideOver } from "@/components/shared/LeadSlideOver"
+import { ThemedSelect } from "@/components/shared/ThemedSelect"
 import { BackToTopButton } from "@/components/shared/BackToTopButton"
 import { Skeleton } from "@/components/ui/skeleton"
+import { formatRupee } from "@/lib/format"
 import {
-  CheckCircle2, Users, Search, X, ChevronDown, SlidersHorizontal,
+  CheckCircle2, Users, Search, X, SlidersHorizontal, Rocket,
 } from "lucide-react"
 import type { QueueLead } from "@/hooks/useQueue"
 
@@ -127,6 +127,8 @@ export default function QueuePage() {
 
   const topFive = filteredLeads.slice(0, 5)
   const topFiveIds = useMemo(() => new Set(topFive.map((l) => l.id)), [topFive])
+  const hero    = topFive[0] ?? null      // #1 — gets the hero card
+  const nextUp  = topFive.slice(1)        // #2–5 — ranked rows under the hero
 
   // Lead set shown in the section BELOW the Top-5 hero.
   // On "all" tab → everything except the Top-5 (avoids visible duplication).
@@ -155,26 +157,21 @@ export default function QueuePage() {
 
   return (
     <>
-      {/* xl+: fixed-height layout where only the leads list scrolls.
-          Below xl: normal page scroll so cramped viewports get full height. */}
-      <div className="grid grid-cols-1 xl:grid-cols-[280px_1fr] gap-6 items-start
-                      xl:h-full xl:max-h-full xl:overflow-hidden">
+      {/* One natural page scroll (the shell's main area scrolls) — no nested
+          inner-scroll, which users found confusing. */}
+      <div className="flex flex-col gap-5 min-w-0 pb-10">
 
-        {/* ── LEFT SIDEBAR ──────────────────────────────────────────────── */}
-        <QueueSidebar kpis={kpis} loading={isLoading} />
+        {/* ── HEADER ────────────────────────────────────────────────────── */}
+        <header className="flex items-start gap-3 flex-wrap">
+          <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-white shrink-0
+                          bg-gradient-to-br from-sky-400 to-sky-600
+                          shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_6px_18px_rgba(14,165,233,0.32)]">
+            <Rocket className="w-5 h-5" />
+          </div>
 
-        {/* ── MAIN COLUMN ───────────────────────────────────────────────── */}
-        <div className="flex flex-col gap-4 min-w-0 xl:h-full xl:min-h-0 xl:overflow-hidden">
-
-          {/* Toolbar */}
-          <div className="flex items-center gap-3 flex-wrap">
-            <p className="text-[12px] text-ink-muted flex items-center gap-2">
-              {isLoading ? "Loading…" : (
-                <>
-                  <span className="font-bold text-slate-700 tabular-nums">{totalLeads}</span> active leads
-                  {kpis ? <> · <span className="font-bold text-sky-700 tabular-nums">{kpis.high_priority_count}</span> high priority</> : null}
-                </>
-              )}
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h1 className="text-[28px] font-bold text-ink tracking-[-0.02em] leading-tight">Priority Queue</h1>
               <span
                 title={
                   realtimeStatus === "live"
@@ -200,9 +197,29 @@ export default function QueuePage() {
                 />
                 {realtimeStatus === "live" ? "Live" : realtimeStatus === "connecting" ? "Live…" : "Polling"}
               </span>
+            </div>
+            <p className="text-[12px] text-ink-muted mt-1">
+              {isLoading ? "Loading your queue…" : (
+                <>
+                  <span className="font-bold text-slate-700 tabular-nums">{totalLeads}</span> to call
+                  {kpis ? (
+                    <>
+                      <span className="text-slate-300"> · </span>
+                      <span className="font-bold text-sky-700 tabular-nums">{kpis.high_priority_count}</span> high-priority
+                      {kpis.est_revenue_potential > 0 && (
+                        <>
+                          <span className="text-slate-300"> · </span>
+                          <span className="font-bold text-emerald-700 tabular-nums">{formatRupee(kpis.est_revenue_potential)}</span> in play
+                        </>
+                      )}
+                    </>
+                  ) : null}
+                </>
+              )}
             </p>
+          </div>
 
-            <div className="flex items-center gap-2 ml-auto">
+          <div className="flex items-center gap-2 ml-auto flex-wrap">
               {/* Search */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none z-10" />
@@ -221,34 +238,26 @@ export default function QueuePage() {
 
               {/* Rep filter — managers only */}
               {isManager && teamData && teamData.members.length > 0 && (
-                <div className="relative">
-                  <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none z-10" />
-                  <select value={repFilter ?? ""} onChange={(e) => setRepFilter(e.target.value || undefined)}
-                    className="h-9 pl-9 pr-8 rounded-full glass-1 border border-white/70 text-[12px] font-semibold
-                               text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500/30
-                               focus:border-sky-400 appearance-none cursor-pointer transition-all">
-                    <option value="">All reps</option>
-                    {teamData.members.map((m) => (
-                      <option key={m.id} value={m.id}>{m.first_name} {m.last_name ?? ""}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none z-10" />
-                </div>
+                <ThemedSelect
+                  variant="pill"
+                  leadingIcon={<Users className="w-3.5 h-3.5 text-slate-400 shrink-0" />}
+                  value={repFilter ?? "all"}
+                  onValueChange={(v) => setRepFilter(v === "all" ? undefined : v)}
+                  options={[{ value: "all", label: "All reps" }, ...teamData.members.map((m) => ({ value: m.id, label: `${m.first_name} ${m.last_name ?? ""}`.trim() }))]}
+                  className="max-w-[160px]"
+                  aria-label="Filter by rep"
+                />
               )}
 
               {/* All Sources dropdown — wired to /api/lead-sources */}
-              <div className="relative">
-                <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}
-                  className="h-9 pl-3 pr-8 rounded-full glass-1 border border-white/70 text-[12px] font-semibold
-                             text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500/30
-                             focus:border-sky-400 appearance-none cursor-pointer transition-all max-w-[160px]">
-                  <option value="all">All Sources</option>
-                  {sourcesData?.sources.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none z-10" />
-              </div>
+              <ThemedSelect
+                variant="pill"
+                value={sourceFilter}
+                onValueChange={setSourceFilter}
+                options={[{ value: "all", label: "All Sources" }, ...(sourcesData?.sources ?? []).map((s) => ({ value: s.id, label: s.name }))]}
+                className="max-w-[160px]"
+                aria-label="Filter by source"
+              />
 
               {/* Filters button + popover */}
               <div className="relative">
@@ -277,7 +286,7 @@ export default function QueuePage() {
                 />
               </div>
             </div>
-          </div>
+        </header>
 
           {/* Error */}
           {error && (
@@ -326,42 +335,56 @@ export default function QueuePage() {
             </div>
           )}
 
-          {/* Top-5 ranked hero — ALWAYS visible, anchors the page across tabs */}
-          {!isLoading && topFive.length > 0 && (
-            <QueueTopFive leads={topFive} onLeadClick={setOpenLeadId} />
+          {/* Hero — the #1 lead, always the focus across grade tabs */}
+          {!isLoading && hero && (
+            <QueueHeroCard lead={hero} onOpen={setOpenLeadId} />
           )}
 
-          {/* CTA banner — also always visible */}
-          {!isLoading && kpis && kpis.top_three_potential_revenue > 0 && (
-            <CompleteActionsBanner topThreeRevenue={kpis.top_three_potential_revenue} />
-          )}
+          {/* The rest of the queue — one continuous list on the natural page
+              scroll. Grade filter sits just above it. */}
+          {!isLoading && totalLeads > 0 && (
+            <section className="flex flex-col gap-3">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-ink-muted">
+                  {gradeTab === "all" ? "The rest of your queue" : `Grade ${gradeTab} leads`}
+                </p>
+                {totalLeads > 5 && (
+                  <QueueGradeTabs active={gradeTab} onChange={setGradeTab} counts={counts} />
+                )}
+              </div>
 
-          {/* Grade tabs */}
-          {!isLoading && totalLeads > 5 && (
-            <QueueGradeTabs active={gradeTab} onChange={setGradeTab} counts={counts} />
-          )}
+              <div className="flex flex-col gap-2">
+                {/* Column header — labels the aligned columns below */}
+                <div className={`${QUEUE_GRID} px-3 pb-0.5`} aria-hidden>
+                  <span /><span />
+                  <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-300">Lead</span>
+                  <span className="hidden sm:block text-right text-[10px] font-bold uppercase tracking-[0.1em] text-slate-300">Value</span>
+                  <span className="justify-self-end text-[10px] font-bold uppercase tracking-[0.1em] text-slate-300">Next</span>
+                </div>
 
-          {/* Scrollable list area — only this scrolls on xl+ */}
-          {!isLoading && (belowList.length > 0 || gradeTab !== "all") && (
-            <div
-              data-queue-scroll
-              className="xl:flex-1 xl:min-h-0 xl:overflow-y-auto -mx-1 px-1 pb-3"
-            >
-              {belowList.length > 0 ? (
-                <div className="space-y-2">
-                  {belowList.map((lead) => (
+                {gradeTab === "all" ? (
+                  // #2…N in rank order: the top-5 tail (ranked) then everyone else.
+                  <>
+                    {nextUp.map((lead, i) => (
+                      <QueueLeadRow key={lead.id} lead={lead} rank={i + 2} onClick={setOpenLeadId} />
+                    ))}
+                    {belowList.map((lead) => (
+                      <QueueLeadRow key={lead.id} lead={lead} onClick={setOpenLeadId} />
+                    ))}
+                  </>
+                ) : belowList.length > 0 ? (
+                  belowList.map((lead) => (
                     <QueueLeadRow key={lead.id} lead={lead} onClick={setOpenLeadId} />
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-2xl glass-1 px-5 py-8 text-center text-[13px] text-ink-muted">
-                  No Grade {gradeTab} leads right now.
-                </div>
-              )}
-            </div>
+                  ))
+                ) : (
+                  <div className="rounded-2xl glass-1 px-5 py-8 text-center text-[13px] text-ink-muted">
+                    No Grade {gradeTab} leads right now.
+                  </div>
+                )}
+              </div>
+            </section>
           )}
 
-        </div>
       </div>
 
       {/* Slide-over drawer */}

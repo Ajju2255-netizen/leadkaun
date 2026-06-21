@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
-import { requireAuth, handleAuthError } from "@/lib/auth/middleware"
+import { requireWorkspace, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
+import { rateLimited, LIMITS } from "@/lib/rate-limit"
 
 /**
  * POST /api/notifications/read-all
@@ -8,11 +9,14 @@ import { apiSuccess, apiError } from "@/lib/api/response"
  */
 export async function POST(_req: Request) {
   try {
-    const session = await requireAuth()
+    const session = await requireWorkspace()
+
+    const _rl = await rateLimited(`notif:${session.user.id}`, LIMITS.write)
+    if (_rl) return _rl
 
     const result = await prisma.notification.updateMany({
       where: {
-        account_id: session.account.id,
+        account_id: session.account.id, workspace_id: session.workspace.id,
         OR: [
           { user_id: null },
           { user_id: session.user.id },

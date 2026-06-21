@@ -60,7 +60,7 @@ export function RankRibbon({ rank, grade, className }: RankRibbonProps) {
       aria-label={`Rank ${rank}`}
     >
       {decorated && <Crown className="w-3.5 h-3.5 mb-0.5 opacity-90" />}
-      <span className={cn("tabular-nums", decorated ? "text-[15px]" : "text-[13px]")}>{rank}</span>
+      <span className={cn("tabular-nums", decorated ? "text-[16px]" : "text-[13px]")}>{rank}</span>
     </div>
   )
 }

@@ -19,6 +19,7 @@ export async function scheduleFollowUp(
   lead: {
     id:              string
     account_id:      string
+    workspace_id:    string | null
     assigned_rep_id: string | null
     won_at:          Date | null
     lost_at:         Date | null
@@ -46,6 +47,7 @@ export async function scheduleFollowUp(
   await tx.followUpAction.create({
     data: {
       account_id:      lead.account_id,
+      workspace_id:    lead.workspace_id,
       lead_id:         lead.id,
       assigned_rep_id: lead.assigned_rep_id,
       day_number:      1,

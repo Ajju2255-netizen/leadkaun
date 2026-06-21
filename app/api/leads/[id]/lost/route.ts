@@ -1,7 +1,8 @@
 import { z } from "zod"
 import { prisma } from "@/lib/prisma"
-import { requireAuth, handleAuthError } from "@/lib/auth/middleware"
+import { requireWorkspace, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError, parseBody, NOT_FOUND } from "@/lib/api/response"
+import { rateLimited, LIMITS } from "@/lib/rate-limit"
 
 type Params = { params: { id: string } }
 
@@ -25,14 +26,17 @@ const LostSchema = z.object({
  */
 export async function POST(req: Request, { params }: Params) {
   try {
-    const session = await requireAuth()
+    const session = await requireWorkspace()
+
+    const _rl = await rateLimited(`lead-action:${session.user.id}`, LIMITS.write)
+    if (_rl) return _rl
     const { data, error } = await parseBody(req, LostSchema)
     if (error) return error
 
     const lead = await prisma.lead.findFirst({
       where: {
         id:         params.id,
-        account_id: session.account.id,
+        account_id: session.account.id, workspace_id: session.workspace.id,
         ...(session.user.role === "REP"
           ? { assigned_rep_id: session.user.id }
           : {}),
@@ -43,7 +47,7 @@ export async function POST(req: Request, { params }: Params) {
     if (lead.lost_at) return apiError("Lead is already marked as lost", "ALREADY_LOST", 409)
 
     const lostStage = await prisma.pipelineStage.findFirst({
-      where: { account_id: session.account.id, is_lost: true },
+      where: { account_id: session.account.id, workspace_id: session.workspace.id, is_lost: true },
     })
     if (!lostStage) return apiError("No Lost stage configured", "NO_LOST_STAGE", 422)
 

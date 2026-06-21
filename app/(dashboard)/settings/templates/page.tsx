@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Skeleton } from "@/components/ui/skeleton"
+import { ModalPortal } from "@/components/shared/ModalPortal"
 import { FileText, Phone, MessageSquare, Plus, X, Eye, Pencil, Trash2, Zap } from "lucide-react"
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -81,9 +82,11 @@ const TYPE_CONFIG: Record<string, { label: string; icon: React.ReactNode; bg: st
 
 function Overlay({ children }: { children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-[2px]">
-      {children}
-    </div>
+    <ModalPortal>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/55 backdrop-blur-sm">
+        {children}
+      </div>
+    </ModalPortal>
   )
 }
 
@@ -272,7 +275,7 @@ function EditModal({
           <button
             onClick={handleSave}
             disabled={saving || !name.trim() || !body.trim()}
-            className="h-9 px-5 rounded-full bg-sky-600 hover:bg-sky-700 text-white text-[13px] font-semibold
+            className="h-9 px-5 rounded-full bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)] text-white text-[13px] font-semibold
                        disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.97] transition-all
                        shadow-[0_1px_2px_rgba(14, 165, 233,0.25),inset_0_1px_0_rgba(255,255,255,0.12)]"
           >
@@ -295,7 +298,7 @@ function PreviewModal({ template, onClose }: { template: Template; onClose: () =
               {cfg.icon}
             </div>
             <div>
-              <h2 className="text-[15px] font-bold text-slate-900">{template.name}</h2>
+              <h2 className="text-[16px] font-bold text-slate-900">{template.name}</h2>
               <p className="text-[11px] text-slate-400">{cfg.label} · {template.usage_count} uses</p>
             </div>
           </div>
@@ -332,7 +335,7 @@ function PreviewModal({ template, onClose }: { template: Template; onClose: () =
         <div className="px-6 py-4 border-t border-slate-100 flex justify-end">
           <button
             onClick={onClose}
-            className="h-9 px-5 rounded-full bg-sky-600 hover:bg-sky-700 text-white text-[13px] font-semibold transition-all"
+            className="h-9 px-5 rounded-full bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)] text-white text-[13px] font-semibold transition-all"
           >
             Done
           </button>
@@ -457,7 +460,7 @@ function TemplateCard({
         </button>
         <button
           onClick={() => onEdit(template)}
-          className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-full bg-sky-600 hover:bg-sky-700
+          className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-full bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)]
                      text-white text-[12px] font-semibold transition-all
                      shadow-[0_1px_2px_rgba(14, 165, 233,0.25),inset_0_1px_0_rgba(255,255,255,0.12)]"
         >
@@ -509,7 +512,7 @@ export default function TemplatesPage() {
             <MessageSquare className="w-6 h-6 text-white" strokeWidth={2.4} />
           </div>
           <div>
-            <h1 className="text-[26px] font-extrabold text-slate-900 tracking-tight leading-tight">Smart Templates</h1>
+            <h1 className="text-[28px] font-bold text-ink tracking-[-0.02em] leading-tight">Smart Templates</h1>
             <p className="text-[13px] text-slate-500 mt-0.5">
               {allTemplates.length} / 20 templates used.
             </p>
@@ -518,7 +521,7 @@ export default function TemplatesPage() {
         <button
           onClick={() => setEditTarget("create")}
           disabled={atLimit}
-          className="flex items-center gap-1.5 h-9 px-4 rounded-full bg-sky-600 hover:bg-sky-700 text-white
+          className="flex items-center gap-1.5 h-9 px-4 rounded-full bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)] text-white
                      text-[13px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed
                      active:scale-[0.97] transition-all
                      shadow-[0_1px_2px_rgba(14, 165, 233,0.25),inset_0_1px_0_rgba(255,255,255,0.12)]"
@@ -563,13 +566,13 @@ export default function TemplatesPage() {
           <div className="w-12 h-12 rounded-xl bg-sky-50 flex items-center justify-center mx-auto mb-4">
             <FileText className="w-6 h-6 text-sky-600" />
           </div>
-          <p className="text-[15px] font-semibold text-slate-900">No templates yet</p>
+          <p className="text-[16px] font-semibold text-slate-900">No templates yet</p>
           <p className="text-[12px] text-slate-400 mt-1.5 max-w-[200px] mx-auto leading-relaxed">
             Create reusable WhatsApp messages and call scripts.
           </p>
           <button
             onClick={() => setEditTarget("create")}
-            className="mt-4 h-9 px-4 rounded-full bg-sky-600 hover:bg-sky-700 text-white text-[13px] font-semibold transition-all"
+            className="mt-4 h-9 px-4 rounded-full bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)] text-white text-[13px] font-semibold transition-all"
           >
             Create first template
           </button>

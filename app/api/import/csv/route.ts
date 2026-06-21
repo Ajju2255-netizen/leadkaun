@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma"
-import { requireAuth } from "@/lib/auth/middleware"
+import { requireWorkspace } from "@/lib/auth/middleware"
 import { handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
+import { rateLimited, LIMITS } from "@/lib/rate-limit"
 import { mapHeader } from "@/lib/import/column-map"
 import { validateRow } from "@/lib/import/validate-row"
 import { generateImportSignals } from "@/lib/import/generate-signals"
@@ -37,11 +38,14 @@ const MAX_STORED_ERRORS = 100
  */
 export async function POST(req: Request) {
   try {
-    const session = await requireAuth()
+    const session = await requireWorkspace()
 
     if (session.user.role === "REP") {
       return apiError("Only Admins and Managers can import leads", "FORBIDDEN", 403)
     }
+
+    const limited = await rateLimited(`import:oneshot:${session.account.id}`, LIMITS.importOneShot)
+    if (limited) return limited
 
     const formData = await req.formData()
     const file     = formData.get("file") as File | null
@@ -66,8 +70,8 @@ export async function POST(req: Request) {
 
     // Validate source and stage belong to this account
     const [source, stage] = await Promise.all([
-      prisma.leadSource.findFirst({ where: { id: sourceId, account_id: session.account.id } }),
-      prisma.pipelineStage.findFirst({ where: { id: stageId, account_id: session.account.id } }),
+      prisma.leadSource.findFirst({ where: { id: sourceId, account_id: session.account.id, workspace_id: session.workspace.id } }),
+      prisma.pipelineStage.findFirst({ where: { id: stageId, account_id: session.account.id, workspace_id: session.workspace.id } }),
     ])
 
     if (!source) return apiError("Lead source not found", "NOT_FOUND", 404)
@@ -156,8 +160,8 @@ export async function POST(req: Request) {
 
         // ── Duplicate check ───────────────────────────────────────────────
         try {
-          const exists = await prisma.lead.findUnique({
-            where: { account_id_phone: { account_id: session.account.id, phone: vr.phone } },
+          const exists = await prisma.lead.findFirst({
+            where: { workspace_id: session.workspace.id, phone: vr.phone },
           })
           if (exists) {
             duplicates++
@@ -256,26 +260,11 @@ export async function POST(req: Request) {
       })
     }
 
-    // ── Regrade any stale E leads in this account (catches pre-fix imports) ──
-    //    Routes through the same orchestrator as everything else so grades are
-    //    computed identically (audit B2 — single source of truth).
-    try {
-      const staleLeads = await prisma.lead.findMany({
-        where: { account_id: session.account.id, grade: "E", is_junk: false },
-        select: { id: true },
-      })
-      for (const stale of staleLeads) {
-        try {
-          await prisma.$transaction((tx) =>
-            processSignalAndUpdateScores(stale.id, session.account.id, tx),
-          )
-        } catch (e) {
-          console.warn(`[import] Regrade failed for ${stale.id}:`, String(e))
-        }
-      }
-    } catch (regradeErr) {
-      console.warn("[import] Regrade sweep failed:", String(regradeErr))
-    }
+    // NOTE: previously this ran an account-wide re-grade sweep of every Grade-E
+    // lead on every import. That was redundant — imported leads are already
+    // scored by the orchestrator during insert (above) — and O(all-E-leads),
+    // which made imports slow down as the account grew. Removed: stale pre-fix
+    // leads are re-graded on their next signal or by the icp-regrade job.
 
     // ── Mark complete ────────────────────────────────────────────────────────
     await prisma.importJobStatus.update({

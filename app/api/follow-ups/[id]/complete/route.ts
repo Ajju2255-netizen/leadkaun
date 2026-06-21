@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma"
-import { requireAuth } from "@/lib/auth/middleware"
+import { requireWorkspace } from "@/lib/auth/middleware"
 import { handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
+import { rateLimited, LIMITS } from "@/lib/rate-limit"
 
 /**
  * POST /api/follow-ups/[id]/complete
@@ -14,11 +15,14 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await requireAuth()
+    const session = await requireWorkspace()
+
+    const _rl = await rateLimited(`lead-action:${session.user.id}`, LIMITS.write)
+    if (_rl) return _rl
     const { id }  = await params
 
     const action = await prisma.followUpAction.findFirst({
-      where: { id, account_id: session.account.id },
+      where: { id, account_id: session.account.id, workspace_id: session.workspace.id },
     })
     if (!action) return apiError("Follow-up action not found", "NOT_FOUND", 404)
 

@@ -1,10 +1,12 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import Papa from "papaparse"
+import { mapHeader } from "@/lib/import/column-map"
 import {
   Download, FileSpreadsheet, FileType2, UserPlus, Lock,
   CloudUpload, Cog, ShieldCheck, Users, CheckCircle2,
@@ -13,6 +15,7 @@ import {
 } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { EmptyState } from "@/components/shared/EmptyState"
+import { ThemedSelect } from "@/components/shared/ThemedSelect"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -46,6 +49,29 @@ interface ImportJob {
 }
 
 type Stage = "idle" | "uploading" | "parsing" | "scoring" | "deduplicating" | "complete"
+
+// ── Constants ────────────────────────────────────────────────────────────────
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB — matches the UI promise
+
+// A minimal, copy-paste-able template covering the required (name, phone) and
+// the most useful optional columns. Headers match the import column map.
+const SAMPLE_CSV =
+  "name,phone,email,company,city,budget,interest_level,inquiry\n" +
+  "Rohan Sharma,98765 43210,rohan@example.com,Acme Realty,Bangalore,25L,High,Looking for 3BHK in Whitefield\n" +
+  "Priya Nair,+91 99887 76655,priya@example.com,,Mumbai,1.2Cr,Medium,Requested a callback next week\n"
+
+function downloadSampleCsv() {
+  const blob = new Blob([SAMPLE_CSV], { type: "text/csv;charset=utf-8;" })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement("a")
+  a.href = url
+  a.download = "leadkaun-import-template.csv"
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -121,7 +147,7 @@ function PipelineSteps({ current }: { current: Stage }) {
                 <span className="absolute inset-0 rounded-full ring-4 ring-sky-200/60 animate-pulse" />
               )}
             </div>
-            <p className={`mt-2.5 text-[12.5px] font-semibold ${done ? "text-emerald-700" : active ? "text-sky-700" : "text-ink-muted"}`}>
+            <p className={`mt-2.5 text-[12px] font-semibold ${done ? "text-emerald-700" : active ? "text-sky-700" : "text-ink-muted"}`}>
               {step.label}
             </p>
           </div>
@@ -142,7 +168,7 @@ function ImportFromCard({
 }) {
   return (
     <div className="glass-2 gloss-edge rounded-2xl p-6">
-      <h2 className="text-[15px] font-semibold text-ink mb-4">Import From</h2>
+      <h2 className="text-[16px] font-semibold text-ink mb-4">Import From</h2>
       <div className="space-y-2.5">
 
         {/* CSV File — active */}
@@ -164,8 +190,8 @@ function ImportFromCard({
             <FileType2 className="w-5 h-5 text-emerald-700" strokeWidth={2} />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[13.5px] font-semibold text-ink leading-tight">CSV File</p>
-            <p className="text-[11.5px] text-ink-muted mt-0.5">Upload — max 10 MB</p>
+            <p className="text-[13px] font-semibold text-ink leading-tight">CSV File</p>
+            <p className="text-[11px] text-ink-muted mt-0.5">Upload — max 10 MB</p>
           </div>
           <span className="text-[11px] font-semibold text-emerald-600 shrink-0">Click ↑</span>
         </button>
@@ -182,8 +208,8 @@ function ImportFromCard({
             <FileSpreadsheet className="w-5 h-5 text-sky-700" strokeWidth={2} />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[13.5px] font-semibold text-ink leading-tight">Google Sheets</p>
-            <p className="text-[11.5px] text-ink-muted mt-0.5">Live sync from any sheet</p>
+            <p className="text-[13px] font-semibold text-ink leading-tight">Google Sheets</p>
+            <p className="text-[11px] text-ink-muted mt-0.5">Live sync from any sheet</p>
           </div>
           <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 shrink-0">
             <Lock className="w-2.5 h-2.5" /> Soon
@@ -202,13 +228,29 @@ function ImportFromCard({
             <UserPlus className="w-5 h-5 text-violet-700" strokeWidth={2} />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[13.5px] font-semibold text-ink leading-tight">Manual Entry</p>
-            <p className="text-[11.5px] text-ink-muted mt-0.5">Add a single lead by hand</p>
+            <p className="text-[13px] font-semibold text-ink leading-tight">Manual Entry</p>
+            <p className="text-[11px] text-ink-muted mt-0.5">Add a single lead by hand</p>
           </div>
           <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 shrink-0">
             <Lock className="w-2.5 h-2.5" /> Soon
           </span>
         </div>
+      </div>
+
+      {/* New to this? grab the template + see what's recognised */}
+      <div className="mt-4 pt-4 border-t border-hairline space-y-2.5">
+        <button
+          type="button"
+          onClick={downloadSampleCsv}
+          className="w-full inline-flex items-center justify-center gap-1.5 h-9 rounded-lg border border-sky-200 bg-sky-50/60 text-[12px] font-semibold text-sky-700 hover:bg-sky-50 transition-colors"
+        >
+          <Download className="w-3.5 h-3.5" /> Download sample template
+        </button>
+        <p className="text-[11px] text-ink-muted leading-relaxed">
+          <span className="font-semibold text-ink-soft">Required:</span> name, phone.{" "}
+          <span className="font-semibold text-ink-soft">Optional:</span> email, company, city, budget, interest level, notes.
+          Column names are matched automatically — “Mobile No”, “Full Name”, etc. all work.
+        </p>
       </div>
     </div>
   )
@@ -241,14 +283,14 @@ function UploadForm({
           <CloudUpload className="w-8 h-8 text-ink-muted" strokeWidth={1.6} />
         </div>
         <p className="text-[14px] font-semibold text-ink">Ready when you are</p>
-        <p className="text-[12.5px] text-ink-muted mt-1">
+        <p className="text-[12px] text-ink-muted mt-1">
           Pick a source + stage, then click <span className="font-semibold text-emerald-700">CSV File</span> on the left to upload.
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="space-y-1.5">
-          <label className="text-[10.5px] font-semibold text-ink-soft uppercase tracking-[0.08em] block">Batch Name</label>
+          <label className="text-[10px] font-semibold text-ink-soft uppercase tracking-[0.08em] block">Batch Name</label>
           <input
             type="text"
             value={sessionName}
@@ -259,28 +301,26 @@ function UploadForm({
           />
         </div>
         <div className="space-y-1.5">
-          <label className="text-[10.5px] font-semibold text-ink-soft uppercase tracking-[0.08em] block">Lead Source</label>
-          <select
+          <label className="text-[10px] font-semibold text-ink-soft uppercase tracking-[0.08em] block">Lead Source</label>
+          <ThemedSelect
             value={sourceId}
-            onChange={(e) => setSourceId(e.target.value)}
+            onValueChange={setSourceId}
+            options={sources.map((s) => ({ value: s.id, label: s.name }))}
+            placeholder={metaError ? "Couldn't load" : sources.length ? "Select source" : "Loading…"}
             disabled={!sources.length || uploading}
-            className={inputCls + " cursor-pointer"}
-          >
-            {sources.length === 0 && <option value="">{metaError ? "Couldn't load" : "Loading…"}</option>}
-            {sources.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
+            aria-label="Lead source"
+          />
         </div>
         <div className="space-y-1.5">
-          <label className="text-[10.5px] font-semibold text-ink-soft uppercase tracking-[0.08em] block">Initial Stage</label>
-          <select
+          <label className="text-[10px] font-semibold text-ink-soft uppercase tracking-[0.08em] block">Initial Stage</label>
+          <ThemedSelect
             value={stageId}
-            onChange={(e) => setStageId(e.target.value)}
+            onValueChange={setStageId}
+            options={stages.map((s) => ({ value: s.id, label: s.name }))}
+            placeholder={metaError ? "Couldn't load" : stages.length ? "Select stage" : "Loading…"}
             disabled={!stages.length || uploading}
-            className={inputCls + " cursor-pointer"}
-          >
-            {stages.length === 0 && <option value="">{metaError ? "Couldn't load" : "Loading…"}</option>}
-            {stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
+            aria-label="Initial stage"
+          />
         </div>
       </div>
 
@@ -290,7 +330,7 @@ function UploadForm({
           <button
             onClick={onRetryMeta}
             disabled={uploading}
-            className="h-7 px-3 rounded-full bg-sky-600 hover:bg-sky-700 text-white text-[12px] font-semibold transition-all active:scale-[0.97] disabled:opacity-50"
+            className="h-7 px-3 rounded-full bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)] text-white text-[12px] font-semibold transition-all active:scale-[0.97] disabled:opacity-50"
           >
             Retry
           </button>
@@ -326,7 +366,7 @@ function LiveProgress({ stage, progress, fileName }: { stage: Stage; progress: n
           }}
         />
       </div>
-      <div className="flex items-center justify-between text-[11.5px] text-ink-muted">
+      <div className="flex items-center justify-between text-[11px] text-ink-muted">
         <span className="truncate pr-2">{fileName || "Processing…"}</span>
         <span className="shrink-0">Hold tight — we finish in seconds.</span>
       </div>
@@ -352,8 +392,8 @@ function SummaryTile({
       >
         <span style={{ color: iconColor }}>{icon}</span>
       </div>
-      <p className="text-[11.5px] text-ink-muted font-medium">{label}</p>
-      <p className="text-[22px] font-bold text-ink tabular-nums mt-1 leading-none">{value}</p>
+      <p className="text-[11px] text-ink-muted font-medium">{label}</p>
+      <p className="text-[24px] font-bold text-ink tabular-nums mt-1 leading-none">{value}</p>
     </div>
   )
 }
@@ -361,7 +401,7 @@ function SummaryTile({
 function IngestionSummary({ job, isLoading }: { job: ImportJob | null; isLoading: boolean }) {
   return (
     <div className="glass-2 gloss-edge rounded-2xl p-6">
-      <h2 className="text-[15px] font-semibold text-ink mb-5">Ingestion Summary</h2>
+      <h2 className="text-[16px] font-semibold text-ink mb-5">Ingestion Summary</h2>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         <SummaryTile
           label="Total Rows"
@@ -427,6 +467,7 @@ function StatusBadge({ status }: { status: ImportJob["status"] }) {
 
 export default function ImportPage() {
   const router            = useRouter()
+  const queryClient       = useQueryClient()
   const { data: currentUser } = useCurrentUser()
   const isManager         = currentUser?.user.role === "ADMIN" || currentUser?.user.role === "MANAGER"
 
@@ -442,7 +483,7 @@ export default function ImportPage() {
   const [progress,  setProgress]  = useState<number | null>(null)
   const [fileName,  setFileName]  = useState<string>("")
   const [result,    setResult]    = useState<{
-    jobId: string
+    jobId: string; aborted: boolean
     inserted: number; duplicates: number; errors: number
     high_intent_count: number; total_value: number; total_rows: number | null
     errorDetail: ErrorDetail | null
@@ -496,59 +537,137 @@ export default function ImportPage() {
     if (!file) return
     e.target.value = ""
 
+    // ── Guard the file before we touch it ────────────────────────────────────
+    const isCsv = file.name.toLowerCase().endsWith(".csv") ||
+      file.type === "text/csv" || file.type === "application/vnd.ms-excel"
+    if (!isCsv) {
+      toast.error("Please upload a .csv file. Export your sheet as CSV first (Excel/Google Sheets → File → Download → CSV).")
+      return
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error(`That file is ${(file.size / 1024 / 1024).toFixed(1)} MB — the limit is 10 MB. Split it into smaller files and import each.`)
+      return
+    }
+    if (file.size === 0) {
+      toast.error("That file is empty.")
+      return
+    }
+
     setFileName(file.name)
     setUploading(true)
     setProgress(0)
     setResult(null)
 
-    const ticker = setInterval(() => {
-      setProgress((p) => (p !== null && p < 90 ? p + 3 : p))
-    }, 400)
+    // Imported leads must surface everywhere without a manual page refresh.
+    const refreshLeadCaches = () => {
+      for (const key of [
+        ["queue"], ["leads"], ["leads-stats"], ["leads-sample"],
+        ["missed-opportunities"], ["missed-count"],
+        ["pipeline"], ["pipeline-summary"],
+        ["dashboard"], ["dashboard-pulse"],
+        ["follow-ups"], ["follow-ups-engine"],
+        ["analytics-intelligence"], ["rep-tracking"],
+        ["notifications"], ["notif-count"],
+      ]) {
+        queryClient.invalidateQueries({ queryKey: key })
+      }
+    }
 
     try {
-      const form = new FormData()
-      form.append("file",      file)
-      form.append("source_id", sourceId)
-      form.append("stage_id",  stageId)
-      if (sessionName.trim()) form.append("name", sessionName.trim())
-
-      const res = await fetch("/api/import/csv", { method: "POST", body: form, credentials: "include" })
-      clearInterval(ticker)
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        toast.error(err.error ?? "Upload failed. Please check your CSV and try again.")
-        setProgress(null); setUploading(false)
-        return
+      // ── Parse client-side (encoding-aware) so the upload streams in small
+      //    batches — each request is short, so it never blocks or times out. ──
+      const buf     = await file.arrayBuffer()
+      const utf8    = new TextDecoder("utf-8").decode(buf)
+      const csvText = utf8.includes("�") ? new TextDecoder("windows-1252").decode(buf) : utf8
+      const parsed  = Papa.parse<Record<string, string>>(csvText, {
+        header: true, skipEmptyLines: true, transformHeader: mapHeader,
+      })
+      const rows = parsed.data
+      if (rows.length === 0) {
+        toast.error("CSV file is empty or has no valid rows.")
+        setProgress(null); setUploading(false); return
       }
 
-      const { jobId } = await res.json()
-      const statusRes = await fetch(`/api/import/status/${jobId}`, { credentials: "include" })
-      const job: ImportJob = statusRes.ok ? await statusRes.json() : null
+      // ── Start the job ────────────────────────────────────────────────────
+      const initRes = await fetch("/api/import/csv/init", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source_id:  sourceId,
+          stage_id:   stageId,
+          name:       sessionName.trim() || undefined,
+          total_rows: rows.length,
+          file_name:  file.name,
+        }),
+      })
+      if (!initRes.ok) {
+        const err = await initRes.json().catch(() => ({}))
+        toast.error(err.error ?? "Could not start import. Check your CSV and try again.")
+        setProgress(null); setUploading(false); return
+      }
+      const { jobId } = await initRes.json()
+
+      // ── Stream rows in small batches with real progress ──────────────────
+      const BATCH = 10
+      let inserted = 0, duplicates = 0, errors = 0, highIntent = 0, totalValue = 0
+      const errorReasons: string[] = []
+      let aborted = false
+
+      for (let i = 0; i < rows.length; i += BATCH) {
+        const batch = rows.slice(i, i + BATCH)
+        const bRes  = await fetch("/api/import/csv/batch", {
+          method: "POST", credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jobId, source_id: sourceId, stage_id: stageId,
+            rows: batch, startRowIndex: i + 2,   // +2: 1-based + header row
+          }),
+        })
+        if (!bRes.ok) { aborted = true; break }
+        const r = await bRes.json()
+        inserted   += r.inserted        ?? 0
+        duplicates += r.duplicates      ?? 0
+        errors     += r.errors          ?? 0
+        highIntent += r.highIntentCount ?? 0
+        totalValue += r.totalValue      ?? 0
+        if (Array.isArray(r.errorReasons)) {
+          for (const reason of r.errorReasons) if (errorReasons.length < 100) errorReasons.push(reason)
+        }
+        setProgress(Math.min(99, Math.round(((i + batch.length) / rows.length) * 100)))
+      }
+
+      // ── Finalise ──────────────────────────────────────────────────────────
+      await fetch("/api/import/csv/complete", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId, errorReasons, totalErrors: errors, aborted }),
+      }).catch(() => {})
 
       setProgress(100)
+      setResult({
+        jobId, aborted,
+        inserted, duplicates, errors,
+        high_intent_count: highIntent,
+        total_value:       totalValue,
+        total_rows:        rows.length,
+        errorDetail: errorReasons.length > 0
+          ? { total_errors: errors, shown: errorReasons.length, truncated: errors > errorReasons.length, rows: errorReasons }
+          : null,
+      })
 
-      if (job) {
-        setResult({
-          jobId:             jobId,
-          inserted:          job.inserted,
-          duplicates:        job.duplicates,
-          errors:            job.errors,
-          high_intent_count: job.high_intent_count ?? 0,
-          total_value:       job.total_value ?? 0,
-          total_rows:        job.total_rows ?? null,
-          errorDetail:       job.error_detail ?? null,
-        })
-        if (job.inserted > 0) {
-          toast.success(`Import complete — ${job.inserted} lead${job.inserted === 1 ? "" : "s"} added`)
-        } else {
-          toast.info(`Import complete — 0 new leads (${job.duplicates} duplicates)`)
-        }
+      if (aborted) {
+        toast.warning(`Import stopped early — ${inserted} added before an error. Please retry the remaining rows.`)
+      } else if (inserted > 0) {
+        toast.success(`Import complete — ${inserted} lead${inserted === 1 ? "" : "s"} added`)
+      } else {
+        toast.info(`Import complete — 0 new leads (${duplicates} duplicate${duplicates === 1 ? "" : "s"})`)
       }
+
+      refreshLeadCaches()
       setRefreshKey((k) => k + 1)
-    } catch {
-      clearInterval(ticker)
-      toast.error("Unexpected error. Please try again.")
+    } catch (err) {
+      console.error("CSV import failed:", err)
+      toast.error("Unexpected error during import. Please try again.")
       setProgress(null)
     } finally {
       setUploading(false)
@@ -572,7 +691,7 @@ export default function ImportPage() {
   // Coerce result OR lastJob into the ImportJob shape that IngestionSummary needs
   const summaryJob: ImportJob | null = result
     ? {
-        id: result.jobId, status: "COMPLETE", name: null, file_name: fileName,
+        id: result.jobId, status: result.aborted ? "FAILED" : "COMPLETE", name: null, file_name: fileName,
         source_name: null, total_rows: result.total_rows, inserted: result.inserted,
         duplicates: result.duplicates, errors: result.errors, progress_pct: 100,
         high_intent_count: result.high_intent_count, total_value: result.total_value,
@@ -605,7 +724,7 @@ export default function ImportPage() {
           <Download className="w-6 h-6 text-sky-700" strokeWidth={2.2} />
         </div>
         <div>
-          <h1 className="text-[32px] md:text-[36px] font-bold text-ink tracking-[-0.025em] leading-[1.05]">Lead Ingestion</h1>
+          <h1 className="text-[28px] font-bold text-ink tracking-[-0.02em] leading-tight">Lead Ingestion</h1>
           <p className="text-[14px] text-ink-soft mt-2 leading-relaxed max-w-[560px]">
             Import from CSV, Google Sheets, or add manually. Indian phone normalisation + dedup built in.
           </p>
@@ -618,8 +737,10 @@ export default function ImportPage() {
         <ImportFromCard uploading={uploading} onCsvClick={handleCsvClick} />
 
         <div className="lg:col-span-2 glass-2 gloss-edge rounded-2xl p-6">
-          <h2 className="text-[15px] font-semibold text-ink mb-5">
-            {stage === "idle" ? "Get started" : stage === "complete" ? "Ingestion complete" : "Ingestion in Progress"}
+          <h2 className="text-[16px] font-semibold text-ink mb-5">
+            {stage === "idle" ? "Get started"
+              : stage === "complete" ? (result?.aborted ? "Import stopped early" : "Ingestion complete")
+              : "Ingestion in Progress"}
           </h2>
 
           {/* Pipeline steps — always visible */}
@@ -638,13 +759,24 @@ export default function ImportPage() {
             ) : stage === "complete" && result ? (
               <div className="rounded-xl bg-white/60 border border-hairline p-5">
                 <div className="flex items-center justify-between mb-3">
-                  <p className="text-[14px] font-semibold text-emerald-700">Done!</p>
-                  <span className="text-[14px] font-bold text-emerald-600 tabular-nums">100%</span>
+                  <p className={`text-[14px] font-semibold ${result.aborted ? "text-amber-700" : "text-emerald-700"}`}>
+                    {result.aborted ? "Stopped early" : "Done!"}
+                  </p>
+                  <span className={`text-[14px] font-bold tabular-nums ${result.aborted ? "text-amber-600" : "text-emerald-600"}`}>
+                    {result.total_rows ? Math.round(((result.inserted + result.duplicates + result.errors) / result.total_rows) * 100) : 100}%
+                  </span>
                 </div>
                 <div className="h-2.5 w-full rounded-full bg-slate-100 overflow-hidden">
-                  <div className="h-full rounded-full" style={{ width: "100%", background: "linear-gradient(90deg, #6EE7B7 0%, #10B981 100%)" }} />
+                  <div className="h-full rounded-full" style={{
+                    width: result.aborted && result.total_rows
+                      ? `${Math.round(((result.inserted + result.duplicates + result.errors) / result.total_rows) * 100)}%`
+                      : "100%",
+                    background: result.aborted
+                      ? "linear-gradient(90deg, #FCD34D 0%, #F59E0B 100%)"
+                      : "linear-gradient(90deg, #6EE7B7 0%, #10B981 100%)",
+                  }} />
                 </div>
-                <p className="text-[11.5px] text-ink-muted mt-2 truncate">{fileName || "Your import"}</p>
+                <p className="text-[11px] text-ink-muted mt-2 truncate">{fileName || "Your import"}</p>
               </div>
             ) : (
               <LiveProgress stage={stage} progress={progress} fileName={fileName} />
@@ -656,8 +788,30 @@ export default function ImportPage() {
       {/* ── Ingestion Summary (5-tile) ───────────────────────────────────── */}
       {showSummary && <IngestionSummary job={summaryJob} isLoading={false} />}
 
+      {/* ── Stopped-early callout (a batch failed mid-stream) ─────────────── */}
+      {result?.aborted && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 flex items-center gap-3">
+          <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" strokeWidth={2.2} />
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] font-semibold text-ink">Import stopped early</p>
+            <p className="text-[12px] text-ink-soft mt-0.5">
+              {result.inserted} lead{result.inserted === 1 ? "" : "s"} added before a connection error.
+              Re-upload the same file to finish — already-added leads are skipped as duplicates, so nothing is double-imported.
+            </p>
+          </div>
+          {result.inserted > 0 && (
+            <Link
+              href={`/leads?batch=${result.jobId}`}
+              className="h-9 px-3.5 rounded-xl text-[12px] font-semibold text-amber-800 border border-amber-300 bg-white/70 hover:bg-amber-100 transition-colors shrink-0 whitespace-nowrap"
+            >
+              View added
+            </Link>
+          )}
+        </div>
+      )}
+
       {/* ── Success callout (post-import) ─────────────────────────────────── */}
-      {result && result.inserted > 0 && (
+      {result && !result.aborted && result.inserted > 0 && (
         <div className="glass-2 gloss-edge rounded-2xl p-5 flex items-center gap-4">
           <div
             className="w-12 h-12 rounded-full flex items-center justify-center shrink-0"
@@ -669,7 +823,7 @@ export default function ImportPage() {
             <CheckCircle2 className="w-6 h-6 text-white" strokeWidth={2.5} />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[15px] font-semibold text-ink">Ingestion completed successfully!</p>
+            <p className="text-[16px] font-semibold text-ink">Ingestion completed successfully!</p>
             <p className="text-[13px] text-ink-soft mt-0.5">Leads are now live in your Priority Queue.</p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -694,11 +848,11 @@ export default function ImportPage() {
       )}
 
       {/* ── No-new-leads callout (when result.inserted == 0) ──────────────── */}
-      {result && result.inserted === 0 && (
+      {result && !result.aborted && result.inserted === 0 && (
         <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 flex items-center gap-3">
           <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" strokeWidth={2.2} />
           <div className="flex-1 min-w-0">
-            <p className="text-[13.5px] font-semibold text-ink">No new leads added</p>
+            <p className="text-[13px] font-semibold text-ink">No new leads added</p>
             <p className="text-[12px] text-ink-soft mt-0.5">
               {result.duplicates > 0 && `${result.duplicates} duplicates skipped. `}
               {result.errors     > 0 && `${result.errors} rows had errors.`}
@@ -726,7 +880,7 @@ export default function ImportPage() {
 
       {/* ── Import History ───────────────────────────────────────────────── */}
       <div className="glass-2 gloss-edge rounded-2xl p-6">
-        <h2 className="text-[15px] font-semibold text-ink mb-4">Import History</h2>
+        <h2 className="text-[16px] font-semibold text-ink mb-4">Import History</h2>
         {historyLoading ? (
           <div className="space-y-2">
             {[1,2,3].map((i) => <Skeleton key={i} className="h-12 w-full rounded-lg" />)}
@@ -738,13 +892,13 @@ export default function ImportPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-hairline">
-                  <th className="text-left  py-2 pr-4 text-[10.5px] font-semibold text-ink-muted uppercase tracking-[0.08em]">Batch</th>
-                  <th className="text-left  py-2 pr-4 text-[10.5px] font-semibold text-ink-muted uppercase tracking-[0.08em]">Date</th>
-                  <th className="text-left  py-2 pr-4 text-[10.5px] font-semibold text-ink-muted uppercase tracking-[0.08em]">Status</th>
-                  <th className="text-right py-2 pr-4 text-[10.5px] font-semibold text-ink-muted uppercase tracking-[0.08em]">Added</th>
-                  <th className="text-right py-2 pr-4 text-[10.5px] font-semibold text-ink-muted uppercase tracking-[0.08em]">Hot</th>
-                  <th className="text-right py-2 pr-4 text-[10.5px] font-semibold text-ink-muted uppercase tracking-[0.08em]">Value</th>
-                  <th className="text-right py-2     text-[10.5px] font-semibold text-ink-muted uppercase tracking-[0.08em]">Dupes</th>
+                  <th className="text-left  py-2 pr-4 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.08em]">Batch</th>
+                  <th className="text-left  py-2 pr-4 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.08em]">Date</th>
+                  <th className="text-left  py-2 pr-4 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.08em]">Status</th>
+                  <th className="text-right py-2 pr-4 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.08em]">Added</th>
+                  <th className="text-right py-2 pr-4 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.08em]">Hot</th>
+                  <th className="text-right py-2 pr-4 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.08em]">Value</th>
+                  <th className="text-right py-2     text-[10px] font-semibold text-ink-muted uppercase tracking-[0.08em]">Dupes</th>
                 </tr>
               </thead>
               <tbody>

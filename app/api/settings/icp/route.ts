@@ -4,6 +4,7 @@ import { inngest } from "@/inngest/client"
 import { requireAuth, requireRole } from "@/lib/auth/middleware"
 import { handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError, parseBody } from "@/lib/api/response"
+import { rateLimited, LIMITS } from "@/lib/rate-limit"
 
 // NOTE: per-account `weight_overrides` (signal-weight tuning) is deferred — it
 // was never wired into the scoring engine and has no UI. The Account column
@@ -66,6 +67,9 @@ export async function GET(_req: Request) {
 export async function PUT(req: Request) {
   try {
     const session = await requireRole("ADMIN")
+
+    const _rl = await rateLimited(`settings:icp:${session.account.id}`, LIMITS.write)
+    if (_rl) return _rl
 
     const { data, error } = await parseBody(req, IcpSchema)
     if (error) return error

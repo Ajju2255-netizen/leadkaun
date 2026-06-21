@@ -2,6 +2,7 @@ import { z } from "zod"
 import { prisma } from "@/lib/prisma"
 import { requireAuth, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError, parseBody } from "@/lib/api/response"
+import { rateLimited, LIMITS } from "@/lib/rate-limit"
 
 const UpdateSchema = z.object({
   first_name: z.string().min(1).max(80),
@@ -15,6 +16,9 @@ const UpdateSchema = z.object({
 export async function PATCH(req: Request) {
   try {
     const session = await requireAuth()
+
+    const _rl = await rateLimited(`profile:${session.user.id}`, LIMITS.write)
+    if (_rl) return _rl
     const { data, error } = await parseBody(req, UpdateSchema)
     if (error) return error
 

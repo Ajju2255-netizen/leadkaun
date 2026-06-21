@@ -147,14 +147,14 @@ enum SignalType {
   SOURCE_BASELINE
   RE_INQUIRY
   // Import inference signals — generated from CSV field data at import time
-  IMPORT_HIGH_INTENT       // interest_level = High    (+40)
-  IMPORT_MEDIUM_INTENT     // interest_level = Medium  (+20)
-  IMPORT_LOW_INTENT        // interest_level = Low     (+5)
-  IMPORT_RECENT_CONTACT    // last_contact_days 0–1    (+30)
-  IMPORT_WARM_CONTACT      // last_contact_days 2–3    (+15)
-  IMPORT_STALE_CONTACT     // last_contact_days > 5    (-20)
-  IMPORT_ACTIVE_INTEREST   // notes: demo/call/callback (+30)
-  IMPORT_NEGATIVE_SIGNAL   // notes: not interested / no response (-25)
+  IMPORT_HIGH_INTENT // interest_level = High    (+40)
+  IMPORT_MEDIUM_INTENT // interest_level = Medium  (+20)
+  IMPORT_LOW_INTENT // interest_level = Low     (+5)
+  IMPORT_RECENT_CONTACT // last_contact_days 0–1    (+30)
+  IMPORT_WARM_CONTACT // last_contact_days 2–3    (+15)
+  IMPORT_STALE_CONTACT // last_contact_days > 5    (-20)
+  IMPORT_ACTIVE_INTEREST // notes: demo/call/callback (+30)
+  IMPORT_NEGATIVE_SIGNAL // notes: not interested / no response (-25)
   // Behavioural signals
   INQUIRY_EVENING_WEEKEND
 
@@ -169,12 +169,12 @@ enum SignalType {
 }
 
 enum NotifType {
-  AT_RISK         // lead approaching missed threshold
-  FOLLOW_UP_DUE   // follow-up action went overdue
-  MISSED          // lead was marked missed
-  RECOVERY        // missed lead with recovery potential
-  EXEC_SCORE_LOW  // rep's daily execution score < 25% at 3pm IST
-  REP_SCORE_DROP  // rep's 5-component rep score dropped 10+ pts WoW (future use)
+  AT_RISK // lead approaching missed threshold
+  FOLLOW_UP_DUE // follow-up action went overdue
+  MISSED // lead was marked missed
+  RECOVERY // missed lead with recovery potential
+  EXEC_SCORE_LOW // rep's daily execution score < 25% at 3pm IST
+  REP_SCORE_DROP // rep's 5-component rep score dropped 10+ pts WoW (future use)
 }
 
 // ─────────────────────────────────────────────
@@ -218,8 +218,60 @@ model Account {
   custom_fields     CustomField[]
   follow_up_configs FollowUpConfig[]
   notifications     Notification[]
+  workspaces        Workspace[]
 
   @@map("accounts")
+}
+
+// A Workspace is a self-contained lead-intelligence environment within an
+// account (flat — never nested). Each owns its own leads, pipeline, sources,
+// templates, follow-up configs, custom fields, team membership and analytics.
+// ICP/SQL scoring stays at the account level (one shared scoring brain).
+model Workspace {
+  id          String    @id @default(cuid())
+  account_id  String
+  name        String
+  slug        String
+  description String?
+  color       String?
+  is_default  Boolean   @default(false)
+  archived_at DateTime?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+
+  account Account           @relation(fields: [account_id], references: [id])
+  members WorkspaceMember[]
+
+  @@unique([account_id, slug])
+  @@index([account_id])
+  @@map("workspaces")
+}
+
+// Pure assignment of a User to a Workspace. The user's ACCOUNT role
+// (ADMIN/MANAGER/REP) governs what they can do inside any workspace.
+model WorkspaceMember {
+  id           String   @id @default(cuid())
+  workspace_id String
+  user_id      String
+  created_at   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([workspace_id, user_id])
+  @@index([user_id])
+  @@map("workspace_members")
+}
+
+// Fixed-window API rate limiter (DB-backed so it works across serverless
+// instances). One row per (limiter key); the count resets when the window
+// elapses. See lib/rate-limit.ts.
+model RateLimit {
+  key          String   @id
+  count        Int      @default(0)
+  window_start DateTime @default(now())
+
+  @@map("rate_limits")
 }
 
 model User {
@@ -237,11 +289,12 @@ model User {
   created_at DateTime  @default(now())
   updated_at DateTime  @updatedAt
 
-  account          Account          @relation(fields: [account_id], references: [id])
-  assigned_leads   Lead[]           @relation("AssignedRep")
-  signals          Signal[]
-  notes            LeadNote[]
-  win_attributions WinAttribution[]
+  account           Account           @relation(fields: [account_id], references: [id])
+  assigned_leads    Lead[]            @relation("AssignedRep")
+  signals           Signal[]
+  notes             LeadNote[]
+  win_attributions  WinAttribution[]
+  workspace_members WorkspaceMember[]
 
   @@unique([account_id, email])
   @@index([account_id])
@@ -251,13 +304,14 @@ model User {
 model Lead {
   id              String  @id @default(cuid())
   account_id      String
+  workspace_id    String?
   assigned_rep_id String?
 
   // Identity
   first_name   String
   last_name    String?
-  phone        String  // Stored as +91XXXXXXXXXX
-  phone_raw    String  // Original value before normalisation
+  phone        String // Stored as +91XXXXXXXXXX
+  phone_raw    String // Original value before normalisation
   email        String?
   company_name String?
   designation  String?
@@ -270,7 +324,7 @@ model Lead {
   import_job_id  String?
   imported_at    DateTime @default(now())
   inquiry_text   String?
-  expected_value Int?     // INR
+  expected_value Int? // INR
 
   // Three-dimensional scores (0–100)
   fit_score     Int       @default(0)
@@ -280,7 +334,7 @@ model Lead {
 
   // Score metadata
   fit_score_breakdown     Json?
-  intent_score_baseline   Int       @default(0)
+  intent_score_baseline   Int        @default(0)
   quality_score_breakdown Json?
   grade_changed_at        DateTime?
   previous_grade          LeadGrade?
@@ -297,7 +351,7 @@ model Lead {
   // Pipeline
   stage_id         String
   stage_entered_at DateTime @default(now())
-  stage_reason     String?  // why the stage last changed (auto-set by system)
+  stage_reason     String? // why the stage last changed (auto-set by system)
 
   // Flags
   is_junk               Boolean  @default(false)
@@ -307,9 +361,9 @@ model Lead {
   is_duplicate          Boolean  @default(false)
 
   // Missed opportunity tracking
-  last_action_at  DateTime?            // when rep last called or messaged
-  is_missed       Boolean  @default(false)
-  missed_at       DateTime?            // when Inngest marked it missed
+  last_action_at DateTime? // when rep last called or messaged
+  is_missed      Boolean   @default(false)
+  missed_at      DateTime? // when Inngest marked it missed
 
   // WhatsApp conversation tracking
   wa_conversation_stage WaStage @default(INQUIRY)
@@ -343,19 +397,21 @@ model Lead {
 
   @@unique([account_id, phone])
   @@index([account_id])
-  @@index([account_id, assigned_rep_id])
-  @@index([account_id, stage_id])
-  @@index([account_id, is_sql])
-  @@index([account_id, imported_at])
-  @@index([account_id, is_junk])
+  @@index([workspace_id])
+  @@index([workspace_id, assigned_rep_id])
+  @@index([workspace_id, stage_id])
+  @@index([workspace_id, is_sql])
+  @@index([workspace_id, imported_at])
+  @@index([workspace_id, is_junk])
   @@map("leads")
 }
 
 model Signal {
-  id         String     @id @default(cuid())
-  account_id String
-  lead_id    String
-  user_id    String?
+  id           String  @id @default(cuid())
+  account_id   String
+  workspace_id String?
+  lead_id      String
+  user_id      String?
 
   signal_type  SignalType
   signal_value Float
@@ -375,6 +431,7 @@ model Signal {
   @@index([lead_id, created_at])
   @@index([account_id])
   @@index([account_id, created_at])
+  @@index([workspace_id, created_at])
   @@map("signals")
 }
 
@@ -395,6 +452,7 @@ model LeadNote {
 model PipelineStage {
   id            String  @id @default(cuid())
   account_id    String
+  workspace_id  String?
   name          String
   key           String
   display_order Int
@@ -405,18 +463,19 @@ model PipelineStage {
   account Account @relation(fields: [account_id], references: [id])
   leads   Lead[]
 
-  @@unique([account_id, key])
+  @@unique([workspace_id, key])
+  @@index([workspace_id])
   @@map("pipeline_stages")
 }
 
 model StageHistory {
-  id            String    @id @default(cuid())
+  id            String   @id @default(cuid())
   lead_id       String
   from_stage_id String?
   to_stage_id   String
   changed_by    String
   note          String?
-  created_at    DateTime  @default(now())
+  created_at    DateTime @default(now())
 
   lead Lead @relation(fields: [lead_id], references: [id], onDelete: Cascade)
 
@@ -425,20 +484,21 @@ model StageHistory {
 }
 
 model FollowUpAction {
-  id              String         @id @default(cuid())
-  account_id      String
-  lead_id         String
-  assigned_rep_id String
-  day_number      Int
-  action_type     FollowUpType
-  due_date        DateTime
-  status          FollowUpStatus @default(PENDING)
-  completed_at    DateTime?
-  completed_by    String?
-  is_overdue        Boolean        @default(false)
-  escalation_count  Int            @default(0)   // how many times this follow-up has gone overdue
-  show_tip          Boolean        @default(false)
-  tip_text          String?
+  id               String         @id @default(cuid())
+  account_id       String
+  workspace_id     String?
+  lead_id          String
+  assigned_rep_id  String
+  day_number       Int
+  action_type      FollowUpType
+  due_date         DateTime
+  status           FollowUpStatus @default(PENDING)
+  completed_at     DateTime?
+  completed_by     String?
+  is_overdue       Boolean        @default(false)
+  escalation_count Int            @default(0) // how many times this follow-up has gone overdue
+  show_tip         Boolean        @default(false)
+  tip_text         String?
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -447,26 +507,29 @@ model FollowUpAction {
 
   @@index([lead_id])
   @@index([account_id, due_date])
+  @@index([workspace_id, due_date])
   @@index([assigned_rep_id, due_date])
   @@map("follow_up_actions")
 }
 
 model FollowUpConfig {
-  id         String    @id @default(cuid())
-  account_id String
-  grade      LeadGrade
-  schedule   Json
-  updated_at DateTime  @updatedAt
+  id           String    @id @default(cuid())
+  account_id   String
+  workspace_id String?
+  grade        LeadGrade
+  schedule     Json
+  updated_at   DateTime  @updatedAt
 
   account Account @relation(fields: [account_id], references: [id])
 
-  @@unique([account_id, grade])
+  @@unique([workspace_id, grade])
   @@map("follow_up_configs")
 }
 
 model LeadSource {
   id                String  @id @default(cuid())
   account_id        String
+  workspace_id      String?
   name              String
   key               String
   intent_baseline   Int     @default(10)
@@ -476,7 +539,8 @@ model LeadSource {
   account Account @relation(fields: [account_id], references: [id])
   leads   Lead[]
 
-  @@unique([account_id, key])
+  @@unique([workspace_id, key])
+  @@index([workspace_id])
   @@map("lead_sources")
 }
 
@@ -495,41 +559,44 @@ model WinAttribution {
 }
 
 model SmartTemplate {
-  id          String       @id @default(cuid())
-  account_id  String
-  name        String
-  type        TemplateType
-  stages      String[]
-  grades      LeadGrade[]
-  body        String
-  is_active   Boolean      @default(true)
-  usage_count Int          @default(0)
-  created_at  DateTime     @default(now())
-  updated_at  DateTime     @updatedAt
+  id           String       @id @default(cuid())
+  account_id   String
+  workspace_id String?
+  name         String
+  type         TemplateType
+  stages       String[]
+  grades       LeadGrade[]
+  body         String
+  is_active    Boolean      @default(true)
+  usage_count  Int          @default(0)
+  created_at   DateTime     @default(now())
+  updated_at   DateTime     @updatedAt
 
   account Account @relation(fields: [account_id], references: [id])
 
+  @@index([workspace_id])
   @@map("smart_templates")
 }
 
 model ImportJobStatus {
   id           String       @id @default(cuid())
   account_id   String
+  workspace_id String?
   user_id      String
   status       ImportStatus @default(PENDING)
 
   // Session identity
-  name              String?
-  file_name         String?
-  source_id         String?
+  name      String?
+  file_name String?
+  source_id String?
 
-  total_rows        Int      @default(0)
-  inserted          Int      @default(0)
-  duplicates        Int      @default(0)
-  errors            Int      @default(0)
-  progress_pct      Int      @default(0)
-  high_intent_count Int      @default(0)  // leads graded A or B from this import
-  total_value       Int      @default(0)  // sum of expected_value (INR)
+  total_rows        Int @default(0)
+  inserted          Int @default(0)
+  duplicates        Int @default(0)
+  errors            Int @default(0)
+  progress_pct      Int @default(0)
+  high_intent_count Int @default(0) // leads graded A or B from this import
+  total_value       Int @default(0) // sum of expected_value (INR)
 
   error_detail Json?
   created_at   DateTime  @default(now())
@@ -538,12 +605,14 @@ model ImportJobStatus {
   leads Lead[]
 
   @@index([account_id])
+  @@index([workspace_id])
   @@map("import_job_status")
 }
 
 model CustomField {
   id            String    @id @default(cuid())
   account_id    String
+  workspace_id  String?
   label         String
   key           String
   field_type    FieldType
@@ -553,27 +622,29 @@ model CustomField {
 
   account Account @relation(fields: [account_id], references: [id])
 
-  @@unique([account_id, key])
+  @@unique([workspace_id, key])
   @@map("custom_fields")
 }
 
 model Notification {
-  id         String    @id @default(cuid())
-  account_id String
-  user_id    String?   // null = visible to all managers; set = specific rep
-  lead_id    String?
-  type       NotifType
-  title      String
-  message    String
-  priority   String    @default("medium")  // high | medium | low
-  action_url String?
-  is_read    Boolean   @default(false)
-  created_at DateTime  @default(now())
+  id           String    @id @default(cuid())
+  account_id   String
+  workspace_id String?
+  user_id      String? // null = visible to all managers; set = specific rep
+  lead_id      String?
+  type         NotifType
+  title        String
+  message      String
+  priority     String    @default("medium") // high | medium | low
+  action_url   String?
+  is_read      Boolean   @default(false)
+  created_at   DateTime  @default(now())
 
   account Account @relation(fields: [account_id], references: [id])
   lead    Lead?   @relation(fields: [lead_id], references: [id], onDelete: SetNull)
 
   @@index([account_id, is_read, created_at])
+  @@index([workspace_id, is_read, created_at])
   @@index([user_id, is_read])
   @@map("notifications")
 }

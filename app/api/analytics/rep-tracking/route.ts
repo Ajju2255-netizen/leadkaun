@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma"
-import { requireRole, handleAuthError } from "@/lib/auth/middleware"
+import { requireWorkspace, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
 import { computeExecutionScore } from "@/lib/scoring/execution-score"
 import { computeRepScore, type RepScoreComponents } from "@/lib/scoring/rep-score"
@@ -25,8 +25,9 @@ import { startOfIstDay, startOfIstMonth, hourIST } from "@/lib/time/ist"
  */
 export async function GET() {
   try {
-    const session   = await requireRole("ADMIN", "MANAGER")
+    const session   = await requireWorkspace("ADMIN", "MANAGER")
     const accountId = session.account.id
+    const workspaceId = session.workspace.id
 
     const now            = new Date()
     const monthStart     = startOfIstMonth(now)
@@ -37,7 +38,7 @@ export async function GET() {
 
     // Detect this account's "qualified" stage (for conversion rate computation)
     const qualifiedStage = await prisma.pipelineStage.findFirst({
-      where: { account_id: accountId, key: "qualified" },
+      where: { account_id: accountId, workspace_id: workspaceId, key: "qualified" },
       select: { id: true },
     })
     const qualifiedStageId = qualifiedStage?.id ?? null
@@ -61,16 +62,16 @@ export async function GET() {
       fuCompletedLast, fuOverdueLast,
     ] = await Promise.all([
       prisma.lead.aggregate({
-        where: { account_id: accountId, won_at: { gte: monthStart } },
+        where: { account_id: accountId, workspace_id: workspaceId, won_at: { gte: monthStart } },
         _sum:  { won_value: true },
       }),
       prisma.lead.aggregate({
-        where: { account_id: accountId, won_at: { gte: lastMonthStart, lt: lastMonthEnd } },
+        where: { account_id: accountId, workspace_id: workspaceId, won_at: { gte: lastMonthStart, lt: lastMonthEnd } },
         _sum:  { won_value: true },
       }),
       prisma.lead.aggregate({
         where: {
-          account_id: accountId, grade: "A",
+          account_id: accountId, workspace_id: workspaceId, grade: "A",
           first_contact_at: { gte: monthStart, not: null },
           speed_to_lead_hours: { not: null, gt: 0 },
         },
@@ -78,7 +79,7 @@ export async function GET() {
       }),
       prisma.lead.aggregate({
         where: {
-          account_id: accountId, grade: "A",
+          account_id: accountId, workspace_id: workspaceId, grade: "A",
           first_contact_at: { gte: lastMonthStart, lt: lastMonthEnd, not: null },
           speed_to_lead_hours: { not: null, gt: 0 },
         },
@@ -86,25 +87,25 @@ export async function GET() {
       }),
       prisma.followUpAction.count({
         where: {
-          account_id: accountId, status: "COMPLETED",
+          account_id: accountId, workspace_id: workspaceId, status: "COMPLETED",
           completed_at: { gte: monthStart },
         },
       }),
       prisma.followUpAction.count({
         where: {
-          account_id: accountId, status: "OVERDUE",
+          account_id: accountId, workspace_id: workspaceId, status: "OVERDUE",
           due_date: { gte: monthStart },
         },
       }),
       prisma.followUpAction.count({
         where: {
-          account_id: accountId, status: "COMPLETED",
+          account_id: accountId, workspace_id: workspaceId, status: "COMPLETED",
           completed_at: { gte: lastMonthStart, lt: lastMonthEnd },
         },
       }),
       prisma.followUpAction.count({
         where: {
-          account_id: accountId, status: "OVERDUE",
+          account_id: accountId, workspace_id: workspaceId, status: "OVERDUE",
           due_date: { gte: lastMonthStart, lt: lastMonthEnd },
         },
       }),
@@ -135,7 +136,7 @@ export async function GET() {
         ] = await Promise.all([
           prisma.lead.aggregate({
             where: {
-              account_id: accountId,
+              account_id: accountId, workspace_id: workspaceId,
               assigned_rep_id: rep.id,
               won_at: { gte: monthStart },
             },
@@ -143,7 +144,7 @@ export async function GET() {
           }),
           prisma.lead.aggregate({
             where: {
-              account_id: accountId,
+              account_id: accountId, workspace_id: workspaceId,
               assigned_rep_id: rep.id,
               grade: "A",
               first_contact_at: { gte: monthStart, not: null },
@@ -153,31 +154,31 @@ export async function GET() {
           }),
           prisma.followUpAction.count({
             where: {
-              account_id: accountId, assigned_rep_id: rep.id,
+              account_id: accountId, workspace_id: workspaceId, assigned_rep_id: rep.id,
               status: "COMPLETED", completed_at: { gte: monthStart },
             },
           }),
           prisma.followUpAction.count({
             where: {
-              account_id: accountId, assigned_rep_id: rep.id,
+              account_id: accountId, workspace_id: workspaceId, assigned_rep_id: rep.id,
               status: "OVERDUE", due_date: { gte: monthStart },
             },
           }),
-          loadExecScoreInputs(accountId, rep.id, dayStart, hr),
+          loadExecScoreInputs(accountId, workspaceId, rep.id, dayStart, hr),
           prisma.lead.count({
             where: {
-              account_id: accountId, assigned_rep_id: rep.id,
+              account_id: accountId, workspace_id: workspaceId, assigned_rep_id: rep.id,
               won_at: { gte: monthStart },
             },
           }),
-          countQualifiedLeads(accountId, rep.id, monthStart, qualifiedStageId),
+          countQualifiedLeads(accountId, workspaceId, rep.id, monthStart, qualifiedStageId),
           // Missed-recovery: won_value of leads that were once is_missed and
           // were won this month. Uses Lead.won_at + a flag-tracking proxy via
           // notifications of type RECOVERY (or simply: leads with missed_at
           // and won_at in this month).
           prisma.lead.aggregate({
             where: {
-              account_id: accountId, assigned_rep_id: rep.id,
+              account_id: accountId, workspace_id: workspaceId, assigned_rep_id: rep.id,
               missed_at: { not: null },
               won_at:    { gte: monthStart, not: null },
             },
@@ -185,7 +186,7 @@ export async function GET() {
           }),
           prisma.lead.aggregate({
             where: {
-              account_id: accountId, assigned_rep_id: rep.id,
+              account_id: accountId, workspace_id: workspaceId, assigned_rep_id: rep.id,
               missed_at: { gte: monthStart, not: null },
             },
             _sum: { expected_value: true },
@@ -278,6 +279,7 @@ export async function GET() {
 
 async function loadExecScoreInputs(
   accountId: string,
+  workspaceId: string,
   repId: string,
   dayStart: Date,
   hr: number,
@@ -286,13 +288,13 @@ async function loadExecScoreInputs(
     fuDue, fuCompleted, fuOverdue,
     touched, abLeads, abContacted, signals,
   ] = await Promise.all([
-    prisma.followUpAction.count({ where: { account_id: accountId, assigned_rep_id: repId, due_date: { gte: dayStart } } }),
-    prisma.followUpAction.count({ where: { account_id: accountId, assigned_rep_id: repId, status: "COMPLETED", completed_at: { gte: dayStart } } }),
-    prisma.followUpAction.count({ where: { account_id: accountId, assigned_rep_id: repId, status: "OVERDUE" } }),
-    prisma.lead.count({ where: { account_id: accountId, assigned_rep_id: repId, last_action_at: { gte: dayStart } } }),
-    prisma.lead.count({ where: { account_id: accountId, assigned_rep_id: repId, grade: { in: ["A", "B"] }, imported_at: { gte: dayStart } } }),
-    prisma.lead.count({ where: { account_id: accountId, assigned_rep_id: repId, grade: { in: ["A", "B"] }, imported_at: { gte: dayStart }, first_contact_at: { not: null } } }),
-    prisma.signal.count({ where: { user_id: repId, created_at: { gte: dayStart }, lead: { account_id: accountId } } }),
+    prisma.followUpAction.count({ where: { account_id: accountId, workspace_id: workspaceId, assigned_rep_id: repId, due_date: { gte: dayStart } } }),
+    prisma.followUpAction.count({ where: { account_id: accountId, workspace_id: workspaceId, assigned_rep_id: repId, status: "COMPLETED", completed_at: { gte: dayStart } } }),
+    prisma.followUpAction.count({ where: { account_id: accountId, workspace_id: workspaceId, assigned_rep_id: repId, status: "OVERDUE" } }),
+    prisma.lead.count({ where: { account_id: accountId, workspace_id: workspaceId, assigned_rep_id: repId, last_action_at: { gte: dayStart } } }),
+    prisma.lead.count({ where: { account_id: accountId, workspace_id: workspaceId, assigned_rep_id: repId, grade: { in: ["A", "B"] }, imported_at: { gte: dayStart } } }),
+    prisma.lead.count({ where: { account_id: accountId, workspace_id: workspaceId, assigned_rep_id: repId, grade: { in: ["A", "B"] }, imported_at: { gte: dayStart }, first_contact_at: { not: null } } }),
+    prisma.signal.count({ where: { user_id: repId, created_at: { gte: dayStart }, lead: { account_id: accountId, workspace_id: workspaceId } } }),
   ])
   return {
     fu_due_today:        fuDue,
@@ -314,6 +316,7 @@ async function loadExecScoreInputs(
  */
 async function countQualifiedLeads(
   accountId: string,
+  workspaceId: string,
   repId: string,
   monthStart: Date,
   qualifiedStageId: string | null,
@@ -325,7 +328,7 @@ async function countQualifiedLeads(
       where: {
         to_stage_id: qualifiedStageId,
         created_at:  { gte: monthStart },
-        lead:        { account_id: accountId, assigned_rep_id: repId },
+        lead:        { account_id: accountId, workspace_id: workspaceId, assigned_rep_id: repId },
       },
       select: { lead_id: true },
       distinct: ["lead_id"],
@@ -335,7 +338,7 @@ async function countQualifiedLeads(
   // Fallback for accounts without an explicit qualified stage
   return prisma.lead.count({
     where: {
-      account_id: accountId, assigned_rep_id: repId,
+      account_id: accountId, workspace_id: workspaceId, assigned_rep_id: repId,
       is_sql: true,
       // Use imported_at as "qualified-at" proxy when no StageHistory
       imported_at: { gte: monthStart },

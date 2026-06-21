@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma"
-import { requireAuth, handleAuthError } from "@/lib/auth/middleware"
+import { requireWorkspace, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
 import { computeFitScore } from "@/lib/scoring/fit-score"
 import { computeQualityScore } from "@/lib/scoring/quality-score"
@@ -16,7 +16,7 @@ import { mapCityToState, inferIndustry } from "@/lib/import/enrich-lead"
  */
 export async function GET(req: Request) {
   try {
-    const session = await requireAuth()
+    const session = await requireWorkspace()
     if (session.user.role === "REP") {
       return apiError("Forbidden", "FORBIDDEN", 403)
     }
@@ -26,12 +26,12 @@ export async function GET(req: Request) {
 
     const leads = leadId
       ? await prisma.lead.findMany({
-          where:   { id: leadId, account_id: session.account.id },
+          where:   { id: leadId, account_id: session.account.id, workspace_id: session.workspace.id },
           include: { source: true, signals: { select: { signal_type: true, signal_value: true } } },
           take:    1,
         })
       : await prisma.lead.findMany({
-          where:   { account_id: session.account.id },
+          where:   { account_id: session.account.id, workspace_id: session.workspace.id },
           include: { source: true, signals: { select: { signal_type: true, signal_value: true } } },
           orderBy: { imported_at: "desc" },
           take:    5,

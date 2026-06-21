@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma"
-import { requireAuth, handleAuthError } from "@/lib/auth/middleware"
+import { requireWorkspace, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
 
 /**
@@ -9,10 +9,10 @@ import { apiSuccess, apiError } from "@/lib/api/response"
  */
 export async function GET() {
   try {
-    const session = await requireAuth()
+    const session = await requireWorkspace()
 
     let stages = await prisma.pipelineStage.findMany({
-      where:   { account_id: session.account.id },
+      where:   { account_id: session.account.id, workspace_id: session.workspace.id },
       orderBy: { display_order: "asc" },
       select:  { id: true, name: true, key: true, display_order: true, is_terminal: true, is_won: true, is_lost: true },
     })
@@ -30,11 +30,11 @@ export async function GET() {
         { name: "Lost",          key: "lost",           display_order: 8, is_terminal: true,  is_won: false, is_lost: true  },
       ]
       await prisma.pipelineStage.createMany({
-        data:           defaults.map((s) => ({ ...s, account_id: session.account.id })),
+        data:           defaults.map((s) => ({ ...s, account_id: session.account.id, workspace_id: session.workspace.id })),
         skipDuplicates: true,
       })
       stages = await prisma.pipelineStage.findMany({
-        where:   { account_id: session.account.id },
+        where:   { account_id: session.account.id, workspace_id: session.workspace.id },
         orderBy: { display_order: "asc" },
         select:  { id: true, name: true, key: true, display_order: true, is_terminal: true, is_won: true, is_lost: true },
       })

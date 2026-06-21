@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
-import { requireRole, handleAuthError } from "@/lib/auth/middleware"
+import { requireWorkspace, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
+import { startOfIstDay, IST_OFFSET_MS } from "@/lib/time/ist"
 
 /**
  * GET /api/analytics/intelligence
@@ -9,8 +10,9 @@ import { apiSuccess, apiError } from "@/lib/api/response"
  */
 export async function GET(req: Request) {
   try {
-    const session   = await requireRole("ADMIN", "MANAGER")
+    const session   = await requireWorkspace("ADMIN", "MANAGER")
     const accountId = session.account.id
+    const workspaceId = session.workspace.id
 
     const { searchParams } = new URL(req.url)
     const periodParam = searchParams.get("period") ?? "30d"
@@ -33,7 +35,7 @@ export async function GET(req: Request) {
     ] = await Promise.all([
       // All missed leads with follow-up context (for loss reason classification)
       prisma.lead.findMany({
-        where: { account_id: accountId, is_missed: true },
+        where: { account_id: accountId, workspace_id: workspaceId, is_missed: true },
         select: {
           id:                  true,
           expected_value:      true,
@@ -47,34 +49,34 @@ export async function GET(req: Request) {
       }),
       // Won leads avg speed (selected period)
       prisma.lead.aggregate({
-        where: { account_id: accountId, won_at: { gte: since } },
+        where: { account_id: accountId, workspace_id: workspaceId, won_at: { gte: since } },
         _avg: { speed_to_lead_hours: true },
         _count: { id: true },
       }),
       // Missed leads avg speed
       prisma.lead.aggregate({
-        where: { account_id: accountId, is_missed: true },
+        where: { account_id: accountId, workspace_id: workspaceId, is_missed: true },
         _avg: { speed_to_lead_hours: true },
       }),
       // Recent missed leads for trend (last 7 days, by missed_at)
       prisma.lead.findMany({
-        where: { account_id: accountId, is_missed: true, missed_at: { gte: sevenDaysAgo } },
+        where: { account_id: accountId, workspace_id: workspaceId, is_missed: true, missed_at: { gte: sevenDaysAgo } },
         select: { expected_value: true, missed_at: true },
         orderBy: { missed_at: "asc" },
       }),
       // Currently overdue follow-up leads (for recovery calc)
       prisma.followUpAction.findMany({
-        where:  { account_id: accountId, status: "OVERDUE" },
+        where:  { account_id: accountId, workspace_id: workspaceId, status: "OVERDUE" },
         select: { lead_id: true, lead: { select: { expected_value: true } } },
         distinct: ["lead_id"],
       }),
       // Source performance
       prisma.leadSource.findMany({
-        where: { account_id: accountId },
+        where: { account_id: accountId, workspace_id: workspaceId },
         select: {
           id: true, name: true,
           leads: {
-            where:  { account_id: accountId },
+            where:  { account_id: accountId, workspace_id: workspaceId },
             select: { is_sql: true, won_at: true, is_missed: true, intent_score: true, is_junk: true, expected_value: true },
           },
         },
@@ -96,14 +98,14 @@ export async function GET(req: Request) {
       }),
       // Current follow-up configs (for Apply Fix comparison)
       prisma.followUpConfig.findMany({
-        where:   { account_id: accountId },
+        where:   { account_id: accountId, workspace_id: workspaceId },
         orderBy: { grade: "asc" },
         select:  { grade: true, schedule: true },
       }),
       // Won leads avg speed by grade (selected period)
       prisma.lead.groupBy({
         by:    ["grade"],
-        where: { account_id: accountId, won_at: { gte: since } },
+        where: { account_id: accountId, workspace_id: workspaceId, won_at: { gte: since } },
         _avg:  { speed_to_lead_hours: true },
         _count: { id: true },
       }),
@@ -190,16 +192,14 @@ export async function GET(req: Request) {
 
     const days: { date: string; missed_value: number; missed_count: number }[] = []
     for (let i = 6; i >= 0; i--) {
-      const d = new Date()
-      d.setHours(0, 0, 0, 0)
-      d.setDate(d.getDate() - i)
-      const next = new Date(d)
-      next.setDate(next.getDate() + 1)
+      const d    = startOfIstDay(new Date(Date.now() - i * 86_400_000))
+      const next = new Date(d.getTime() + 86_400_000)
       const dayLeads = recentMissed.filter(
         (l) => l.missed_at && l.missed_at >= d && l.missed_at < next,
       )
       days.push({
-        date:          d.toISOString().slice(0, 10),
+        // label with the IST calendar date, not the UTC date of the boundary
+        date:          new Date(d.getTime() + IST_OFFSET_MS).toISOString().slice(0, 10),
         missed_value:  dayLeads.reduce((s, l) => s + (l.expected_value ?? 0), 0),
         missed_count:  dayLeads.length,
       })

@@ -1,7 +1,8 @@
 import { z } from "zod"
 import { prisma } from "@/lib/prisma"
-import { requireAuth, requireRole, handleAuthError } from "@/lib/auth/middleware"
+import { requireWorkspace, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError, parseBody, NOT_FOUND } from "@/lib/api/response"
+import { rateLimited, LIMITS } from "@/lib/rate-limit"
 import { getNextAction, buildActionReason } from "@/lib/scoring/next-action"
 
 type Params = { params: { id: string } }
@@ -13,12 +14,12 @@ type Params = { params: { id: string } }
 
 export async function GET(_req: Request, { params }: Params) {
   try {
-    const session = await requireAuth()
+    const session = await requireWorkspace()
 
     const lead = await prisma.lead.findFirst({
       where: {
         id:         params.id,
-        account_id: session.account.id,
+        account_id: session.account.id, workspace_id: session.workspace.id,
         // REP can only view their assigned leads
         ...(session.user.role === "REP"
           ? { assigned_rep_id: session.user.id }
@@ -89,14 +90,18 @@ const UpdateLeadSchema = z.object({
 
 export async function PATCH(req: Request, { params }: Params) {
   try {
-    const session = await requireAuth()
+    const session = await requireWorkspace()
+
+    const limited = await rateLimited(`lead-action:${session.user.id}`, LIMITS.write)
+    if (limited) return limited
+
     const { data, error } = await parseBody(req, UpdateLeadSchema)
     if (error) return error
 
     const lead = await prisma.lead.findFirst({
       where: {
         id:         params.id,
-        account_id: session.account.id,
+        account_id: session.account.id, workspace_id: session.workspace.id,
         ...(session.user.role === "REP"
           ? { assigned_rep_id: session.user.id }
           : {}),
@@ -126,10 +131,10 @@ export async function PATCH(req: Request, { params }: Params) {
 
 export async function DELETE(_req: Request, { params }: Params) {
   try {
-    const session = await requireRole("ADMIN")
+    const session = await requireWorkspace("ADMIN")
 
     const lead = await prisma.lead.findFirst({
-      where: { id: params.id, account_id: session.account.id },
+      where: { id: params.id, account_id: session.account.id, workspace_id: session.workspace.id },
     })
     if (!lead) return NOT_FOUND("Lead")
 

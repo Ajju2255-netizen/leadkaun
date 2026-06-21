@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server"
-import { getServerSession } from "./session"
+import { getServerSession, type AuthSession, type SessionWorkspace } from "./session"
 import type { UserRole } from "@prisma/client"
+
+/** A session guaranteed to have an active workspace. */
+export type WorkspaceSession = AuthSession & { workspace: SessionWorkspace }
 
 export class AuthError extends Error {
   constructor(
@@ -39,6 +42,19 @@ export async function requireRole(...roles: UserRole[]) {
     )
   }
   return session
+}
+
+/**
+ * Asserts the user is authenticated (optionally with a role) AND has an active
+ * workspace. Returns a session whose `workspace` is guaranteed non-null, so
+ * data routes can scope queries by `session.workspace.id`.
+ */
+export async function requireWorkspace(...roles: UserRole[]): Promise<WorkspaceSession> {
+  const session = roles.length ? await requireRole(...roles) : await requireAuth()
+  if (!session.workspace) {
+    throw new AuthError("No workspace assigned. Ask an admin to add you to a workspace.", 403)
+  }
+  return session as WorkspaceSession
 }
 
 /**

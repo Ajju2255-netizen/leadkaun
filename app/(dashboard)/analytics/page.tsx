@@ -1,14 +1,13 @@
 "use client"
 
 import { useState } from "react"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import {
   TrendingDown, TrendingUp, Minus, CheckCircle2,
   Zap, AlertTriangle, PhoneOff, Snowflake,
   BarChart3, Target, Clock, IndianRupee, ArrowRight,
 } from "lucide-react"
-import { toast } from "sonner"
 import { useHasRole } from "@/hooks/useCurrentUser"
 import { GradeBadge } from "@/components/shared/GradeBadge"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -100,38 +99,6 @@ function formatValue(v: number): string {
   return `₹${v.toLocaleString("en-IN")}`
 }
 
-// ── Apply Fix hook (preserved) ───────────────────────────────────────────────
-
-function useApplyFix() {
-  const queryClient = useQueryClient()
-  const [applying, setApplying] = useState<Record<string, boolean>>({})
-  const [applied,  setApplied]  = useState<Record<string, boolean>>({})
-
-  async function applyFix(grade: string, first_followup_h: number, channel: string) {
-    const key = `${grade}-${first_followup_h}`
-    setApplying((p) => ({ ...p, [key]: true }))
-    try {
-      const res = await fetch("/api/settings/follow-up-config", {
-        method: "PUT", credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          grade,
-          schedule: { first_followup_h, second_followup_h: first_followup_h * 3, max_followups: 5, action_type: channel },
-        }),
-      })
-      if (res.ok) {
-        setApplied((p) => ({ ...p, [key]: true }))
-        queryClient.invalidateQueries({ queryKey: ["analytics-intelligence"] })
-        toast.success(`Grade ${grade} follow-up updated to ${first_followup_h}h`)
-      } else { toast.error("Failed to apply fix") }
-    } finally {
-      setApplying((p) => ({ ...p, [key]: false }))
-    }
-  }
-
-  return { applyFix, applying, applied }
-}
-
 // ── KPI card ─────────────────────────────────────────────────────────────────
 
 function KpiCard({
@@ -151,7 +118,7 @@ function KpiCard({
         </div>
         <p className="text-[12px] font-semibold text-ink-soft leading-tight pt-1">{label}</p>
       </div>
-      <div className={`mt-3 text-[26px] md:text-[28px] font-bold tabular-nums leading-none ${valueColor}`}>
+      <div className={`mt-3 text-[30px] font-bold tabular-nums leading-none ${valueColor}`}>
         {value}
       </div>
       <div className="mt-2 text-[12px] text-ink-muted min-h-[16px]">{sub}</div>
@@ -163,7 +130,6 @@ function KpiCard({
 
 export default function AnalyticsPage() {
   const isManager = useHasRole("ADMIN", "MANAGER")
-  const { applyFix, applying, applied } = useApplyFix()
   const [period, setPeriod] = useState<"7d" | "30d" | "90d">("30d")
 
   const { data, isLoading } = useQuery<IntelData>({
@@ -185,7 +151,6 @@ export default function AnalyticsPage() {
   const pats        = data?.patterns
   const sources     = data?.source_performance ?? []
   const reps        = data?.rep_performance    ?? []
-  const configs     = data?.follow_up_configs  ?? []
   const wonByGrade  = data?.won_by_grade       ?? []
 
   const days     = pred?.days ?? []
@@ -201,7 +166,6 @@ export default function AnalyticsPage() {
   const simRecovery      = Math.round(followUpGapValue * 0.35)
   const showSimulation   = followUpGapValue > 0 && currentAvgSpeed != null && currentAvgSpeed > 3
 
-  const configMap   = Object.fromEntries(configs.map((c) => [c.grade, c.first_followup_h]))
   const sortedReps  = [...reps].sort((a, b) => b.missed_value - a.missed_value)
   const topMissedId = sortedReps[0]?.id
   const topWonId    = [...reps].sort((a, b) => b.won_value - a.won_value)[0]?.id
@@ -230,9 +194,9 @@ export default function AnalyticsPage() {
             <BarChart3 className="w-6 h-6 text-sky-700" strokeWidth={2.2} />
           </div>
           <div>
-            <h1 className="text-[32px] md:text-[36px] font-bold text-ink tracking-[-0.025em] leading-[1.05]">Analytics</h1>
+            <h1 className="text-[28px] font-bold text-ink tracking-[-0.02em] leading-tight">Analytics</h1>
             <p className="text-[14px] text-ink-soft mt-2 leading-relaxed max-w-[560px]">
-              Find what&apos;s slowing your pipeline. See loss patterns, recovery potential, and one-click fixes.
+              Find what&apos;s slowing your pipeline — loss patterns, recovery potential, and where to act next.
             </p>
           </div>
         </div>
@@ -320,7 +284,7 @@ export default function AnalyticsPage() {
       {(!isLoading && days.some((d) => d.missed_value > 0)) && (
         <div className="glass-2 gloss-edge rounded-2xl p-6">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="text-[15px] font-semibold text-ink">Daily Miss Trend</h2>
+            <h2 className="text-[16px] font-semibold text-ink">Daily Miss Trend</h2>
             <p className="text-[11px] font-mono uppercase tracking-[0.10em] text-ink-muted">₹ missed per day</p>
           </div>
           <MissTrendChart days={days} />
@@ -333,7 +297,7 @@ export default function AnalyticsPage() {
         {/* Loss reasons (3/5) */}
         <div className="lg:col-span-3 glass-2 gloss-edge rounded-2xl p-6">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="text-[15px] font-semibold text-ink">Why You&apos;re Losing</h2>
+            <h2 className="text-[16px] font-semibold text-ink">Why You&apos;re Losing</h2>
             {!isLoading && (data?.total_missed_count ?? 0) > 0 && (
               <span className="text-[11px] font-mono uppercase tracking-[0.08em] text-ink-muted">
                 {data!.total_missed_count} leads · {formatValue(data!.total_missed_value)}
@@ -354,16 +318,11 @@ export default function AnalyticsPage() {
                 const meta = LOSS_META[r.reason] ?? DEFAULT_LOSS
 
                 const fixInfo = (() => {
-                  if (r.reason === "Follow-up delay or skip") {
-                    const currentA = configMap["A"] ?? null
-                    const currentB = configMap["B"] ?? null
-                    const needsFix = (currentA != null && currentA > 3) || (currentB != null && currentB > 5) || currentA == null
-                    return {
-                      fix:       "Tighten follow-up: call A-grade within 2h, B-grade within 4h",
-                      recovery:  Math.round(r.value * 0.35),
-                      action:    needsFix ? "apply-timing" : null,
-                      isApplied: applied["A-2"] && applied["B-4"],
-                    }
+                  if (r.reason === "Follow-up delay or skip") return {
+                    fix:       "Clear overdue follow-ups — call A-grade within 2h, B-grade within 4h",
+                    recovery:  Math.round(r.value * 0.35),
+                    action:    "go-followups",
+                    isApplied: false,
                   }
                   if (r.reason === "Never contacted") return {
                     fix:       "First contact must happen within 1h — open queue and work it",
@@ -398,7 +357,7 @@ export default function AnalyticsPage() {
                           </div>
                         </div>
                         <div className="shrink-0 text-right">
-                          <p className="text-[20px] font-bold text-red-600 tabular-nums leading-none">{formatValue(r.value)}</p>
+                          <p className="text-[18px] font-bold text-red-600 tabular-nums leading-none">{formatValue(r.value)}</p>
                           <p className="text-[11px] text-ink-muted tabular-nums mt-1">{r.pct}% of losses</p>
                         </div>
                       </div>
@@ -414,9 +373,9 @@ export default function AnalyticsPage() {
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5 mb-1">
                             <Zap className="w-3 h-3 text-sky-500 shrink-0" />
-                            <span className="text-[10.5px] font-bold text-sky-600 uppercase tracking-[0.08em]">Fix</span>
+                            <span className="text-[10px] font-bold text-sky-600 uppercase tracking-[0.08em]">Fix</span>
                           </div>
-                          <p className="text-[12.5px] text-ink leading-snug">{fixInfo.fix}</p>
+                          <p className="text-[12px] text-ink leading-snug">{fixInfo.fix}</p>
                           {fixInfo.recovery > 0 && (
                             <p className="text-[12px] font-bold text-emerald-600 mt-1">→ Est. recovery: {formatValue(fixInfo.recovery)}</p>
                           )}
@@ -426,18 +385,6 @@ export default function AnalyticsPage() {
                             <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-600">
                               <CheckCircle2 className="w-3.5 h-3.5" /> Applied
                             </span>
-                          ) : fixInfo.action === "apply-timing" ? (
-                            <button
-                              onClick={() => Promise.all([applyFix("A", 2, "CALL"), applyFix("B", 4, "WHATSAPP")])}
-                              disabled={applying["A-2"] || applying["B-4"]}
-                              className="text-[12px] font-semibold text-white rounded-lg px-3 py-1.5 disabled:opacity-50 transition-all whitespace-nowrap"
-                              style={{
-                                background: "linear-gradient(180deg, #38BDF8 0%, #0EA5E9 100%)",
-                                boxShadow:  "inset 0 1px 0 rgba(255,255,255,0.45), 0 2px 6px rgba(14,165,233,0.25)",
-                              }}
-                            >
-                              {applying["A-2"] ? "Applying…" : "Apply Fix →"}
-                            </button>
                           ) : fixInfo.action === "go-queue" ? (
                             <Link href="/queue" className="text-[12px] font-semibold text-sky-700 border border-sky-200 rounded-lg px-3 py-1.5 hover:bg-sky-50 transition-colors whitespace-nowrap">
                               Open Queue →
@@ -480,7 +427,7 @@ export default function AnalyticsPage() {
 
           {/* Speed comparison */}
           <div className="glass-2 gloss-edge rounded-2xl p-6">
-            <h2 className="text-[15px] font-semibold text-ink mb-4">Speed to First Contact</h2>
+            <h2 className="text-[16px] font-semibold text-ink mb-4">Speed to First Contact</h2>
             {isLoading ? <Skeleton className="h-28 rounded-xl" /> : (
               (pats?.avg_speed_won != null || pats?.avg_speed_missed != null) ? (
                 <div className="space-y-4">
@@ -505,7 +452,7 @@ export default function AnalyticsPage() {
 
           {/* Recovery simulation */}
           <div className="glass-2 gloss-edge rounded-2xl p-6">
-            <h2 className="text-[15px] font-semibold text-ink mb-4">Recovery Simulation</h2>
+            <h2 className="text-[16px] font-semibold text-ink mb-4">Recovery Simulation</h2>
             {isLoading ? <Skeleton className="h-28 rounded-xl" /> : (
               showSimulation ? (
                 <div className="space-y-3">
@@ -521,7 +468,7 @@ export default function AnalyticsPage() {
                     </div>
                   </div>
                   <div className="rounded-xl bg-emerald-50/70 border border-emerald-200 px-4 py-3">
-                    <p className="text-[10.5px] font-mono uppercase tracking-[0.08em] text-emerald-700 mb-0.5">Estimated Recovery</p>
+                    <p className="text-[10px] font-mono uppercase tracking-[0.08em] text-emerald-700 mb-0.5">Estimated Recovery</p>
                     <p className="text-[24px] font-bold text-emerald-700 tabular-nums">{formatValue(simRecovery)}</p>
                     <p className="text-[11px] text-emerald-700/80 mt-0.5">35% of {formatValue(followUpGapValue)} lost to follow-up gaps</p>
                     <Link href="/missed" className="inline-block mt-2 text-[11px] font-semibold text-emerald-700 underline underline-offset-2 hover:text-emerald-900">
@@ -529,60 +476,71 @@ export default function AnalyticsPage() {
                     </Link>
                   </div>
                 </div>
+              ) : followUpGapValue > 0 ? (
+                <div className="rounded-xl bg-emerald-50/70 border border-emerald-200 px-4 py-3">
+                  <p className="text-[10px] font-mono uppercase tracking-[0.08em] text-emerald-700 mb-0.5">Recoverable now</p>
+                  <p className="text-[24px] font-bold text-emerald-700 tabular-nums">{formatValue(simRecovery)}</p>
+                  <p className="text-[11px] text-emerald-700/80 mt-0.5">
+                    35% of {formatValue(followUpGapValue)} lost to follow-up gaps
+                    {currentAvgSpeed != null && ` · response avg ${formatDuration(currentAvgSpeed)}`}
+                  </p>
+                  <Link href="/missed" className="inline-block mt-2 text-[11px] font-semibold text-emerald-700 underline underline-offset-2 hover:text-emerald-900">
+                    View recoverable leads →
+                  </Link>
+                </div>
+              ) : currentAvgSpeed != null ? (
+                <div className="flex items-start gap-2.5 rounded-xl bg-emerald-50/60 border border-emerald-100 px-4 py-3">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+                  <p className="text-[12px] text-emerald-800 leading-relaxed">
+                    Response time is healthy — <span className="font-bold">{formatDuration(currentAvgSpeed)}</span> avg, under the 3h danger line. Nothing to recover right now.
+                  </p>
+                </div>
               ) : (
-                <p className="text-[13px] text-ink-muted py-4">Simulation appears when avg response time exceeds 3h.</p>
+                <p className="text-[13px] text-ink-muted py-4">Recoverable revenue appears here when leads start slipping through follow-up.</p>
               )
             )}
           </div>
         </div>
       </div>
 
-      {/* ── Lead Playbook (full-width) ──────────────────────────────────────── */}
+      {/* ── Lead Playbook (full-width) — recommended first touch, benchmarked
+            against the team's own won-deal speed (read-only guidance). ─────── */}
       <div className="glass-2 gloss-edge rounded-2xl p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-[15px] font-semibold text-ink">Lead Playbook</h2>
-          <span className="text-[11px] font-mono uppercase tracking-[0.10em] text-ink-muted">Best practice per grade</span>
+        <div className="flex items-center justify-between mb-1 gap-3 flex-wrap">
+          <h2 className="text-[16px] font-semibold text-ink">Lead Playbook</h2>
+          <span className="text-[11px] font-mono uppercase tracking-[0.10em] text-ink-muted">Recommended first touch by grade</span>
         </div>
+        <p className="text-[12px] text-ink-muted mb-4">How fast to reach each grade — measured against your own won deals.</p>
         {isLoading ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">{[1,2,3,4].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">{[1,2,3,4].map(i => <Skeleton key={i} className="h-28 rounded-xl" />)}</div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
             {(["A","B","C","D"] as const).map((grade) => {
-              const pb        = GRADE_PLAYBOOK[grade]
-              const won       = wonByGrade.find((g) => g.grade === grade)
-              const curConf   = configMap[grade]
-              const isFast    = curConf != null && curConf <= pb.defaultH
-              const key       = `${grade}-${pb.defaultH}`
-              const isApplied = applied[key] || isFast
+              const pb    = GRADE_PLAYBOOK[grade]
+              const won   = wonByGrade.find((g) => g.grade === grade)
+              const beats = won?.avg_speed != null && won.avg_speed <= pb.defaultH
 
               return (
-                <div key={grade} className="rounded-xl border border-hairline bg-white/60 px-4 py-3.5 flex items-start gap-3">
-                  <GradeBadge grade={grade} size="md" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-semibold text-ink leading-tight">{pb.action}</p>
-                    <p className="text-[11px] text-ink-muted mt-0.5">{pb.desc}</p>
-                    <p className="text-[11px] text-ink-soft mt-1.5">
-                      {won?.avg_speed != null
-                        ? `Won avg: ${formatDuration(won.avg_speed)} · ${won.count} won`
-                        : curConf != null
-                          ? `Config: ${curConf}h first follow-up`
-                          : "No config set"}
-                    </p>
-                    <div className="mt-2">
-                      {isApplied ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Active
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => applyFix(grade, pb.defaultH, pb.channel)}
-                          disabled={applying[key]}
-                          className="text-[11px] font-semibold text-sky-700 border border-sky-200 rounded-lg px-2.5 py-1 hover:bg-sky-50 disabled:opacity-50 transition-colors"
-                        >
-                          {applying[key] ? "…" : "Apply →"}
-                        </button>
-                      )}
-                    </div>
+                <div key={grade} className="rounded-xl border border-hairline bg-white/60 px-4 py-3.5">
+                  <div className="flex items-center gap-2">
+                    <GradeBadge grade={grade} size="md" />
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full ${
+                      pb.channel === "CALL" ? "bg-sky-50 text-sky-700" : "bg-emerald-50 text-emerald-700"
+                    }`}>
+                      {pb.channel === "CALL" ? "Call" : "WhatsApp"}
+                    </span>
+                  </div>
+                  <p className="text-[13px] font-semibold text-ink leading-tight mt-2.5">{pb.action}</p>
+                  <p className="text-[11px] text-ink-muted mt-0.5">{pb.desc}</p>
+                  <div className="mt-3 pt-2.5 border-t border-hairline flex items-center justify-between gap-2">
+                    <span className="text-[11px] text-ink-muted">Your won avg</span>
+                    {won?.avg_speed != null ? (
+                      <span className={`text-[12px] font-bold tabular-nums ${beats ? "text-emerald-600" : "text-orange-600"}`}>
+                        {formatDuration(won.avg_speed)}
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-ink-faint">No data</span>
+                    )}
                   </div>
                 </div>
               )
@@ -598,7 +556,7 @@ export default function AnalyticsPage() {
         {(isLoading || sources.length > 0) && (
           <div className="glass-2 gloss-edge rounded-2xl overflow-hidden">
             <div className="px-6 py-4 border-b border-hairline flex items-center justify-between">
-              <h2 className="text-[15px] font-semibold text-ink">Source Quality</h2>
+              <h2 className="text-[16px] font-semibold text-ink">Source Quality</h2>
               <span className="text-[11px] font-mono uppercase tracking-[0.08em] text-ink-muted">{sources.length} sources</span>
             </div>
             {isLoading ? (
@@ -655,7 +613,7 @@ export default function AnalyticsPage() {
         {(isLoading || reps.length > 0) && (
           <div className="glass-2 gloss-edge rounded-2xl overflow-hidden">
             <div className="px-6 py-4 border-b border-hairline flex items-center justify-between">
-              <h2 className="text-[15px] font-semibold text-ink">Rep Performance</h2>
+              <h2 className="text-[16px] font-semibold text-ink">Rep Performance</h2>
               <span className="text-[11px] font-mono uppercase tracking-[0.08em] text-ink-muted">{reps.length} reps</span>
             </div>
             {isLoading ? (
@@ -698,7 +656,7 @@ export default function AnalyticsPage() {
                             {rep.first_name[0]}{rep.last_name?.[0] ?? ""}
                           </div>
                           <div className="min-w-0">
-                            <p className="text-[12.5px] font-semibold text-ink truncate leading-tight">
+                            <p className="text-[12px] font-semibold text-ink truncate leading-tight">
                               {rep.first_name} {rep.last_name ?? ""}
                             </p>
                             {isTopWon && <span className="text-[9px] font-bold text-emerald-600 block">Top</span>}
@@ -774,8 +732,8 @@ function SpeedRow({ label, value, pct, color, textColor }: {
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <span className="text-[11.5px] font-semibold text-ink-soft">{label}</span>
-        <span className={`text-[15px] font-bold tabular-nums ${textColor}`}>{value}</span>
+        <span className="text-[11px] font-semibold text-ink-soft">{label}</span>
+        <span className={`text-[16px] font-bold tabular-nums ${textColor}`}>{value}</span>
       </div>
       <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
         <div className={`h-full rounded-full transition-all duration-700 ${color}`} style={{ width: `${pct}%` }} />

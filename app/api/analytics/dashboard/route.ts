@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma"
-import { requireRole } from "@/lib/auth/middleware"
+import { requireWorkspace } from "@/lib/auth/middleware"
 import { handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
 
@@ -11,8 +11,9 @@ import { apiSuccess, apiError } from "@/lib/api/response"
  */
 export async function GET(_req: Request) {
   try {
-    const session = await requireRole("ADMIN", "MANAGER")
+    const session = await requireWorkspace("ADMIN", "MANAGER")
     const accountId = session.account.id
+    const workspaceId = session.workspace.id
 
     const today    = new Date()
     today.setHours(0, 0, 0, 0)
@@ -49,15 +50,15 @@ export async function GET(_req: Request) {
     ] = await Promise.all([
       // Total active leads
       prisma.lead.count({
-        where: { account_id: accountId, is_junk: false, won_at: null, lost_at: null },
+        where: { account_id: accountId, workspace_id: workspaceId, is_junk: false, won_at: null, lost_at: null },
       }),
       // New in last 7 days
       prisma.lead.count({
-        where: { account_id: accountId, is_junk: false, created_at: { gte: sevenDaysAgo } },
+        where: { account_id: accountId, workspace_id: workspaceId, is_junk: false, created_at: { gte: sevenDaysAgo } },
       }),
       // SQL count
       prisma.lead.count({
-        where: { account_id: accountId, is_sql: true, won_at: null, lost_at: null },
+        where: { account_id: accountId, workspace_id: workspaceId, is_sql: true, won_at: null, lost_at: null },
       }),
       // Stale (no contact in 14+ days)
       prisma.lead.count({
@@ -72,7 +73,7 @@ export async function GET(_req: Request) {
       // Callbacks due today
       prisma.followUpAction.count({
         where: {
-          account_id: accountId,
+          account_id: accountId, workspace_id: workspaceId,
           action_type: "CALL",
           status: "PENDING",
           due_date: { gte: today, lt: tomorrow },
@@ -80,22 +81,22 @@ export async function GET(_req: Request) {
       }),
       // Overdue follow-ups
       prisma.followUpAction.count({
-        where: { account_id: accountId, status: "OVERDUE" },
+        where: { account_id: accountId, workspace_id: workspaceId, status: "OVERDUE" },
       }),
       // Won deal value this month
       prisma.lead.aggregate({
-        where: { account_id: accountId, won_at: { gte: thirtyDaysAgo } },
+        where: { account_id: accountId, workspace_id: workspaceId, won_at: { gte: thirtyDaysAgo } },
         _sum: { won_value: true },
       }),
       // Pipeline value
       prisma.lead.aggregate({
-        where: { account_id: accountId, is_junk: false, won_at: null, lost_at: null },
+        where: { account_id: accountId, workspace_id: workspaceId, is_junk: false, won_at: null, lost_at: null },
         _sum: { expected_value: true },
       }),
       // Grade distribution
       prisma.lead.groupBy({
         by:    ["grade"],
-        where: { account_id: accountId, is_junk: false, won_at: null, lost_at: null },
+        where: { account_id: accountId, workspace_id: workspaceId, is_junk: false, won_at: null, lost_at: null },
         _count: { grade: true },
         orderBy: { grade: "asc" },
       }),
@@ -112,28 +113,28 @@ export async function GET(_req: Request) {
       }),
       // A leads in queue (not missed/won/lost/junk)
       prisma.lead.aggregate({
-        where: { account_id: accountId, grade: "A", is_missed: false, won_at: null, lost_at: null, is_junk: false },
+        where: { account_id: accountId, workspace_id: workspaceId, grade: "A", is_missed: false, won_at: null, lost_at: null, is_junk: false },
         _count: { id: true }, _sum: { expected_value: true },
       }),
       // B leads in queue
       prisma.lead.aggregate({
-        where: { account_id: accountId, grade: "B", is_missed: false, won_at: null, lost_at: null, is_junk: false },
+        where: { account_id: accountId, workspace_id: workspaceId, grade: "B", is_missed: false, won_at: null, lost_at: null, is_junk: false },
         _count: { id: true }, _sum: { expected_value: true },
       }),
       // A/B leads with a signal logged today (distinct lead)
       prisma.signal.findMany({
-        where: { account_id: accountId, created_at: { gte: today }, lead: { grade: { in: ["A", "B"] } } },
+        where: { account_id: accountId, workspace_id: workspaceId, created_at: { gte: today }, lead: { grade: { in: ["A", "B"] } } },
         select: { lead_id: true, lead: { select: { expected_value: true } } },
         distinct: ["lead_id"],
       }),
       // Missed leads
       prisma.lead.aggregate({
-        where: { account_id: accountId, is_missed: true, won_at: null, lost_at: null },
+        where: { account_id: accountId, workspace_id: workspaceId, is_missed: true, won_at: null, lost_at: null },
         _count: { id: true }, _sum: { expected_value: true },
       }),
       // Pipeline stages (non-terminal) with lead counts+values
       prisma.pipelineStage.findMany({
-        where: { account_id: accountId, is_terminal: false },
+        where: { account_id: accountId, workspace_id: workspaceId, is_terminal: false },
         select: {
           name: true, key: true, display_order: true,
           leads: {
@@ -146,42 +147,42 @@ export async function GET(_req: Request) {
       // Leads stuck in "contacted" stage > 48h
       prisma.lead.count({
         where: {
-          account_id: accountId, is_junk: false, won_at: null, lost_at: null,
+          account_id: accountId, workspace_id: workspaceId, is_junk: false, won_at: null, lost_at: null,
           stage: { key: "contacted" },
           stage_entered_at: { lt: new Date(Date.now() - 48 * 3_600_000) },
         },
       }),
       // Follow-ups due today
       prisma.followUpAction.findMany({
-        where: { account_id: accountId, status: "PENDING", due_date: { gte: today, lt: tomorrow } },
+        where: { account_id: accountId, workspace_id: workspaceId, status: "PENDING", due_date: { gte: today, lt: tomorrow } },
         select: { lead: { select: { expected_value: true } } },
       }),
       // Overdue follow-ups distinct by lead
       prisma.followUpAction.findMany({
-        where: { account_id: accountId, status: "OVERDUE" },
+        where: { account_id: accountId, workspace_id: workspaceId, status: "OVERDUE" },
         select: { lead_id: true, lead: { select: { expected_value: true } } },
         distinct: ["lead_id"],
       }),
       // Sources
       prisma.leadSource.findMany({
-        where: { account_id: accountId },
+        where: { account_id: accountId, workspace_id: workspaceId },
         select: {
           id: true, name: true,
           leads: {
-            where:  { account_id: accountId },
+            where:  { account_id: accountId, workspace_id: workspaceId },
             select: { is_sql: true, won_at: true, intent_score: true, is_junk: true },
           },
         },
       }),
       // Yesterday missed leads (approximate via updated_at when is_missed was set)
       prisma.lead.aggregate({
-        where: { account_id: accountId, is_missed: true, updated_at: { gte: yesterday, lt: today } },
+        where: { account_id: accountId, workspace_id: workspaceId, is_missed: true, updated_at: { gte: yesterday, lt: today } },
         _count: { id: true }, _sum: { expected_value: true },
       }),
       // A leads about to go cold: last signal 20-24h ago (within 4h of being missed)
       prisma.signal.findMany({
         where: {
-          account_id: accountId,
+          account_id: accountId, workspace_id: workspaceId,
           created_at: { gte: new Date(Date.now() - 24 * 3_600_000), lt: new Date(Date.now() - 20 * 3_600_000) },
           lead: { grade: "A", is_missed: false, won_at: null, lost_at: null, is_junk: false },
         },

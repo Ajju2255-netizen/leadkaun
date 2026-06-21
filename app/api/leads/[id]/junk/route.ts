@@ -1,7 +1,8 @@
 import { z } from "zod"
 import { prisma } from "@/lib/prisma"
-import { requireAuth, handleAuthError } from "@/lib/auth/middleware"
+import { requireWorkspace, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError, parseBody, NOT_FOUND } from "@/lib/api/response"
+import { rateLimited, LIMITS } from "@/lib/rate-limit"
 
 type Params = { params: { id: string } }
 
@@ -17,12 +18,15 @@ const JunkSchema = z.object({
  */
 export async function POST(req: Request, { params }: Params) {
   try {
-    const session = await requireAuth()
+    const session = await requireWorkspace()
+
+    const _rl = await rateLimited(`lead-action:${session.user.id}`, LIMITS.write)
+    if (_rl) return _rl
     const { data, error } = await parseBody(req, JunkSchema)
     if (error) return error
 
     const lead = await prisma.lead.findFirst({
-      where: { id: params.id, account_id: session.account.id },
+      where: { id: params.id, account_id: session.account.id, workspace_id: session.workspace.id },
     })
     if (!lead) return NOT_FOUND("Lead")
 

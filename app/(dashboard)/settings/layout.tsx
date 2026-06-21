@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
-  User2, Lock, Building2, UserCog, Target, Radio, FileText, ChevronLeft,
+  User2, Lock, Building2, UserCog, Target, Radio, FileText, ChevronLeft, Layers,
   type LucideIcon,
 } from "lucide-react"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
@@ -21,6 +21,7 @@ const ALL_TABS: Tab[] = [
   { href: "/settings/security",  label: "Security",      icon: Lock,     section: "personal", roles: ["ADMIN","MANAGER","REP"] },
   { href: "/settings/org",       label: "Organisation",  icon: Building2, section: "workspace", roles: ["ADMIN"] },
   { href: "/settings/team",      label: "Team",          icon: UserCog,  section: "workspace", roles: ["ADMIN"] },
+  { href: "/settings/workspaces", label: "Workspaces",   icon: Layers,   section: "workspace", roles: ["ADMIN"] },
   { href: "/settings/icp",       label: "ICP Settings",  icon: Target,   section: "workspace", roles: ["ADMIN"] },
   { href: "/settings/sources",   label: "Lead Sources",  icon: Radio,    section: "workspace", roles: ["ADMIN"] },
   { href: "/settings/templates", label: "Templates",     icon: FileText, section: "workspace", roles: ["ADMIN","MANAGER"] },

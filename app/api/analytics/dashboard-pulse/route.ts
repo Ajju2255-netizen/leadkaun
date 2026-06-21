@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
-import { requireRole, handleAuthError } from "@/lib/auth/middleware"
+import { requireWorkspace, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
+import { startOfIstMonth } from "@/lib/time/ist"
 
 /**
  * GET /api/analytics/dashboard-pulse
@@ -59,12 +60,15 @@ const SIGNAL_LABELS: Record<string, { label: string; category: "call" | "whatsap
 
 export async function GET() {
   try {
-    const session   = await requireRole("ADMIN", "MANAGER")
+    const session   = await requireWorkspace("ADMIN", "MANAGER")
     const accountId = session.account.id
+    const workspaceId = session.workspace.id
 
     const now            = new Date()
-    const monthStart     = new Date(now.getFullYear(), now.getMonth(), 1)
-    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    // IST calendar-month boundaries so "this month" matches Rep Tracking
+    // (and every other screen) instead of drifting by the UTC offset.
+    const monthStart     = startOfIstMonth(now)
+    const lastMonthStart = startOfIstMonth(new Date(monthStart.getTime() - 1))
     const lastMonthEnd   = monthStart
     const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 3_600_000)
 
@@ -81,34 +85,34 @@ export async function GET() {
       recentSignals,
       behaviourCounts,
     ] = await Promise.all([
-      prisma.lead.count({ where: { account_id: accountId, created_at: { gte: monthStart } } }),
-      prisma.lead.count({ where: { account_id: accountId, created_at: { gte: lastMonthStart, lt: lastMonthEnd } } }),
+      prisma.lead.count({ where: { account_id: accountId, workspace_id: workspaceId, created_at: { gte: monthStart } } }),
+      prisma.lead.count({ where: { account_id: accountId, workspace_id: workspaceId, created_at: { gte: lastMonthStart, lt: lastMonthEnd } } }),
 
-      prisma.lead.count({ where: { account_id: accountId, first_contact_at: { gte: monthStart } } }),
-      prisma.lead.count({ where: { account_id: accountId, first_contact_at: { gte: lastMonthStart, lt: lastMonthEnd } } }),
+      prisma.lead.count({ where: { account_id: accountId, workspace_id: workspaceId, first_contact_at: { gte: monthStart } } }),
+      prisma.lead.count({ where: { account_id: accountId, workspace_id: workspaceId, first_contact_at: { gte: lastMonthStart, lt: lastMonthEnd } } }),
 
-      prisma.followUpAction.count({ where: { account_id: accountId, status: "COMPLETED", completed_at: { gte: monthStart } } }),
-      prisma.followUpAction.count({ where: { account_id: accountId, status: "COMPLETED", completed_at: { gte: lastMonthStart, lt: lastMonthEnd } } }),
+      prisma.followUpAction.count({ where: { account_id: accountId, workspace_id: workspaceId, status: "COMPLETED", completed_at: { gte: monthStart } } }),
+      prisma.followUpAction.count({ where: { account_id: accountId, workspace_id: workspaceId, status: "COMPLETED", completed_at: { gte: lastMonthStart, lt: lastMonthEnd } } }),
 
-      prisma.lead.count({ where: { account_id: accountId, won_at: { gte: monthStart } } }),
-      prisma.lead.count({ where: { account_id: accountId, won_at: { gte: lastMonthStart, lt: lastMonthEnd } } }),
+      prisma.lead.count({ where: { account_id: accountId, workspace_id: workspaceId, won_at: { gte: monthStart } } }),
+      prisma.lead.count({ where: { account_id: accountId, workspace_id: workspaceId, won_at: { gte: lastMonthStart, lt: lastMonthEnd } } }),
 
       prisma.lead.aggregate({
-        where: { account_id: accountId, won_at: { gte: monthStart } },
+        where: { account_id: accountId, workspace_id: workspaceId, won_at: { gte: monthStart } },
         _sum:  { won_value: true },
       }),
       prisma.lead.aggregate({
-        where: { account_id: accountId, won_at: { gte: lastMonthStart, lt: lastMonthEnd } },
+        where: { account_id: accountId, workspace_id: workspaceId, won_at: { gte: lastMonthStart, lt: lastMonthEnd } },
         _sum:  { won_value: true },
       }),
 
       // Pipeline funnel — non-terminal stages, with lead counts
       prisma.pipelineStage.findMany({
-        where:   { account_id: accountId },
+        where:   { account_id: accountId, workspace_id: workspaceId },
         select:  {
           name: true, key: true, display_order: true, is_won: true, is_lost: true,
           leads: {
-            where:  { account_id: accountId, is_junk: false },
+            where:  { account_id: accountId, workspace_id: workspaceId, is_junk: false },
             select: { id: true, won_at: true, lost_at: true },
           },
         },
@@ -121,7 +125,7 @@ export async function GET() {
         select:  {
           id: true, first_name: true, last_name: true,
           assigned_leads: {
-            where:  { account_id: accountId, won_at: { gte: monthStart } },
+            where:  { account_id: accountId, workspace_id: workspaceId, won_at: { gte: monthStart } },
             select: { won_value: true },
           },
         },
@@ -129,11 +133,11 @@ export async function GET() {
 
       // Lead sources with recent activity
       prisma.leadSource.findMany({
-        where:  { account_id: accountId },
+        where:  { account_id: accountId, workspace_id: workspaceId },
         select: {
           id: true, name: true,
           leads: {
-            where:  { account_id: accountId, is_junk: false },
+            where:  { account_id: accountId, workspace_id: workspaceId, is_junk: false },
             select: { id: true, created_at: true, won_at: true },
           },
         },
@@ -141,7 +145,7 @@ export async function GET() {
 
       // Recent activity — last 8 signals across the account
       prisma.signal.findMany({
-        where:   { account_id: accountId },
+        where:   { account_id: accountId, workspace_id: workspaceId },
         orderBy: { created_at: "desc" },
         take:    8,
         select:  {
@@ -153,7 +157,7 @@ export async function GET() {
 
       // Behaviour health — counts for donut bands (active leads only)
       prisma.lead.findMany({
-        where:  { account_id: accountId, is_junk: false, won_at: null, lost_at: null },
+        where:  { account_id: accountId, workspace_id: workspaceId, is_junk: false, won_at: null, lost_at: null },
         select: {
           is_missed:        true,
           first_contact_at: true,

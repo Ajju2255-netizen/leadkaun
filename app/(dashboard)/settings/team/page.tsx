@@ -5,7 +5,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { UserPlus, Users, X, ShieldCheck, UserCog } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
-import { NativeSelect } from "@/components/shared/NativeSelect"
+import { ThemedSelect } from "@/components/shared/ThemedSelect"
+import { ModalPortal } from "@/components/shared/ModalPortal"
 
 interface Member {
   id: string
@@ -131,7 +132,7 @@ export default function TeamPage() {
           <Users className="w-6 h-6 text-white" strokeWidth={2.4} />
         </div>
         <div>
-          <h1 className="text-[26px] font-extrabold text-slate-900 tracking-tight leading-tight">Team</h1>
+          <h1 className="text-[28px] font-bold text-ink tracking-[-0.02em] leading-tight">Team</h1>
           <p className="text-[13px] text-slate-500 mt-0.5">Invite members, manage roles, reassign leads.</p>
         </div>
       </div>
@@ -163,20 +164,21 @@ export default function TeamPage() {
             <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
               Role
             </label>
-            <NativeSelect
+            <ThemedSelect
               value={inviteRole}
-              onChange={(e) => setInviteRole(e.target.value as "REP" | "MANAGER")}
-              className="h-[42px] py-0"
-            >
-              <option value="REP">Rep</option>
-              <option value="MANAGER">Manager</option>
-            </NativeSelect>
+              onValueChange={(v) => setInviteRole(v as "REP" | "MANAGER")}
+              options={[{ value: "REP", label: "Rep" }, { value: "MANAGER", label: "Manager" }]}
+              className="!h-[42px]"
+              aria-label="Role"
+            />
           </div>
           <button
             type="submit"
             disabled={inviteLoading}
-            className="h-[42px] px-5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white
-                       text-[13px] font-semibold transition-all duration-150 disabled:opacity-50 shrink-0"
+            className="h-[42px] px-5 rounded-xl text-white text-[13px] font-semibold transition-all duration-150
+                       bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600
+                       shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)]
+                       disabled:opacity-50 active:scale-[0.98] shrink-0"
           >
             {inviteLoading ? "Sending…" : "Send Invite"}
           </button>
@@ -267,11 +269,12 @@ export default function TeamPage() {
 
       {/* ── Deactivate modal ─────────────────────────────────────────────── */}
       {deactivateTarget && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px] flex items-end sm:items-center justify-center z-50 p-4">
+        <ModalPortal>
+        <div className="fixed inset-0 bg-slate-900/55 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl border border-slate-200 p-6 w-full max-w-sm space-y-4
                           shadow-[0_24px_48px_rgba(15,23,42,0.18)]">
             <div className="flex items-center justify-between">
-              <h2 className="text-[17px] font-bold text-slate-900">Deactivate {deactivateTarget.first_name}?</h2>
+              <h2 className="text-[16px] font-bold text-slate-900">Deactivate {deactivateTarget.first_name}?</h2>
               <button onClick={() => setDeactivateTarget(null)}
                 className="w-7 h-7 flex items-center justify-center rounded-full text-slate-400
                            hover:text-slate-700 hover:bg-slate-100 transition-all">
@@ -291,16 +294,13 @@ export default function TeamPage() {
                 <label className="text-[12px] font-semibold text-slate-500 uppercase tracking-wider">
                   Reassign leads to
                 </label>
-                <NativeSelect
+                <ThemedSelect
                   value={reassignTo}
-                  onChange={(e) => setReassignTo(e.target.value)}
-                  className="h-10 py-0"
-                >
-                  <option value="">Select a rep…</option>
-                  {activeReps.filter((r) => r.id !== deactivateTarget.id).map((r) => (
-                    <option key={r.id} value={r.id}>{r.first_name} {r.last_name}</option>
-                  ))}
-                </NativeSelect>
+                  onValueChange={setReassignTo}
+                  options={activeReps.filter((r) => r.id !== deactivateTarget.id).map((r) => ({ value: r.id, label: `${r.first_name} ${r.last_name ?? ""}`.trim() }))}
+                  placeholder="Select a rep…"
+                  aria-label="Reassign leads to"
+                />
               </div>
             )}
             <div className="flex gap-2 pt-1">
@@ -319,15 +319,17 @@ export default function TeamPage() {
             </div>
           </div>
         </div>
+        </ModalPortal>
       )}
 
       {/* ── Role change modal ────────────────────────────────────────────── */}
       {roleTarget && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px] flex items-end sm:items-center justify-center z-50 p-4">
+        <ModalPortal>
+        <div className="fixed inset-0 bg-slate-900/55 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl border border-slate-200 p-6 w-full max-w-sm space-y-4
                           shadow-[0_24px_48px_rgba(15,23,42,0.18)]">
             <div className="flex items-center justify-between">
-              <h2 className="text-[17px] font-bold text-slate-900">Change Role</h2>
+              <h2 className="text-[16px] font-bold text-slate-900">Change Role</h2>
               <button onClick={() => setRoleTarget(null)}
                 className="w-7 h-7 flex items-center justify-center rounded-full text-slate-400
                            hover:text-slate-700 hover:bg-slate-100 transition-all">
@@ -339,14 +341,12 @@ export default function TeamPage() {
             </p>
             <div className="space-y-1.5">
               <label className="text-[12px] font-semibold text-slate-500 uppercase tracking-wider">New Role</label>
-              <NativeSelect
+              <ThemedSelect
                 value={newRole}
-                onChange={(e) => setNewRole(e.target.value as "REP" | "MANAGER")}
-                className="h-10 py-0"
-              >
-                <option value="REP">Rep</option>
-                <option value="MANAGER">Manager</option>
-              </NativeSelect>
+                onValueChange={(v) => setNewRole(v as "REP" | "MANAGER")}
+                options={[{ value: "REP", label: "Rep" }, { value: "MANAGER", label: "Manager" }]}
+                aria-label="New role"
+              />
             </div>
             <div className="flex gap-2 pt-1">
               <button onClick={() => setRoleTarget(null)}
@@ -355,13 +355,14 @@ export default function TeamPage() {
                 Cancel
               </button>
               <button onClick={handleRoleChange} disabled={roleSaving}
-                className="flex-1 h-10 rounded-full bg-sky-600 hover:bg-sky-700 text-white
+                className="flex-1 h-10 rounded-full bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)] text-white
                            text-[13px] font-semibold transition-all disabled:opacity-50">
                 {roleSaving ? "Saving…" : "Save Role"}
               </button>
             </div>
           </div>
         </div>
+        </ModalPortal>
       )}
 
     </div>

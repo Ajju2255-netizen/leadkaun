@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { requireRole } from "@/lib/auth/middleware"
 import { handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError, parseBody } from "@/lib/api/response"
+import { rateLimited, LIMITS } from "@/lib/rate-limit"
 
 const UpdateSchema = z.object({
   role:               z.enum(["REP", "MANAGER"]).optional(),
@@ -25,6 +26,9 @@ export async function PATCH(
 ) {
   try {
     const session = await requireRole("ADMIN")
+
+    const _rl = await rateLimited(`team:member:${session.account.id}`, LIMITS.write)
+    if (_rl) return _rl
     const { id }  = await params
 
     const { data, error } = await parseBody(req, UpdateSchema)

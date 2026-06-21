@@ -1,8 +1,9 @@
 import { z } from "zod"
 import { prisma } from "@/lib/prisma"
-import { requireRole } from "@/lib/auth/middleware"
+import { requireWorkspace } from "@/lib/auth/middleware"
 import { handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError, parseBody } from "@/lib/api/response"
+import { rateLimited, LIMITS } from "@/lib/rate-limit"
 
 /**
  * GET /api/settings/follow-up-config
@@ -27,10 +28,10 @@ const ConfigSchema = z.object({
 
 export async function GET(_req: Request) {
   try {
-    const session = await requireRole("ADMIN", "MANAGER")
+    const session = await requireWorkspace("ADMIN", "MANAGER")
 
     const configs = await prisma.followUpConfig.findMany({
-      where:   { account_id: session.account.id },
+      where:   { account_id: session.account.id, workspace_id: session.workspace.id },
       orderBy: { grade: "asc" },
     })
 
@@ -44,18 +45,22 @@ export async function GET(_req: Request) {
 
 export async function PUT(req: Request) {
   try {
-    const session = await requireRole("ADMIN")
+    const session = await requireWorkspace("ADMIN")
+
+    const _rl = await rateLimited(`settings:fuconfig:${session.account.id}`, LIMITS.write)
+    if (_rl) return _rl
 
     const { data, error } = await parseBody(req, ConfigSchema)
     if (error) return error
 
     const config = await prisma.followUpConfig.upsert({
-      where:  { account_id_grade: { account_id: session.account.id, grade: data.grade } },
+      where:  { workspace_id_grade: { workspace_id: session.workspace.id, grade: data.grade } },
       update: { schedule: data.schedule },
       create: {
-        account_id: session.account.id,
-        grade:      data.grade,
-        schedule:   data.schedule,
+        account_id:   session.account.id,
+        workspace_id: session.workspace.id,
+        grade:        data.grade,
+        schedule:     data.schedule,
       },
     })
 

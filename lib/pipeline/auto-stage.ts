@@ -26,6 +26,7 @@ export async function applyAutoStage(
   lead: {
     id:              string
     account_id:      string
+    workspace_id:    string | null
     stage_id:        string
     stage:           { key: string; display_order: number; is_terminal: boolean }
     assigned_rep_id: string | null
@@ -45,9 +46,9 @@ export async function applyAutoStage(
   const transition = SIGNAL_TO_STAGE[signalType]
   if (!transition) return false
 
-  // Find the target stage for this account
+  // Find the target stage in this workspace
   const targetStage = await tx.pipelineStage.findFirst({
-    where: { account_id: accountId, key: transition.key },
+    where: { account_id: accountId, workspace_id: lead.workspace_id, key: transition.key },
   })
   if (!targetStage) return false
 

@@ -1,7 +1,8 @@
 "use client"
 
+import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { User, IndianRupee, Clock, CheckCircle, Trophy } from "lucide-react"
+import { User, IndianRupee, Clock, CheckCircle, Trophy, ChevronDown } from "lucide-react"
 import { DeltaChip } from "@/components/shared/DeltaChip"
 import { Skeleton } from "@/components/ui/skeleton"
 import { AvatarCircle } from "@/components/shared/AvatarCircle"
@@ -46,6 +47,15 @@ const REP_SCORE_MAX = {
   daily_execution:    20,
   conversion_rate:    20,
 } as const
+
+/** The five Rep-Score components, in display order, for the expandable breakdown. */
+const SCORE_SEGMENTS: { key: keyof RepScoreComponents; label: string; max: number }[] = [
+  { key: "follow_up_pct",      label: "Follow-up",  max: REP_SCORE_MAX.follow_up_pct },
+  { key: "speed_to_lead",      label: "Speed",      max: REP_SCORE_MAX.speed_to_lead },
+  { key: "missed_value_recov", label: "Recovered",  max: REP_SCORE_MAX.missed_value_recov },
+  { key: "daily_execution",    label: "Exec today", max: REP_SCORE_MAX.daily_execution },
+  { key: "conversion_rate",    label: "Conversion", max: REP_SCORE_MAX.conversion_rate },
+]
 
 interface RepTrackingData {
   account: {
@@ -131,37 +141,6 @@ function PerfBar({ pct, color }: { pct: number; color: string }) {
   )
 }
 
-// ── RepScoreBreakdown — 5-segment bar showing each component's contribution ──
-
-function RepScoreBreakdown({ components }: { components: RepScoreComponents }) {
-  const segments: { key: keyof RepScoreComponents; label: string; value: number; max: number }[] = [
-    { key: "follow_up_pct",      label: "FU%",        value: components.follow_up_pct,      max: REP_SCORE_MAX.follow_up_pct },
-    { key: "speed_to_lead",      label: "Speed",      value: components.speed_to_lead,      max: REP_SCORE_MAX.speed_to_lead },
-    { key: "missed_value_recov", label: "Recovered",  value: components.missed_value_recov, max: REP_SCORE_MAX.missed_value_recov },
-    { key: "daily_execution",    label: "Exec today", value: components.daily_execution,    max: REP_SCORE_MAX.daily_execution },
-    { key: "conversion_rate",    label: "Conversion", value: components.conversion_rate,    max: REP_SCORE_MAX.conversion_rate },
-  ]
-  return (
-    <div className="flex h-1 w-full rounded-full overflow-hidden mt-1.5 gap-[2px]">
-      {segments.map((s) => {
-        const fillRatio = s.max > 0 ? s.value / s.max : 0
-        return (
-          <div
-            key={s.key}
-            className="h-full"
-            title={`${s.label}: ${s.value}/${s.max}`}
-            style={{
-              width:      `${s.max}%`,
-              background: scoreColor(fillRatio * 100).bar,
-              opacity:    0.25 + 0.75 * fillRatio,
-            }}
-          />
-        )
-      })}
-    </div>
-  )
-}
-
 // ── StatCard — top-row tinted KPI tile ────────────────────────────────────────
 
 function StatCard({
@@ -193,7 +172,7 @@ function StatCard({
       <p className="text-[12px] font-semibold text-ink-soft">{label}</p>
       <div className="mt-3 flex items-end justify-between gap-3">
         <div>
-          <div className={`text-[32px] md:text-[36px] font-bold tabular-nums leading-none ${valueColor}`}>
+          <div className={`text-[30px] font-bold tabular-nums leading-none ${valueColor}`}>
             {value}
           </div>
           <p className="text-[12px] text-ink-muted mt-2">{caption}</p>
@@ -229,12 +208,17 @@ export default function RepTrackingPage() {
     refetchInterval: 60_000,
   })
 
-  const account     = data?.account
-  const reps        = data?.reps ?? []
-  const topPerformer = data?.top_performer
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
-  // Sort reps by revenue desc for the table
-  const sortedReps = [...reps].sort((a, b) => b.revenue_recovered - a.revenue_recovered)
+  const account = data?.account
+  const reps    = data?.reps ?? []
+
+  // Sort by the holistic Rep Score (the headline metric) so the list order
+  // matches the score column; revenue recovered breaks ties.
+  const sortedReps = [...reps].sort(
+    (a, b) => (b.rep_score ?? 0) - (a.rep_score ?? 0) || b.revenue_recovered - a.revenue_recovered,
+  )
+  const leader = sortedReps[0] ?? null
 
   // Find max values for proportional bar scaling
   const maxRevenue   = Math.max(...sortedReps.map((r) => r.revenue_recovered), 1)
@@ -255,7 +239,7 @@ export default function RepTrackingPage() {
           <User className="w-6 h-6 text-sky-600" strokeWidth={2.25} fill="currentColor" />
         </div>
         <div>
-          <h1 className="text-[28px] md:text-[32px] font-bold text-ink tracking-tight leading-none">
+          <h1 className="text-[28px] font-bold text-ink tracking-[-0.02em] leading-tight">
             Sales Rep Tracking
           </h1>
           <p className="text-[14px] text-ink-soft mt-2 leading-relaxed">
@@ -385,48 +369,86 @@ export default function RepTrackingPage() {
 
               const score = rep.rep_score ?? rep.follow_up_score ?? 0
 
+              const isOpen = expandedId === rep.id
+
               return (
-                <div
-                  key={rep.id}
-                  className={`grid grid-cols-[1.2fr_1fr_1fr_1fr_88px] gap-4 px-6 py-4 items-center transition-colors hover:bg-sky-50/40 ${idx === 1 ? "bg-sky-50/40" : ""}`}
-                >
-                  {/* Rep */}
-                  <div className="flex items-center gap-3 min-w-0">
-                    <AvatarCircle seed={rep.first_name} size="md" />
-                    <p className="text-[14px] font-semibold text-ink truncate">{fullName}</p>
-                  </div>
+                <div key={rep.id}>
+                  <button
+                    onClick={() => setExpandedId(isOpen ? null : rep.id)}
+                    className={`w-full text-left grid grid-cols-[1.2fr_1fr_1fr_1fr_88px] gap-4 px-6 py-4 items-center transition-colors hover:bg-sky-50/40 ${isOpen ? "bg-sky-50/40" : ""}`}
+                  >
+                    {/* Rep */}
+                    <div className="flex items-center gap-3 min-w-0">
+                      <AvatarCircle seed={rep.first_name} size="md" />
+                      <div className="min-w-0">
+                        <p className="text-[14px] font-semibold text-ink truncate">{fullName}</p>
+                        {idx === 0 && <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 leading-none mt-0.5">Leader</p>}
+                      </div>
+                    </div>
 
-                  {/* ₹ Recovered */}
-                  <div>
-                    <p className="text-[14px] font-semibold text-ink tabular-nums">
-                      ₹{formatINR(rep.revenue_recovered)}
-                    </p>
-                    <PerfBar pct={revPct} color={revColor} />
-                  </div>
+                    {/* ₹ Recovered */}
+                    <div>
+                      <p className="text-[14px] font-semibold text-ink tabular-nums">
+                        ₹{formatINR(rep.revenue_recovered)}
+                      </p>
+                      <PerfBar pct={revPct} color={revColor} />
+                    </div>
 
-                  {/* Response Time */}
-                  <div>
-                    <p className="text-[14px] font-semibold text-ink tabular-nums">
-                      {formatResponseTime(rep.response_time_seconds)}
-                    </p>
-                    <PerfBar pct={respPct} color={respColor} />
-                  </div>
+                    {/* Response Time */}
+                    <div>
+                      <p className="text-[14px] font-semibold text-ink tabular-nums">
+                        {formatResponseTime(rep.response_time_seconds)}
+                      </p>
+                      <PerfBar pct={respPct} color={respColor} />
+                    </div>
 
-                  {/* Follow-up Completion */}
-                  <div>
-                    <p className="text-[14px] font-semibold text-ink tabular-nums">
-                      {rep.follow_up_completion_pct == null ? "—" : `${rep.follow_up_completion_pct}%`}
-                    </p>
-                    <PerfBar pct={fuPct} color={fuColor} />
-                  </div>
+                    {/* Follow-up Completion */}
+                    <div>
+                      <p className="text-[14px] font-semibold text-ink tabular-nums">
+                        {rep.follow_up_completion_pct == null ? "—" : `${rep.follow_up_completion_pct}%`}
+                      </p>
+                      <PerfBar pct={fuPct} color={fuColor} />
+                    </div>
 
-                  {/* Rep Score donut + 5-component breakdown */}
-                  <div className="flex flex-col items-center gap-1.5">
-                    <ScoreRing score={score} />
-                    {rep.rep_score_components && (
-                      <RepScoreBreakdown components={rep.rep_score_components} />
-                    )}
-                  </div>
+                    {/* Rep Score donut + expand cue */}
+                    <div className="flex flex-col items-center gap-1">
+                      <ScoreRing score={score} />
+                      <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-sky-600">
+                        {isOpen ? "Hide" : "Why"}
+                        <ChevronDown className={`w-3 h-3 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                      </span>
+                    </div>
+                  </button>
+
+                  {/* Expandable 5-component breakdown — explains the score */}
+                  {isOpen && rep.rep_score_components && (
+                    <div className="px-6 pb-4">
+                      <div className="rounded-xl bg-slate-50/70 ring-1 ring-slate-100 px-4 py-3.5">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-muted mb-3">
+                          Rep score breakdown · {score}/100
+                        </p>
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-x-4 gap-y-3">
+                          {SCORE_SEGMENTS.map((seg) => {
+                            const val = rep.rep_score_components[seg.key]
+                            const pct = seg.max > 0 ? (val / seg.max) * 100 : 0
+                            return (
+                              <div key={seg.key}>
+                                <div className="flex items-baseline justify-between gap-1">
+                                  <span className="text-[11px] text-ink-soft">{seg.label}</span>
+                                  <span className="text-[11px] font-bold tabular-nums text-ink">
+                                    {Math.round(val)}<span className="text-slate-400 font-medium">/{seg.max}</span>
+                                  </span>
+                                </div>
+                                <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden mt-1">
+                                  <div className="h-full rounded-full" style={{ width: `${pct}%`, background: scoreColor(pct).bar }} />
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )
             })}
@@ -434,8 +456,8 @@ export default function RepTrackingPage() {
         )}
       </div>
 
-      {/* ── Top Performer card ─────────────────────────────────────────────── */}
-      {!isLoading && topPerformer && topPerformer.revenue_recovered > 0 && (
+      {/* ── Top Performer card — highest Rep Score (matches the sorted list) ── */}
+      {!isLoading && leader && (leader.rep_score > 0 || leader.revenue_recovered > 0) && (
         <div className="glass-2 gloss-edge rounded-2xl px-5 py-4 flex items-center gap-4">
           <div
             className="w-12 h-12 rounded-full flex items-center justify-center shrink-0"
@@ -446,26 +468,17 @@ export default function RepTrackingPage() {
           >
             <Trophy className="w-5 h-5 text-white" strokeWidth={2.5} fill="currentColor" />
           </div>
-          <div className="flex-1">
-            <p className="text-[11px] font-semibold text-ink-muted uppercase tracking-[0.14em]">Top Performer</p>
-            <p className="text-[15px] font-bold text-ink mt-0.5">
-              {topPerformer.first_name} {topPerformer.last_name}
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] font-semibold text-ink-muted uppercase tracking-[0.14em]">Top performer</p>
+            <p className="text-[16px] font-bold text-ink mt-0.5">
+              {leader.first_name} {leader.last_name}
             </p>
-            <p className="text-[13px] text-emerald-600 font-semibold tabular-nums mt-0.5">
-              ₹{formatINR(topPerformer.revenue_recovered)} recovered this month!
+            <p className="text-[13px] text-ink-muted mt-0.5">
+              Rep score <span className="font-bold text-sky-700 tabular-nums">{leader.rep_score}</span>
+              {leader.revenue_recovered > 0 && (
+                <> · <span className="font-semibold text-emerald-600 tabular-nums">₹{formatINR(leader.revenue_recovered)}</span> recovered</>
+              )}
             </p>
-          </div>
-          {/* Decorative sparkles */}
-          <div className="hidden md:flex items-center gap-2">
-            {[12, 8, 14].map((s, i) => (
-              <span
-                key={i}
-                className="text-[18px]"
-                style={{ opacity: 0.35 + i * 0.15, fontSize: `${s}px` }}
-              >
-                ✦
-              </span>
-            ))}
           </div>
         </div>
       )}

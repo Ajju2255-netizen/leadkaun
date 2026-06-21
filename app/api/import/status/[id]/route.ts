@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma"
-import { requireAuth } from "@/lib/auth/middleware"
+import { requireWorkspace } from "@/lib/auth/middleware"
 import { handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
 
@@ -16,11 +16,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session  = await requireAuth()
+    const session  = await requireWorkspace()
     const { id }   = await params
 
     const job = await prisma.importJobStatus.findFirst({
-      where: { id, account_id: session.account.id },
+      where: { id, account_id: session.account.id, workspace_id: session.workspace.id },
       select: {
         id:                true,
         status:            true,

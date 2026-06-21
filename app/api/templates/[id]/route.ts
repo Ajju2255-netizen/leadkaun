@@ -1,8 +1,9 @@
 import { z } from "zod"
 import { prisma } from "@/lib/prisma"
-import { requireAuth, requireRole } from "@/lib/auth/middleware"
+import { requireWorkspace } from "@/lib/auth/middleware"
 import { handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError, parseBody } from "@/lib/api/response"
+import { rateLimited, LIMITS } from "@/lib/rate-limit"
 
 const UpdateSchema = z.object({
   name:   z.string().min(1).max(100).optional(),
@@ -17,11 +18,13 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await requireRole("ADMIN", "MANAGER")
+    const session = await requireWorkspace("ADMIN", "MANAGER")
+    const _rl = await rateLimited(`templates:${session.user.id}`, LIMITS.write)
+    if (_rl) return _rl
     const { id }  = await params
 
     const tmpl = await prisma.smartTemplate.findFirst({
-      where: { id, account_id: session.account.id },
+      where: { id, account_id: session.account.id, workspace_id: session.workspace.id },
     })
     if (!tmpl) return apiError("Template not found", "NOT_FOUND", 404)
 
@@ -52,11 +55,13 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await requireRole("ADMIN", "MANAGER")
+    const session = await requireWorkspace("ADMIN", "MANAGER")
+    const _rl = await rateLimited(`templates:${session.user.id}`, LIMITS.write)
+    if (_rl) return _rl
     const { id }  = await params
 
     const tmpl = await prisma.smartTemplate.findFirst({
-      where: { id, account_id: session.account.id },
+      where: { id, account_id: session.account.id, workspace_id: session.workspace.id },
     })
     if (!tmpl) return apiError("Template not found", "NOT_FOUND", 404)
 
@@ -76,11 +81,13 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await requireAuth()
+    const session = await requireWorkspace()
+    const _rl = await rateLimited(`templates:${session.user.id}`, LIMITS.write)
+    if (_rl) return _rl
     const { id }  = await params
 
     const tmpl = await prisma.smartTemplate.findFirst({
-      where: { id, account_id: session.account.id },
+      where: { id, account_id: session.account.id, workspace_id: session.workspace.id },
     })
     if (!tmpl) return apiError("Template not found", "NOT_FOUND", 404)
 

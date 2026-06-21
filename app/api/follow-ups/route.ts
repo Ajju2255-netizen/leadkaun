@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma"
-import { requireAuth } from "@/lib/auth/middleware"
+import { requireWorkspace } from "@/lib/auth/middleware"
 import { handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
 
@@ -11,7 +11,7 @@ import { apiSuccess, apiError } from "@/lib/api/response"
  */
 export async function GET(req: Request) {
   try {
-    const session = await requireAuth()
+    const session = await requireWorkspace()
     const { searchParams } = new URL(req.url)
     const repId = searchParams.get("rep_id") ?? undefined
 
@@ -26,7 +26,7 @@ export async function GET(req: Request) {
     // Defensive promotion: PENDING with past due → OVERDUE. Idempotent.
     await prisma.followUpAction.updateMany({
       where: {
-        account_id: session.account.id,
+        account_id: session.account.id, workspace_id: session.workspace.id,
         ...(repFilterId ? { assigned_rep_id: repFilterId } : {}),
         status:     "PENDING",
         due_date:   { lt: new Date() },

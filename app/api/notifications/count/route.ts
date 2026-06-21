@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma"
-import { requireAuth, handleAuthError } from "@/lib/auth/middleware"
+import { requireWorkspace, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
 
 /**
@@ -8,11 +8,11 @@ import { apiSuccess, apiError } from "@/lib/api/response"
  */
 export async function GET(_req: Request) {
   try {
-    const session = await requireAuth()
+    const session = await requireWorkspace()
 
     const count = await prisma.notification.count({
       where: {
-        account_id: session.account.id,
+        account_id: session.account.id, workspace_id: session.workspace.id,
         OR: [
           { user_id: null },
           { user_id: session.user.id },

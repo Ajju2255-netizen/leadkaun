@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma"
-import { requireAuth, handleAuthError } from "@/lib/auth/middleware"
+import { requireWorkspace, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
 
 /**
@@ -17,7 +17,7 @@ import { apiSuccess, apiError } from "@/lib/api/response"
  */
 export async function GET(req: Request) {
   try {
-    const session  = await requireAuth()
+    const session  = await requireWorkspace()
     const { searchParams } = new URL(req.url)
     const repId    = searchParams.get("rep_id")
     const isManager = session.user.role === "ADMIN" || session.user.role === "MANAGER"
@@ -38,7 +38,7 @@ export async function GET(req: Request) {
     // schedule is missed or the worker is paused — done on every read, idempotent.
     await prisma.followUpAction.updateMany({
       where: {
-        account_id: session.account.id,
+        account_id: session.account.id, workspace_id: session.workspace.id,
         ...(targetId ? { assigned_rep_id: targetId } : {}),
         status:     "PENDING",
         due_date:   { lt: now },

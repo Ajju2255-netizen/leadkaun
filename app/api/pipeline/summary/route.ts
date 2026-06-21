@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
-import { requireAuth, handleAuthError } from "@/lib/auth/middleware"
+import { requireWorkspace, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
+import { startOfIstDay, startOfIstMonth } from "@/lib/time/ist"
 
 /**
  * GET /api/pipeline/summary
@@ -69,21 +70,24 @@ function deltaPct(curr: number, prev: number): number {
   return Math.round(((curr - prev) / prev) * 1000) / 10
 }
 
-function startOfDay(d: Date): Date { const c = new Date(d); c.setHours(0, 0, 0, 0); return c }
+// IST day start (UTC instant) — keeps day buckets aligned to the Indian
+// calendar day rather than the server's UTC midnight.
+function startOfDay(d: Date): Date { return startOfIstDay(d) }
 
 export async function GET() {
   try {
-    const session = await requireAuth()
+    const session = await requireWorkspace()
     const accountId = session.account.id
+    const workspaceId = session.workspace.id
 
     const now = new Date()
-    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    const thisMonthStart = startOfIstMonth(now)
+    const lastMonthStart = startOfIstMonth(new Date(thisMonthStart.getTime() - 1))
 
     // Pull all the leads/signals we need in parallel
     const [allLeads, recentSignals, sources, stages] = await Promise.all([
       prisma.lead.findMany({
-        where: { account_id: accountId },
+        where: { account_id: accountId, workspace_id: workspaceId },
         select: {
           id: true, created_at: true, won_at: true, lost_at: true, won_value: true,
           stage_id: true, source_id: true,
@@ -91,7 +95,7 @@ export async function GET() {
         },
       }),
       prisma.signal.findMany({
-        where:   { account_id: accountId },
+        where:   { account_id: accountId, workspace_id: workspaceId },
         orderBy: { created_at: "desc" },
         take:    8,
         select:  {
@@ -100,11 +104,11 @@ export async function GET() {
         },
       }),
       prisma.leadSource.findMany({
-        where: { account_id: accountId },
+        where: { account_id: accountId, workspace_id: workspaceId },
         select: { id: true, name: true, key: true },
       }),
       prisma.pipelineStage.findMany({
-        where:  { account_id: accountId },
+        where:  { account_id: accountId, workspace_id: workspaceId },
         select: { id: true, is_terminal: true, is_won: true, is_lost: true },
       }),
     ])

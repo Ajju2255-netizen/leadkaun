@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma"
-import { requireAuth, handleAuthError } from "@/lib/auth/middleware"
+import { requireWorkspace, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
 import { getNextAction, buildActionReason } from "@/lib/scoring/next-action"
 import { computeAiScore } from "@/lib/scoring/ai-score"
@@ -50,7 +50,7 @@ const HOT_WINDOW_MS = 2 * 3_600_000 // 2 hours
  */
 export async function GET(req: Request) {
   try {
-    const session = await requireAuth()
+    const session = await requireWorkspace()
     const { searchParams } = new URL(req.url)
 
     // Rep filter: REP always sees only their leads; admin can optionally filter
@@ -63,7 +63,7 @@ export async function GET(req: Request) {
 
     const leads = await prisma.lead.findMany({
       where: {
-        account_id: session.account.id,
+        account_id: session.account.id, workspace_id: session.workspace.id,
         is_junk:    false,
         is_fatigued: false,
         is_missed:  false,
@@ -194,7 +194,7 @@ export async function GET(req: Request) {
     const sevenDaysAgo = new Date(now - 7 * 24 * 60 * 60 * 1000)
     const highPrioritySevenDaysAgo = await prisma.lead.count({
       where: {
-        account_id: session.account.id,
+        account_id: session.account.id, workspace_id: session.workspace.id,
         grade:      { in: ["A", "B"] },
         is_junk:    false,
         is_missed:  false,

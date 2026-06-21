@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma"
-import { requireAuth, handleAuthError } from "@/lib/auth/middleware"
+import { requireWorkspace, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
 
 /**
@@ -15,13 +15,14 @@ import { apiSuccess, apiError } from "@/lib/api/response"
  */
 export async function GET() {
   try {
-    const session = await requireAuth()
+    const session = await requireWorkspace()
     const accountId = session.account.id
+    const workspaceId = session.workspace.id
 
     // ── 1. Scoring speed — avg ms per lead from import jobs ─────────────────
     const completedJobs = await prisma.importJobStatus.findMany({
       where: {
-        account_id: accountId,
+        account_id: accountId, workspace_id: workspaceId,
         status: "COMPLETE",
         completed_at: { not: null },
         total_rows: { gt: 0 },
@@ -43,7 +44,7 @@ export async function GET() {
 
     // ── 2. Score breakdown — avg fit / intent / quality across non-junk leads ─
     const agg = await prisma.lead.aggregate({
-      where: { account_id: accountId, is_junk: false },
+      where: { account_id: accountId, workspace_id: workspaceId, is_junk: false },
       _avg: { fit_score: true, intent_score: true, quality_score: true },
       _count: { _all: true },
     })
@@ -75,7 +76,7 @@ export async function GET() {
     const [recentAgg, olderAgg] = await Promise.all([
       prisma.lead.aggregate({
         where: {
-          account_id: accountId,
+          account_id: accountId, workspace_id: workspaceId,
           is_junk: false,
           imported_at: { gte: day7 },
         },
@@ -84,7 +85,7 @@ export async function GET() {
       }),
       prisma.lead.aggregate({
         where: {
-          account_id: accountId,
+          account_id: accountId, workspace_id: workspaceId,
           is_junk: false,
           imported_at: { gte: day14, lt: day7 },
         },

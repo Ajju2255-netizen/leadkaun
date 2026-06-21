@@ -5,7 +5,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Building2 } from "lucide-react"
-import { NativeSelect } from "@/components/shared/NativeSelect"
+import { ThemedSelect } from "@/components/shared/ThemedSelect"
 
 const TEAM_SIZE_OPTIONS = [
   { value: "SOLO",       label: "Solo (just me)"    },
@@ -101,7 +101,7 @@ export default function OrgPage() {
           <Building2 className="w-6 h-6 text-white" strokeWidth={2.4} />
         </div>
         <div>
-          <h1 className="text-[26px] font-extrabold text-slate-900 tracking-tight leading-tight">Organisation</h1>
+          <h1 className="text-[28px] font-bold text-ink tracking-[-0.02em] leading-tight">Organisation</h1>
           <p className="text-[13px] text-slate-500 mt-0.5">Your workspace details.</p>
         </div>
       </div>
@@ -130,21 +130,17 @@ export default function OrgPage() {
 
         <div className="grid grid-cols-2 gap-3">
           <Field label="Team size">
-            <NativeSelect value={teamSize} onChange={(e) => setTeamSize(e.target.value)}>
-              {TEAM_SIZE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </NativeSelect>
+            <ThemedSelect value={teamSize} onValueChange={setTeamSize} options={TEAM_SIZE_OPTIONS} aria-label="Team size" />
           </Field>
           <Field label="Monthly lead volume">
-            <NativeSelect value={leadVol} onChange={(e) => setLeadVol(e.target.value)}>
-              {LEAD_VOL_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </NativeSelect>
+            <ThemedSelect value={leadVol} onValueChange={setLeadVol} options={LEAD_VOL_OPTIONS} aria-label="Monthly lead volume" />
           </Field>
         </div>
 
         <button
           onClick={handleSave}
           disabled={saving || !orgName.trim() || !industry.trim() || !city.trim() || !state.trim()}
-          className="h-9 px-5 rounded-full bg-sky-600 hover:bg-sky-700 disabled:opacity-50
+          className="h-9 px-5 rounded-full bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)] disabled:opacity-50
                      text-white text-[13px] font-semibold transition-all active:scale-[0.97]"
         >
           {saving ? "Saving…" : "Save organisation"}

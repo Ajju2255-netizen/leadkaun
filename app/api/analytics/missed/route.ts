@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma"
-import { requireRole } from "@/lib/auth/middleware"
+import { requireWorkspace } from "@/lib/auth/middleware"
 import { handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
+import { startOfIstDay } from "@/lib/time/ist"
 
 /**
  * GET /api/analytics/missed
@@ -13,8 +14,9 @@ import { apiSuccess, apiError } from "@/lib/api/response"
  */
 export async function GET(_req: Request) {
   try {
-    const session = await requireRole("ADMIN", "MANAGER")
+    const session = await requireWorkspace("ADMIN", "MANAGER")
     const accountId = session.account.id
+    const workspaceId = session.workspace.id
 
     const now    = new Date()
     const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
@@ -22,7 +24,7 @@ export async function GET(_req: Request) {
     // All currently missed leads
     const missedLeads = await prisma.lead.findMany({
       where: {
-        account_id: accountId,
+        account_id: accountId, workspace_id: workspaceId,
         is_missed:  true,
         won_at:     null,
         lost_at:    null,
@@ -47,7 +49,7 @@ export async function GET(_req: Request) {
     // (matches the 4-tier missed-opportunity model — A=24h, B=48h, C=7d, D=30d)
     const recoveredThisWeek = await prisma.lead.aggregate({
       where: {
-        account_id: accountId,
+        account_id: accountId, workspace_id: workspaceId,
         grade:      { in: ["A", "B", "C", "D"] },
         won_at:     { gte: weekAgo },
       },
@@ -106,11 +108,8 @@ export async function GET(_req: Request) {
     // became missed on that day. Drives the sparkline + 7d % change.
     const trend_7d: number[] = []
     for (let i = 6; i >= 0; i--) {
-      const dayStart = new Date(now)
-      dayStart.setHours(0, 0, 0, 0)
-      dayStart.setDate(dayStart.getDate() - i)
-      const dayEnd = new Date(dayStart)
-      dayEnd.setDate(dayEnd.getDate() + 1)
+      const dayStart = startOfIstDay(new Date(now.getTime() - i * 86_400_000))
+      const dayEnd   = new Date(dayStart.getTime() + 86_400_000)
       const dayValue = enriched
         .filter((l) => l.missed_at && new Date(l.missed_at) >= dayStart && new Date(l.missed_at) < dayEnd)
         .reduce((s, l) => s + (l.expected_value ?? 0), 0)

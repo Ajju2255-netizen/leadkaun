@@ -1,7 +1,8 @@
 import { z } from "zod"
 import { prisma } from "@/lib/prisma"
-import { requireRole, handleAuthError } from "@/lib/auth/middleware"
+import { requireWorkspace, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError, parseBody, NOT_FOUND } from "@/lib/api/response"
+import { rateLimited, LIMITS } from "@/lib/rate-limit"
 
 type Params = { params: { id: string } }
 
@@ -15,13 +16,16 @@ const AssignSchema = z.object({
  */
 export async function POST(req: Request, { params }: Params) {
   try {
-    const session = await requireRole("ADMIN", "MANAGER")
+    const session = await requireWorkspace("ADMIN", "MANAGER")
+
+    const _rl = await rateLimited(`lead-action:${session.user.id}`, LIMITS.write)
+    if (_rl) return _rl
     const { data, error } = await parseBody(req, AssignSchema)
     if (error) return error
 
     // Verify lead + target rep both belong to this account
     const [lead, rep] = await Promise.all([
-      prisma.lead.findFirst({ where: { id: params.id, account_id: session.account.id } }),
+      prisma.lead.findFirst({ where: { id: params.id, account_id: session.account.id, workspace_id: session.workspace.id } }),
       prisma.user.findFirst({
         where: { id: data.rep_id, account_id: session.account.id, is_active: true },
       }),

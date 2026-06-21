@@ -13,6 +13,8 @@ import { GradeBadge } from "@/components/shared/GradeBadge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
 import { LeadSlideOver } from "@/components/shared/LeadSlideOver"
+import { ThemedSelect } from "@/components/shared/ThemedSelect"
+import { ModalPortal } from "@/components/shared/ModalPortal"
 import { timeAgo } from "@/lib/format"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -175,7 +177,7 @@ function ScoreDonut({
           boxShadow: "inset 0 1px 0 rgba(255,255,255,1), 0 1px 2px rgba(15,23,42,0.04)",
         }}
       >
-        <span className="text-[22px] font-bold text-ink tabular-nums leading-none">{avgTotal}</span>
+        <span className="text-[24px] font-bold text-ink tabular-nums leading-none">{avgTotal}</span>
         <span className="text-[9px] font-semibold text-ink-muted uppercase tracking-[0.10em] mt-0.5">/100</span>
       </div>
     </div>
@@ -261,6 +263,81 @@ function RepAvatar({
   )
 }
 
+// ── RepCell — inline rep reassignment (managers) ────────────────────────────────
+
+function RepCell({
+  leadId, current, members, onUpdated,
+}: {
+  leadId:    string
+  current:   { id: string; first_name: string; last_name: string | null } | null
+  members:   { id: string; first_name: string; last_name: string | null }[]
+  onUpdated: () => void
+}) {
+  const [open, setOpen]     = useState(false)
+  const [saving, setSaving] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function onDown(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    if (open) document.addEventListener("mousedown", onDown)
+    return () => document.removeEventListener("mousedown", onDown)
+  }, [open])
+
+  async function assign(repId: string) {
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/leads/${leadId}/assign`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rep_id: repId }),
+      })
+      if (res.ok) { toast.success("Rep reassigned"); onUpdated(); setOpen(false) }
+      else { const e = await res.json().catch(() => ({})); toast.error(e.error ?? "Failed to reassign") }
+    } catch { toast.error("Failed to reassign") }
+    finally { setSaving(false) }
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={e => { e.stopPropagation(); setOpen(o => !o) }}
+        className="flex items-center gap-0.5 rounded-full hover:bg-slate-100 p-0.5 transition-colors"
+        title="Reassign rep"
+      >
+        {current ? (
+          <RepAvatar firstName={current.first_name} lastName={current.last_name} repId={current.id} size="md" />
+        ) : (
+          <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center">
+            <span className="text-[9px] text-ink-muted font-semibold">—</span>
+          </div>
+        )}
+        <ChevronDown className="w-2.5 h-2.5 text-slate-400 shrink-0" />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-1.5 z-50 bg-white rounded-xl border border-slate-200 shadow-xl min-w-[190px] py-1 overflow-hidden max-h-60 overflow-y-auto">
+          {members.map(m => (
+            <button
+              key={m.id}
+              onClick={() => assign(m.id)}
+              disabled={saving}
+              className={`w-full text-left px-3 py-2 text-[13px] hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2 transition-colors disabled:opacity-50 ${
+                current?.id === m.id ? "text-sky-700 font-semibold" : "text-slate-700"
+              }`}
+            >
+              <RepAvatar firstName={m.first_name} lastName={m.last_name} repId={m.id} size="sm" />
+              <span className="truncate">{m.first_name} {m.last_name ?? ""}</span>
+              {current?.id === m.id && <Check className="w-3 h-3 text-sky-600 shrink-0 ml-auto" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── FilterChip ────────────────────────────────────────────────────────────────
 
 function FilterChip({
@@ -310,8 +387,13 @@ function FilterChip({
         )}
       </div>
       {open && (
-        <div className="absolute left-0 top-full mt-1.5 z-50 rounded-xl glass-3 gloss-edge min-w-[180px] overflow-hidden">
-          {children}
+        // Outer holds the positioning; inner holds the glass styling. `gloss-edge`
+        // sets `position: relative` (for its ::before), which would otherwise
+        // override `absolute` and push the page down in normal flow.
+        <div className="absolute left-0 top-full mt-1.5 z-50 min-w-[180px]">
+          <div className="rounded-xl glass-3 gloss-edge overflow-hidden">
+            {children}
+          </div>
         </div>
       )}
     </div>
@@ -392,7 +474,7 @@ function StageCell({
             <button
               key={s.id}
               onClick={() => handleSelect(s)}
-              className={`w-full text-left px-3.5 py-2 text-[13px] hover:bg-slate-50 flex items-center justify-between transition-colors ${
+              className={`w-full text-left px-3.5 py-2 text-[13px] hover:bg-sky-50 hover:text-sky-700 flex items-center justify-between transition-colors ${
                 s.id === stageId ? "text-sky-700 font-semibold" : "text-slate-700"
               }`}
             >
@@ -405,7 +487,8 @@ function StageCell({
 
       {/* Backward-move note modal */}
       {noteOpen && pending && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
+        <ModalPortal>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/55 backdrop-blur-sm">
           <div className="bg-white rounded-xl p-5 w-full max-w-sm shadow-2xl space-y-4 mx-4">
             <div>
               <p className="text-[14px] font-bold text-slate-900">Move back to &ldquo;{pending.name}&rdquo;?</p>
@@ -426,11 +509,12 @@ function StageCell({
               <button
                 onClick={() => note.trim() && submit(pending.id, note.trim())}
                 disabled={!note.trim() || saving}
-                className="flex-1 h-9 rounded-full bg-sky-600 hover:bg-sky-700 text-[12px] font-bold text-white transition-colors disabled:opacity-50"
+                className="flex-1 h-9 rounded-full bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)] text-[12px] font-bold text-white transition-colors disabled:opacity-50"
               >{saving ? "Moving…" : "Confirm"}</button>
             </div>
           </div>
         </div>
+        </ModalPortal>
       )}
     </div>
   )
@@ -659,7 +743,7 @@ export default function LeadsPage() {
             <Users2 className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-[24px] font-bold text-slate-900 tracking-tight leading-tight">All Leads</h1>
+            <h1 className="text-[28px] font-bold text-ink tracking-[-0.02em] leading-tight">All Leads</h1>
             <p className="text-[13px] text-slate-500 mt-0.5">
               {isLoading
                 ? "Loading…"
@@ -711,7 +795,7 @@ export default function LeadsPage() {
             {["all", "A", "B", "C", "D", "E", "F"].map(g => (
               <button key={g}
                 onClick={() => { setGrade(g); setPage(1) }}
-                className={`w-full text-left px-3.5 py-2 text-[13px] hover:bg-slate-50 flex items-center justify-between transition-colors ${grade === g ? "text-sky-700 font-semibold" : "text-slate-700"}`}
+                className={`w-full text-left px-3.5 py-2 text-[13px] hover:bg-sky-50 hover:text-sky-700 flex items-center justify-between transition-colors ${grade === g ? "text-sky-700 font-semibold" : "text-slate-700"}`}
               >
                 {g === "all" ? "All grades" : `Grade ${g}`}
                 {grade === g && <Check className="w-3 h-3 text-sky-600 shrink-0" />}
@@ -728,11 +812,11 @@ export default function LeadsPage() {
         >
           <div className="py-1 max-h-52 overflow-y-auto">
             <button onClick={() => { setStageFilter("all"); setPage(1) }}
-              className={`w-full text-left px-3.5 py-2 text-[13px] hover:bg-slate-50 flex items-center justify-between transition-colors ${stageFilter === "all" ? "text-sky-700 font-semibold" : "text-slate-700"}`}
+              className={`w-full text-left px-3.5 py-2 text-[13px] hover:bg-sky-50 hover:text-sky-700 flex items-center justify-between transition-colors ${stageFilter === "all" ? "text-sky-700 font-semibold" : "text-slate-700"}`}
             >All stages{stageFilter === "all" && <Check className="w-3 h-3 text-sky-600 shrink-0" />}</button>
             {stages.map(s => (
               <button key={s.id} onClick={() => { setStageFilter(s.id); setPage(1) }}
-                className={`w-full text-left px-3.5 py-2 text-[13px] hover:bg-slate-50 flex items-center justify-between transition-colors ${stageFilter === s.id ? "text-sky-700 font-semibold" : "text-slate-700"}`}
+                className={`w-full text-left px-3.5 py-2 text-[13px] hover:bg-sky-50 hover:text-sky-700 flex items-center justify-between transition-colors ${stageFilter === s.id ? "text-sky-700 font-semibold" : "text-slate-700"}`}
               >
                 <span className="truncate">{s.name}</span>
                 {stageFilter === s.id && <Check className="w-3 h-3 text-sky-600 shrink-0 ml-2" />}
@@ -749,11 +833,11 @@ export default function LeadsPage() {
         >
           <div className="py-1 max-h-52 overflow-y-auto">
             <button onClick={() => { setSourceFilter("all"); setPage(1) }}
-              className={`w-full text-left px-3.5 py-2 text-[13px] hover:bg-slate-50 flex items-center justify-between transition-colors ${sourceFilter === "all" ? "text-sky-700 font-semibold" : "text-slate-700"}`}
+              className={`w-full text-left px-3.5 py-2 text-[13px] hover:bg-sky-50 hover:text-sky-700 flex items-center justify-between transition-colors ${sourceFilter === "all" ? "text-sky-700 font-semibold" : "text-slate-700"}`}
             >All sources{sourceFilter === "all" && <Check className="w-3 h-3 text-sky-600 shrink-0" />}</button>
             {sources.map(s => (
               <button key={s.id} onClick={() => { setSourceFilter(s.id); setPage(1) }}
-                className={`w-full text-left px-3.5 py-2 text-[13px] hover:bg-slate-50 flex items-center justify-between transition-colors ${sourceFilter === s.id ? "text-sky-700 font-semibold" : "text-slate-700"}`}
+                className={`w-full text-left px-3.5 py-2 text-[13px] hover:bg-sky-50 hover:text-sky-700 flex items-center justify-between transition-colors ${sourceFilter === s.id ? "text-sky-700 font-semibold" : "text-slate-700"}`}
               >
                 <span className="truncate">{s.name}</span>
                 {sourceFilter === s.id && <Check className="w-3 h-3 text-sky-600 shrink-0 ml-2" />}
@@ -771,11 +855,11 @@ export default function LeadsPage() {
           >
             <div className="py-1">
               <button onClick={() => { setRepFilter("all"); setPage(1) }}
-                className={`w-full text-left px-3.5 py-2 text-[13px] hover:bg-slate-50 flex items-center justify-between transition-colors ${repFilter === "all" ? "text-sky-700 font-semibold" : "text-slate-700"}`}
+                className={`w-full text-left px-3.5 py-2 text-[13px] hover:bg-sky-50 hover:text-sky-700 flex items-center justify-between transition-colors ${repFilter === "all" ? "text-sky-700 font-semibold" : "text-slate-700"}`}
               >All reps{repFilter === "all" && <Check className="w-3 h-3 text-sky-600 shrink-0" />}</button>
               {members.map((m: { id: string; first_name: string; last_name: string | null }) => (
                 <button key={m.id} onClick={() => { setRepFilter(m.id); setPage(1) }}
-                  className={`w-full text-left px-3.5 py-2 text-[13px] hover:bg-slate-50 flex items-center gap-2 transition-colors ${repFilter === m.id ? "text-sky-700 font-semibold" : "text-slate-700"}`}
+                  className={`w-full text-left px-3.5 py-2 text-[13px] hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2 transition-colors ${repFilter === m.id ? "text-sky-700 font-semibold" : "text-slate-700"}`}
                 >
                   <RepAvatar firstName={m.first_name} lastName={m.last_name} repId={m.id} size="sm" />
                   {m.first_name} {m.last_name ?? ""}
@@ -854,48 +938,12 @@ export default function LeadsPage() {
       {/* ── Leads table ───────────────────────────────────────────────────── */}
       <div className="rounded-2xl glass-2 gloss-edge overflow-x-auto">
 
-        {/* Bulk action bar */}
-        {checkedIds.size > 0 && (
-          <div className="flex items-center gap-3 px-5 py-2.5 bg-sky-100/40 border-b border-sky-200/40">
-            <span className="text-[12px] font-semibold text-sky-700 tabular-nums">
-              {checkedIds.size} selected
-            </span>
-            <div className="flex items-center gap-2 ml-auto">
-              <button
-                onClick={handleBulkExport}
-                className="h-7 px-3 rounded-full glass-1 border border-white/70 text-sky-700
-                           text-[12px] font-semibold hover:text-sky-800 transition-all active:scale-[0.97]"
-              >
-                Export CSV
-              </button>
-              {isManager && members.length > 0 && (
-                <select
-                  defaultValue=""
-                  disabled={bulkAssigning}
-                  onChange={e => handleBulkAssign(e.target.value)}
-                  className="h-7 pl-2.5 pr-7 rounded-full glass-1 border border-white/70 text-sky-700
-                             text-[12px] font-semibold appearance-none focus:outline-none
-                             transition-all cursor-pointer disabled:opacity-50"
-                >
-                  <option value="">{bulkAssigning ? "Assigning…" : "Assign to rep…"}</option>
-                  {members.map((m: { id: string; first_name: string; last_name: string | null }) => (
-                    <option key={m.id} value={m.id}>{m.first_name} {m.last_name ?? ""}</option>
-                  ))}
-                </select>
-              )}
-              <button
-                onClick={() => setCheckedIds(new Set())}
-                className="h-7 w-7 flex items-center justify-center rounded-full
-                           text-sky-500 hover:text-sky-700 hover:bg-white/70 transition-all"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Column headers — 10 columns: ☐ · Lead · Score · Grade · Fit · Intent · Quality · Stage · Rep · Last activity */}
-        <div className="grid grid-cols-[32px_1fr_56px_48px_88px_88px_88px_130px_36px_92px] gap-x-3 min-w-[900px] px-5 py-2.5 border-b border-slate-100">
+        {/* Header row — shows column labels normally, or the bulk actions when
+            leads are selected. Both occupy the SAME fixed-height row, so
+            selecting a lead never pushes the table down. */}
+        <div className={`grid grid-cols-[32px_1fr_56px_48px_88px_88px_88px_130px_52px_92px] gap-x-3 min-w-[900px] items-center px-5 min-h-[44px] border-b ${
+          checkedIds.size > 0 ? "bg-sky-100/40 border-sky-200/40" : "border-slate-100"
+        }`}>
           <div className="flex items-center">
             <input
               type="checkbox"
@@ -904,32 +952,69 @@ export default function LeadsPage() {
               className="w-3.5 h-3.5 rounded accent-sky-500 cursor-pointer"
             />
           </div>
-          {[
-            { label: "Lead",          align: "left"  },
-            { label: "Score",         align: "right" },
-            { label: "Grade",         align: "center"},
-            { label: "Fit",           align: "left"  },
-            { label: "Intent",        align: "left"  },
-            { label: "Quality",       align: "left"  },
-            { label: "Stage",         align: "left"  },
-            { label: "Rep",           align: "left"  },
-            { label: "Last activity", align: "right" },
-          ].map(({ label, align }) => (
-            <span
-              key={label}
-              className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.08em]"
-              style={{ textAlign: align as "left"|"right"|"center" }}
-            >
-              {label}
-            </span>
-          ))}
+
+          {checkedIds.size > 0 ? (
+            <div className="flex items-center gap-3" style={{ gridColumn: "2 / -1" }}>
+              <span className="text-[12px] font-semibold text-sky-700 tabular-nums">
+                {checkedIds.size} selected
+              </span>
+              <div className="flex items-center gap-2 ml-auto">
+                <button
+                  onClick={handleBulkExport}
+                  className="h-7 px-3 rounded-full glass-1 border border-white/70 text-sky-700
+                             text-[12px] font-semibold hover:text-sky-800 transition-all active:scale-[0.97]"
+                >
+                  Export CSV
+                </button>
+                {isManager && members.length > 0 && (
+                  <ThemedSelect
+                    variant="pill"
+                    className="!h-7 text-sky-700"
+                    value=""
+                    onValueChange={(v) => { if (v) handleBulkAssign(v) }}
+                    options={members.map((m: { id: string; first_name: string; last_name: string | null }) => ({ value: m.id, label: `${m.first_name} ${m.last_name ?? ""}`.trim() }))}
+                    placeholder={bulkAssigning ? "Assigning…" : "Assign to rep…"}
+                    disabled={bulkAssigning}
+                    aria-label="Bulk assign to rep"
+                  />
+                )}
+                <button
+                  onClick={() => setCheckedIds(new Set())}
+                  className="h-7 w-7 flex items-center justify-center rounded-full
+                             text-sky-500 hover:text-sky-700 hover:bg-white/70 transition-all"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            [
+              { label: "Lead",          align: "left"  },
+              { label: "Score",         align: "right" },
+              { label: "Grade",         align: "center"},
+              { label: "Fit",           align: "left"  },
+              { label: "Intent",        align: "left"  },
+              { label: "Quality",       align: "left"  },
+              { label: "Stage",         align: "left"  },
+              { label: "Rep",           align: "left"  },
+              { label: "Last activity", align: "right" },
+            ].map(({ label, align }) => (
+              <span
+                key={label}
+                className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.08em]"
+                style={{ textAlign: align as "left"|"right"|"center" }}
+              >
+                {label}
+              </span>
+            ))
+          )}
         </div>
 
         {/* Rows */}
         {isLoading ? (
           <div className="divide-y divide-slate-50">
             {[...Array(8)].map((_, i) => (
-              <div key={i} className="grid grid-cols-[32px_1fr_56px_48px_88px_88px_88px_130px_36px_92px] gap-x-3 min-w-[900px] px-5 py-3.5 items-center">
+              <div key={i} className="grid grid-cols-[32px_1fr_56px_48px_88px_88px_88px_130px_52px_92px] gap-x-3 min-w-[900px] px-5 py-3.5 items-center">
                 <Skeleton className="h-3.5 w-3.5 rounded" />
                 <div className="space-y-1.5">
                   <Skeleton className="h-4 w-32" />
@@ -985,15 +1070,22 @@ export default function LeadsPage() {
                 <div
                   key={lead.id}
                   onClick={() => setSelectedId(lead.id)}
-                  className={`grid grid-cols-[32px_1fr_56px_48px_88px_88px_88px_130px_36px_92px] gap-x-3 min-w-[900px] px-5 py-3.5 items-center cursor-pointer transition-colors group ${checkedIds.has(lead.id) ? "bg-sky-50/50" : "hover:bg-sky-50/40"}`}
+                  className={`grid grid-cols-[32px_1fr_56px_48px_88px_88px_88px_130px_52px_92px] gap-x-3 min-w-[900px] px-5 py-3.5 items-center cursor-pointer transition-colors group ${checkedIds.has(lead.id) ? "bg-sky-50/50" : "hover:bg-sky-50/40"}`}
                 >
-                  {/* Checkbox */}
-                  <div onClick={e => { e.stopPropagation(); toggleCheck(lead.id) }} className="flex items-center">
+                  {/* Checkbox — the whole cell toggles once. The input is
+                      display-only (pointer-events-none) so the click can't fire
+                      both the input's onChange AND the div's onClick (which
+                      previously cancelled each other out → checkbox did nothing). */}
+                  <div
+                    onClick={e => { e.stopPropagation(); toggleCheck(lead.id) }}
+                    className="flex items-center cursor-pointer -my-1 py-1 pr-1"
+                  >
                     <input
                       type="checkbox"
                       checked={checkedIds.has(lead.id)}
-                      onChange={() => toggleCheck(lead.id)}
-                      className="w-3.5 h-3.5 rounded accent-sky-500 cursor-pointer"
+                      readOnly
+                      tabIndex={-1}
+                      className="w-3.5 h-3.5 rounded accent-sky-500 cursor-pointer pointer-events-none"
                     />
                   </div>
 
@@ -1050,9 +1142,16 @@ export default function LeadsPage() {
                     )}
                   </div>
 
-                  {/* Rep avatar */}
+                  {/* Rep — inline reassign for managers, read-only otherwise */}
                   <div onClick={e => e.stopPropagation()}>
-                    {lead.assigned_rep ? (
+                    {isManager && members.length > 0 ? (
+                      <RepCell
+                        leadId={lead.id}
+                        current={lead.assigned_rep}
+                        members={members}
+                        onUpdated={() => queryClient.invalidateQueries({ queryKey: ["leads"] })}
+                      />
+                    ) : lead.assigned_rep ? (
                       <RepAvatar
                         firstName={lead.assigned_rep.first_name}
                         lastName={lead.assigned_rep.last_name}
@@ -1099,7 +1198,7 @@ export default function LeadsPage() {
                 <Zap className="w-5 h-5 text-sky-700" strokeWidth={2.5} fill="currentColor" />
               </div>
               <div>
-                <p className="text-[28px] font-bold text-ink tabular-nums leading-none">
+                <p className="text-[30px] font-bold text-ink tabular-nums leading-none">
                   {stats?.scoring_speed_ms ?? "—"}
                   <span className="text-[14px] font-semibold text-ink-soft ml-1">ms</span>
                 </p>

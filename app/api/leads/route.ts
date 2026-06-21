@@ -1,8 +1,9 @@
 import { z } from "zod"
 import { prisma } from "@/lib/prisma"
-import { requireAuth } from "@/lib/auth/middleware"
+import { requireWorkspace } from "@/lib/auth/middleware"
 import { handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError, parseBody } from "@/lib/api/response"
+import { rateLimited, LIMITS } from "@/lib/rate-limit"
 import { processSignalAndUpdateScores } from "@/lib/scoring/orchestrator"
 import { getNextAction } from "@/lib/scoring/next-action"
 
@@ -15,7 +16,7 @@ const PAGE_SIZE = 100
 
 export async function GET(req: Request) {
   try {
-    const session = await requireAuth()
+    const session = await requireWorkspace()
     const { searchParams } = new URL(req.url)
 
     const grade       = searchParams.get("grade") ?? undefined
@@ -38,7 +39,7 @@ export async function GET(req: Request) {
         : {}
 
     const where = {
-      account_id: session.account.id,
+      account_id: session.account.id, workspace_id: session.workspace.id,
       ...assignedFilter,
       ...(grade       ? { grade: grade as "A" | "B" | "C" | "D" | "E" | "F" } : {}),
       ...(stageId     ? { stage_id: stageId }         : {}),
@@ -123,16 +124,20 @@ const CreateLeadSchema = z.object({
 
 export async function POST(req: Request) {
   try {
-    const session = await requireAuth()
+    const session = await requireWorkspace()
+
+    const limited = await rateLimited(`leads:create:${session.user.id}`, LIMITS.heavyWrite)
+    if (limited) return limited
+
     const { data, error } = await parseBody(req, CreateLeadSchema)
     if (error) return error
 
     // Normalise phone — ensure +91 prefix
     const phone = normalisePhone(data.phone)
 
-    // Check for duplicate phone within account
-    const existing = await prisma.lead.findUnique({
-      where: { account_id_phone: { account_id: session.account.id, phone } },
+    // Check for duplicate phone within the workspace
+    const existing = await prisma.lead.findFirst({
+      where: { workspace_id: session.workspace.id, phone },
     })
     if (existing) {
       return apiError(`A lead with phone ${phone} already exists`, "DUPLICATE_PHONE", 409)
@@ -140,8 +145,8 @@ export async function POST(req: Request) {
 
     // Verify source + stage belong to this account
     const [source, stage] = await Promise.all([
-      prisma.leadSource.findFirst({ where: { id: data.source_id, account_id: session.account.id } }),
-      prisma.pipelineStage.findFirst({ where: { id: data.stage_id, account_id: session.account.id } }),
+      prisma.leadSource.findFirst({ where: { id: data.source_id, account_id: session.account.id, workspace_id: session.workspace.id } }),
+      prisma.pipelineStage.findFirst({ where: { id: data.stage_id, account_id: session.account.id, workspace_id: session.workspace.id } }),
     ])
     if (!source) return apiError("Invalid source_id", "INVALID_SOURCE", 422)
     if (!stage)  return apiError("Invalid stage_id",  "INVALID_STAGE",  422)

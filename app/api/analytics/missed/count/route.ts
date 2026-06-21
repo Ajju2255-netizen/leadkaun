@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma"
-import { requireRole, handleAuthError } from "@/lib/auth/middleware"
+import { requireWorkspace, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
 
 /**
@@ -12,15 +12,16 @@ import { apiSuccess, apiError } from "@/lib/api/response"
  */
 export async function GET(_req: Request) {
   try {
-    const session   = await requireRole("ADMIN", "MANAGER")
+    const session   = await requireWorkspace("ADMIN", "MANAGER")
     const accountId = session.account.id
+    const workspaceId = session.workspace.id
 
     const [count, value] = await Promise.all([
       prisma.lead.count({
-        where: { account_id: accountId, is_missed: true, won_at: null, lost_at: null },
+        where: { account_id: accountId, workspace_id: workspaceId, is_missed: true, won_at: null, lost_at: null },
       }),
       prisma.lead.aggregate({
-        where: { account_id: accountId, is_missed: true, won_at: null, lost_at: null },
+        where: { account_id: accountId, workspace_id: workspaceId, is_missed: true, won_at: null, lost_at: null },
         _sum: { expected_value: true },
       }),
     ])

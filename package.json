@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "test": "vitest",
-    "test:ui": "vitest --ui"
+    "test:ui": "vitest --ui",
+    "db:backfill-workspaces": "npx tsx prisma/backfill-workspaces.ts"
   },
   "prisma": {
     "seed": "npx ts-node prisma/seed.ts"

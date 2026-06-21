@@ -3,6 +3,7 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin"
 import { prisma } from "@/lib/prisma"
 import { sendWelcomeAdminEmail } from "@/lib/email/lead-alerts"
+import { provisionWorkspaceDefaults } from "@/lib/workspace/provision"
 
 type RegisterInput = {
   orgName: string
@@ -15,39 +16,6 @@ type RegisterInput = {
 type RegisterResult =
   | { success: true; redirectTo: string }
   | { success: false; error: string }
-
-// Default pipeline stages — created for every new account so imports + pipeline work immediately
-const DEFAULT_PIPELINE_STAGES = [
-  { name: "New Inquiry",   key: "new_inquiry",   display_order: 1, is_terminal: false, is_won: false, is_lost: false },
-  { name: "Contacted",     key: "contacted",      display_order: 2, is_terminal: false, is_won: false, is_lost: false },
-  { name: "Qualified",     key: "qualified",      display_order: 3, is_terminal: false, is_won: false, is_lost: false },
-  { name: "Proposal Sent", key: "proposal_sent",  display_order: 4, is_terminal: false, is_won: false, is_lost: false },
-  { name: "Negotiation",   key: "negotiation",    display_order: 5, is_terminal: false, is_won: false, is_lost: false },
-  { name: "Follow-up",     key: "follow_up",      display_order: 6, is_terminal: false, is_won: false, is_lost: false },
-  { name: "Won",           key: "won",            display_order: 7, is_terminal: true,  is_won: true,  is_lost: false },
-  { name: "Lost",          key: "lost",           display_order: 8, is_terminal: true,  is_won: false, is_lost: true  },
-]
-
-// Default lead sources — created for every new account so import source dropdown is pre-populated
-const DEFAULT_LEAD_SOURCES = [
-  { name: "Google Ads",           key: "google_ads",           intent_baseline: 55, reliability_score: 90.0,  is_custom: false },
-  { name: "Google Organic SEO",   key: "google_organic",       intent_baseline: 65, reliability_score: 95.0,  is_custom: false },
-  { name: "Facebook Ads",         key: "facebook_ads",         intent_baseline: 35, reliability_score: 75.0,  is_custom: false },
-  { name: "Instagram Ads",        key: "instagram_ads",        intent_baseline: 30, reliability_score: 70.0,  is_custom: false },
-  { name: "LinkedIn Ads",         key: "linkedin_ads",         intent_baseline: 50, reliability_score: 85.0,  is_custom: false },
-  { name: "Website Contact Form", key: "website_contact_form", intent_baseline: 65, reliability_score: 92.0,  is_custom: false },
-  { name: "Website Chat",         key: "website_chat",         intent_baseline: 70, reliability_score: 93.0,  is_custom: false },
-  { name: "Referral",             key: "referral",             intent_baseline: 75, reliability_score: 96.0,  is_custom: false },
-  { name: "WhatsApp Business",    key: "whatsapp_business",    intent_baseline: 60, reliability_score: 88.0,  is_custom: false },
-  { name: "JustDial",             key: "justdial",             intent_baseline: 50, reliability_score: 80.0,  is_custom: false },
-  { name: "IndiaMART",            key: "indiamart",            intent_baseline: 60, reliability_score: 85.0,  is_custom: false },
-  { name: "Cold Call Outbound",   key: "cold_call_outbound",   intent_baseline: 20, reliability_score: 65.0,  is_custom: false },
-  { name: "Exhibition / Event",   key: "exhibition_event",     intent_baseline: 55, reliability_score: 82.0,  is_custom: false },
-  { name: "Walk-in",              key: "walk_in",              intent_baseline: 70, reliability_score: 90.0,  is_custom: false },
-  { name: "Re-inquiry",           key: "re_inquiry",           intent_baseline: 50, reliability_score: 82.0,  is_custom: false },
-  { name: "Partner / Reseller",   key: "partner_reseller",     intent_baseline: 65, reliability_score: 88.0,  is_custom: false },
-  { name: "Other",                key: "other",                intent_baseline: 10, reliability_score: 50.0,  is_custom: false },
-]
 
 export async function registerAction(input: RegisterInput): Promise<RegisterResult> {
   const { orgName, email, password, firstName, lastName } = input
@@ -80,7 +48,7 @@ export async function registerAction(input: RegisterInput): Promise<RegisterResu
         },
       })
 
-      await tx.user.create({
+      const user = await tx.user.create({
         data: {
           account_id: account.id,
           auth_id: authData.user!.id,
@@ -91,17 +59,22 @@ export async function registerAction(input: RegisterInput): Promise<RegisterResu
         },
       })
 
-      // Seed default pipeline stages so pipeline + import work immediately after registration
-      await tx.pipelineStage.createMany({
-        data: DEFAULT_PIPELINE_STAGES.map((s) => ({ ...s, account_id: account.id })),
-        skipDuplicates: true,
+      // Every account starts with one default workspace; the admin is its first
+      // member. Default pipeline stages + lead sources are seeded INTO it so
+      // pipeline + import work immediately after registration.
+      const workspace = await tx.workspace.create({
+        data: {
+          account_id:  account.id,
+          name:        "Main",
+          slug:        "main",
+          is_default:  true,
+          description: "Your primary workspace.",
+        },
       })
-
-      // Seed default lead sources so import source dropdown is pre-populated
-      await tx.leadSource.createMany({
-        data: DEFAULT_LEAD_SOURCES.map((s) => ({ ...s, account_id: account.id })),
-        skipDuplicates: true,
+      await tx.workspaceMember.create({
+        data: { workspace_id: workspace.id, user_id: user.id },
       })
+      await provisionWorkspaceDefaults(tx, { accountId: account.id, workspaceId: workspace.id })
     })
   } catch (dbError) {
     // Rollback: delete the Supabase auth user we just created

@@ -3,11 +3,9 @@
 import { useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
+import { X } from "lucide-react"
+import { ThemedSelect } from "@/components/shared/ThemedSelect"
+import { ModalPortal } from "@/components/shared/ModalPortal"
 import { enqueueOfflineAction } from "@/lib/offline/queue"
 
 const WA_OUTCOMES = [
@@ -87,60 +85,81 @@ export function LogWhatsAppModal({ open, onClose, leadId, leadName }: Props) {
     onClose()
   }
 
+  if (!open) return null
+
+  const labelCls = "text-[10px] font-semibold text-ink-soft uppercase tracking-[0.08em] block"
+
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Log WhatsApp — {leadName}</DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4 py-2">
-          <div className="space-y-1.5">
-            <Label>Conversation outcome <span className="text-destructive">*</span></Label>
-            <Select value={outcome} onValueChange={(v) => setOutcome(v ?? "")}>
-              <SelectTrigger>
-                <SelectValue placeholder="What happened?" />
-              </SelectTrigger>
-              <SelectContent>
-                {WA_OUTCOMES.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Conversation tag (optional)</Label>
-            <Select value={tag} onValueChange={(v) => setTag(v ?? "")}>
-              <SelectTrigger>
-                <SelectValue placeholder="Tag this conversation…" />
-              </SelectTrigger>
-              <SelectContent>
-                {WA_TAGS.map((t) => (
-                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Notes</Label>
-            <Textarea
-              placeholder="Summarise the conversation…"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={3}
-            />
-          </div>
+    <ModalPortal>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-slate-900/55 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-2xl glass-3 gloss-edge p-6 space-y-4
+                      shadow-[0_24px_48px_rgba(15,23,42,0.18)]">
+        <div className="flex items-center justify-between">
+          <p className="text-[16px] font-bold text-slate-900 truncate pr-3">Log WhatsApp — {leadName}</p>
+          <button
+            onClick={handleClose}
+            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/70 text-slate-400 transition-colors shrink-0"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={saving}>Cancel</Button>
-          <Button onClick={handleSave} disabled={saving}>
+        <div className="space-y-1.5">
+          <label className={labelCls}>Conversation outcome <span className="text-rose-500">*</span></label>
+          <ThemedSelect
+            value={outcome}
+            onValueChange={setOutcome}
+            options={WA_OUTCOMES}
+            placeholder="What happened?"
+            aria-label="Conversation outcome"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className={labelCls}>Conversation tag (optional)</label>
+          <ThemedSelect
+            value={tag}
+            onValueChange={setTag}
+            options={WA_TAGS}
+            placeholder="Tag this conversation…"
+            aria-label="Conversation tag"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className={labelCls}>Notes</label>
+          <textarea
+            placeholder="Summarise the conversation…"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={3}
+            className="w-full rounded-xl border border-hairline-strong bg-white px-3.5 py-2.5 text-[13px] text-ink
+                       placeholder:text-ink-faint resize-none focus:outline-none focus:ring-2 focus:ring-sky-100 focus:border-sky-400 transition-colors"
+          />
+        </div>
+
+        <div className="flex gap-2 pt-1">
+          <button
+            onClick={handleClose}
+            disabled={saving}
+            className="flex-1 h-10 rounded-full border border-slate-200/70 text-[13px] font-semibold
+                       text-slate-600 hover:bg-white/70 transition-all bg-white/40 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex-1 h-10 rounded-full text-white text-[13px] font-semibold transition-all
+                       bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600
+                       shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)]
+                       disabled:opacity-50 active:scale-[0.98]"
+          >
             {saving ? "Saving…" : "Log WhatsApp"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </button>
+        </div>
+      </div>
+    </div>
+    </ModalPortal>
   )
 }

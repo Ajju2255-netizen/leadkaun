@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma"
-import { requireAuth, handleAuthError } from "@/lib/auth/middleware"
+import { requireWorkspace, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
 import { computeExecutionScore } from "@/lib/scoring/execution-score"
 import { startOfIstDay, hourIST } from "@/lib/time/ist"
@@ -20,8 +20,9 @@ import { startOfIstDay, hourIST } from "@/lib/time/ist"
  */
 export async function GET(req: Request) {
   try {
-    const session   = await requireAuth()
+    const session   = await requireWorkspace()
     const accountId = session.account.id
+    const workspaceId = session.workspace.id
     const url       = new URL(req.url)
     const repIdParam = url.searchParams.get("rep_id")
 
@@ -31,7 +32,7 @@ export async function GET(req: Request) {
 
     if (repIdParam) {
       // Single-rep path
-      const inputs = await loadRepInputs(accountId, repIdParam, dayStart, hr)
+      const inputs = await loadRepInputs(accountId, workspaceId, repIdParam, dayStart, hr)
       const result = computeExecutionScore(inputs)
       return apiSuccess({
         rep_id: repIdParam,
@@ -62,7 +63,7 @@ export async function GET(req: Request) {
     }
 
     const repIds = reps.map((r) => r.id)
-    const inputsByRep = await loadInputsBatch(accountId, repIds, dayStart)
+    const inputsByRep = await loadInputsBatch(accountId, workspaceId, repIds, dayStart)
 
     const results = reps.map((rep) => {
       const inputs = { ...inputsByRep[rep.id], hour_ist: hr }
@@ -91,6 +92,7 @@ export async function GET(req: Request) {
 
 async function loadRepInputs(
   accountId: string,
+  workspaceId: string,
   repId: string,
   dayStart: Date,
   hr: number,
@@ -100,32 +102,32 @@ async function loadRepInputs(
     touched, abLeads, abContacted, signals,
   ] = await Promise.all([
     prisma.followUpAction.count({
-      where: { account_id: accountId, assigned_rep_id: repId,
+      where: { account_id: accountId, workspace_id: workspaceId, assigned_rep_id: repId,
                due_date: { gte: dayStart } },
     }),
     prisma.followUpAction.count({
-      where: { account_id: accountId, assigned_rep_id: repId,
+      where: { account_id: accountId, workspace_id: workspaceId, assigned_rep_id: repId,
                status: "COMPLETED", completed_at: { gte: dayStart } },
     }),
     prisma.followUpAction.count({
-      where: { account_id: accountId, assigned_rep_id: repId, status: "OVERDUE" },
+      where: { account_id: accountId, workspace_id: workspaceId, assigned_rep_id: repId, status: "OVERDUE" },
     }),
     prisma.lead.count({
-      where: { account_id: accountId, assigned_rep_id: repId,
+      where: { account_id: accountId, workspace_id: workspaceId, assigned_rep_id: repId,
                last_action_at: { gte: dayStart } },
     }),
     prisma.lead.count({
-      where: { account_id: accountId, assigned_rep_id: repId,
+      where: { account_id: accountId, workspace_id: workspaceId, assigned_rep_id: repId,
                grade: { in: ["A", "B"] }, imported_at: { gte: dayStart } },
     }),
     prisma.lead.count({
-      where: { account_id: accountId, assigned_rep_id: repId,
+      where: { account_id: accountId, workspace_id: workspaceId, assigned_rep_id: repId,
                grade: { in: ["A", "B"] }, imported_at: { gte: dayStart },
                first_contact_at: { not: null } },
     }),
     prisma.signal.count({
       where: { user_id: repId, created_at: { gte: dayStart },
-               lead: { account_id: accountId } },
+               lead: { account_id: accountId, workspace_id: workspaceId } },
     }),
   ])
 
@@ -147,6 +149,7 @@ async function loadRepInputs(
  */
 async function loadInputsBatch(
   accountId: string,
+  workspaceId: string,
   repIds: string[],
   dayStart: Date,
 ) {
@@ -167,36 +170,36 @@ async function loadInputsBatch(
   ] = await Promise.all([
     prisma.followUpAction.groupBy({
       by: ["assigned_rep_id"],
-      where: { account_id: accountId, assigned_rep_id: { in: repIds },
+      where: { account_id: accountId, workspace_id: workspaceId, assigned_rep_id: { in: repIds },
                due_date: { gte: dayStart } },
       _count: { _all: true },
     }),
     prisma.followUpAction.groupBy({
       by: ["assigned_rep_id"],
-      where: { account_id: accountId, assigned_rep_id: { in: repIds },
+      where: { account_id: accountId, workspace_id: workspaceId, assigned_rep_id: { in: repIds },
                status: "COMPLETED", completed_at: { gte: dayStart } },
       _count: { _all: true },
     }),
     prisma.followUpAction.groupBy({
       by: ["assigned_rep_id"],
-      where: { account_id: accountId, assigned_rep_id: { in: repIds }, status: "OVERDUE" },
+      where: { account_id: accountId, workspace_id: workspaceId, assigned_rep_id: { in: repIds }, status: "OVERDUE" },
       _count: { _all: true },
     }),
     prisma.lead.groupBy({
       by: ["assigned_rep_id"],
-      where: { account_id: accountId, assigned_rep_id: { in: repIds },
+      where: { account_id: accountId, workspace_id: workspaceId, assigned_rep_id: { in: repIds },
                last_action_at: { gte: dayStart } },
       _count: { _all: true },
     }),
     prisma.lead.groupBy({
       by: ["assigned_rep_id"],
-      where: { account_id: accountId, assigned_rep_id: { in: repIds },
+      where: { account_id: accountId, workspace_id: workspaceId, assigned_rep_id: { in: repIds },
                grade: { in: ["A", "B"] }, imported_at: { gte: dayStart } },
       _count: { _all: true },
     }),
     prisma.lead.groupBy({
       by: ["assigned_rep_id"],
-      where: { account_id: accountId, assigned_rep_id: { in: repIds },
+      where: { account_id: accountId, workspace_id: workspaceId, assigned_rep_id: { in: repIds },
                grade: { in: ["A", "B"] }, imported_at: { gte: dayStart },
                first_contact_at: { not: null } },
       _count: { _all: true },
@@ -204,7 +207,7 @@ async function loadInputsBatch(
     prisma.signal.groupBy({
       by: ["user_id"],
       where: { user_id: { in: repIds }, created_at: { gte: dayStart },
-               lead: { account_id: accountId } },
+               lead: { account_id: accountId, workspace_id: workspaceId } },
       _count: { _all: true },
     }),
   ])

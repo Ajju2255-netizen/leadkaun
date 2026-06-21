@@ -11,6 +11,7 @@ import {
 } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { DeltaChip } from "@/components/shared/DeltaChip"
+import { timeAgo } from "@/lib/format"
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -72,14 +73,6 @@ function formatINR(n: number): string {
   return n.toLocaleString("en-IN")
 }
 
-function relTime(iso: string): string {
-  const d = (Date.now() - new Date(iso).getTime()) / 1000
-  if (d < 60)         return "just now"
-  if (d < 3600)       return `${Math.floor(d / 60)} min ago`
-  if (d < 86400)      return `${Math.floor(d / 3600)} hr ago`
-  if (d < 7 * 86400)  return `${Math.floor(d / 86400)} d ago`
-  return `${Math.floor(d / (7 * 86400))} wk ago`
-}
 
 const ACTIVITY_STYLE: Record<ActivityItem["category"], { icon: typeof Phone; bg: string; color: string }> = {
   call:     { icon: Phone,        bg: "linear-gradient(180deg, #BAE6FD 0%, #7DD3FC 100%)", color: "#0284C7" },
@@ -127,7 +120,7 @@ function KpiCard({
         </div>
         <p className="text-[12px] font-semibold text-ink-soft leading-tight pt-1">{label}</p>
       </div>
-      <div className="mt-3 text-[28px] md:text-[30px] font-bold tabular-nums leading-none text-ink">
+      <div className="mt-3 text-[30px] font-bold tabular-nums leading-none text-ink">
         {value}
       </div>
       <div className="mt-2 flex items-center gap-1.5">
@@ -186,8 +179,8 @@ function HealthDonut({ pct, total }: { pct: number; total: number }) {
         ) : (
           <>
             <div className="text-[24px] font-bold text-ink tabular-nums leading-none">{pct}%</div>
-            <div className="text-[11px] text-ink-muted mt-1">{headline}</div>
-            <div className="text-[10px] text-ink-faint mt-0.5">{total} active</div>
+            <div className="text-[11px] text-ink-muted mt-1">healthy</div>
+            <div className={`text-[10px] font-semibold mt-0.5 ${ringColor}`}>{headline}</div>
           </>
         )}
       </div>
@@ -235,7 +228,7 @@ export default function DashboardPage() {
             <LayoutDashboard className="w-6 h-6 text-sky-700" strokeWidth={2} />
           </div>
           <div>
-            <h1 className="text-[32px] md:text-[36px] font-bold text-ink tracking-[-0.025em] leading-[1.05]">
+            <h1 className="text-[28px] font-bold text-ink tracking-[-0.02em] leading-tight">
               Sales Behaviour Pulse
             </h1>
             <p className="text-[14px] text-ink-soft mt-2 leading-relaxed max-w-[560px]">
@@ -251,14 +244,12 @@ export default function DashboardPage() {
             <Plus className="w-4 h-4" strokeWidth={2.5} />
             Import leads
           </Link>
-          <button
-            type="button"
-            disabled
-            className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl text-[13px] font-semibold text-ink-soft border border-hairline-strong bg-white/70 cursor-default"
-          >
-            <Calendar className="w-4 h-4" strokeWidth={2} />
-            This Month
-          </button>
+          {/* Static period indicator — the pulse is this-month scoped. Not a
+              filter (kept as a label, not a fake disabled button). */}
+          <span className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl text-[13px] font-semibold text-ink-soft bg-slate-50 border border-hairline">
+            <Calendar className="w-4 h-4 text-ink-muted" strokeWidth={2} />
+            This month
+          </span>
         </div>
       </div>
 
@@ -453,8 +444,8 @@ export default function DashboardPage() {
                 return (
                   <li key={s.id} className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <span className="text-[13.5px] font-medium text-ink truncate">{s.name}</span>
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10.5px] font-semibold border rounded-full ${sty.pillCls}`}>
+                      <span className="text-[13px] font-medium text-ink truncate">{s.name}</span>
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold border rounded-full ${sty.pillCls}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${sty.dotCls}`} />
                         {sty.label}
                       </span>
@@ -502,12 +493,12 @@ export default function DashboardPage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-[13px] text-ink leading-tight">{a.title}</p>
-                      <p className="text-[11.5px] text-ink-muted truncate mt-0.5">
+                      <p className="text-[11px] text-ink-muted truncate mt-0.5">
                         {a.lead_name}{a.company ? ` · ${a.company}` : ""}
                       </p>
                     </div>
                     <span className="text-[11px] text-ink-faint tabular-nums shrink-0 mt-0.5">
-                      {relTime(a.created_at)}
+                      {timeAgo(a.created_at)}
                     </span>
                   </li>
                 )
@@ -525,10 +516,10 @@ export default function DashboardPage() {
             <>
               <HealthDonut pct={health.headline_pct} total={health.total} />
               <ul className="mt-4 space-y-2">
-                <BandRow color="bg-emerald-500" label="Healthy"  count={health.healthy.count}  pct={health.healthy.pct}  icon={<Activity      className="w-3.5 h-3.5 text-emerald-600" strokeWidth={2.5} />} />
-                <BandRow color="bg-orange-400"  label="At risk"  count={health.at_risk.count}  pct={health.at_risk.pct}  icon={<AlertTriangle className="w-3.5 h-3.5 text-orange-500"  strokeWidth={2.5} />} />
-                <BandRow color="bg-red-500"     label="Missed"   count={health.missed.count}   pct={health.missed.pct}   icon={<ArrowUpRight  className="w-3.5 h-3.5 text-red-500"     strokeWidth={2.5} />} />
-                <BandRow color="bg-slate-300"   label="Cold"     count={health.cold.count}     pct={health.cold.pct}     icon={<Snowflake     className="w-3.5 h-3.5 text-slate-500"   strokeWidth={2.5} />} />
+                <BandRow label="Healthy"  count={health.healthy.count}  pct={health.healthy.pct}  icon={<Activity      className="w-3.5 h-3.5 text-emerald-600" strokeWidth={2.5} />} />
+                <BandRow label="At risk"  count={health.at_risk.count}  pct={health.at_risk.pct}  icon={<AlertTriangle className="w-3.5 h-3.5 text-orange-500"  strokeWidth={2.5} />} />
+                <BandRow label="Missed"   count={health.missed.count}   pct={health.missed.pct}   icon={<ArrowUpRight  className="w-3.5 h-3.5 text-red-500"     strokeWidth={2.5} />} />
+                <BandRow label="Cold"     count={health.cold.count}     pct={health.cold.pct}     icon={<Snowflake     className="w-3.5 h-3.5 text-slate-500"   strokeWidth={2.5} />} />
               </ul>
               {health.total <= 0 ? (
                 <div className="mt-4 flex items-start gap-2 rounded-xl px-3 py-2.5 bg-sky-50/70 border border-sky-100">
@@ -562,17 +553,17 @@ export default function DashboardPage() {
   )
 }
 
-function BandRow({ color, label, count, pct, icon: _icon }: {
-  color: string; label: string; count: number; pct: number; icon: React.ReactNode
+function BandRow({ label, count, pct, icon }: {
+  label: string; count: number; pct: number; icon: React.ReactNode
 }) {
   return (
     <li className="flex items-center justify-between gap-2">
       <div className="flex items-center gap-2 min-w-0">
-        <span className={`w-2 h-2 rounded-full shrink-0 ${color}`} />
-        <span className="text-[12.5px] text-ink-soft truncate">{label}</span>
+        <span className="w-5 h-5 rounded-md bg-slate-50 flex items-center justify-center shrink-0">{icon}</span>
+        <span className="text-[12px] text-ink-soft truncate">{label}</span>
       </div>
       <div className="flex items-center gap-1 shrink-0 tabular-nums">
-        <span className="text-[12.5px] font-semibold text-ink">{count}</span>
+        <span className="text-[12px] font-semibold text-ink">{count}</span>
         <span className="text-[11px] text-ink-muted">({pct}%)</span>
       </div>
     </li>

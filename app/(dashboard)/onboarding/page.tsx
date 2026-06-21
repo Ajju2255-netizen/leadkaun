@@ -6,6 +6,7 @@ import { useQueryClient, useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
 import { GradeBadge } from "@/components/shared/GradeBadge"
+import { ThemedSelect } from "@/components/shared/ThemedSelect"
 import { CheckCircle2, Upload } from "lucide-react"
 
 const STEPS = [
@@ -58,7 +59,7 @@ export default function OnboardingPage() {
         </p>
         <button
           onClick={() => router.push("/queue")}
-          className="mt-2 inline-flex items-center gap-2 h-10 px-6 rounded-full bg-sky-600 hover:bg-sky-700
+          className="mt-2 inline-flex items-center gap-2 h-10 px-6 rounded-full bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)]
                      text-white text-[13px] font-semibold transition-all active:scale-[0.97]"
         >
           Open My Queue →
@@ -142,7 +143,7 @@ export default function OnboardingPage() {
           {step < STEPS.length ? (
             <button
               onClick={next}
-              className="h-9 px-5 rounded-full bg-sky-600 hover:bg-sky-700 text-white
+              className="h-9 px-5 rounded-full bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)] text-white
                          text-[13px] font-semibold transition-all active:scale-[0.97]"
             >
               Continue →
@@ -151,7 +152,7 @@ export default function OnboardingPage() {
             <button
               onClick={finish}
               disabled={saving}
-              className="h-9 px-5 rounded-full bg-sky-600 hover:bg-sky-700 disabled:opacity-60
+              className="h-9 px-5 rounded-full bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)] disabled:opacity-60
                          text-white text-[13px] font-semibold transition-all active:scale-[0.97]"
             >
               {saving ? "Finishing…" : "Go to Dashboard →"}
@@ -169,7 +170,7 @@ function StepWelcome({ name }: { name?: string }) {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-[18px] font-bold text-slate-900">
+        <h2 className="text-[16px] font-bold text-slate-900">
           Welcome{name ? `, ${name}` : ""}! 👋
         </h2>
         <p className="text-[13px] text-slate-500 mt-1 leading-relaxed">
@@ -392,18 +393,16 @@ function StepTeam() {
           onChange={(e) => setEmail(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && invite()}
         />
-        <select
+        <ThemedSelect
           value={role}
-          onChange={(e) => setRole(e.target.value)}
-          className="px-3 rounded-xl border border-slate-200 bg-white text-[13px] text-slate-700
-                     focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-400"
-        >
-          <option value="REP">Rep</option>
-          <option value="MANAGER">Manager</option>
-        </select>
+          onValueChange={setRole}
+          options={[{ value: "REP", label: "Rep" }, { value: "MANAGER", label: "Manager" }]}
+          className="w-auto min-w-[120px]"
+          aria-label="Role"
+        />
         <button
           onClick={invite} disabled={sending || !email}
-          className="h-10 px-4 rounded-full bg-sky-600 hover:bg-sky-700 disabled:opacity-50
+          className="h-10 px-4 rounded-full bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)] disabled:opacity-50
                      text-white text-[13px] font-semibold transition-all shrink-0"
         >
           {sending ? "…" : "Invite"}

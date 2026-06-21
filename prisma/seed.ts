@@ -205,12 +205,20 @@ async function main() {
 
   console.log(`✓ Demo account: ${demoAccount.name}`)
 
+  // Default workspace — config below is scoped to it
+  const demoWorkspace = await prisma.workspace.upsert({
+    where: { account_id_slug: { account_id: demoAccount.id, slug: "main" } },
+    update: {},
+    create: { account_id: demoAccount.id, name: "Main", slug: "main", is_default: true },
+  })
+  console.log(`✓ Demo workspace: ${demoWorkspace.name}`)
+
   // Seed pipeline stages
   for (const stage of PIPELINE_STAGES) {
     await prisma.pipelineStage.upsert({
-      where: { account_id_key: { account_id: demoAccount.id, key: stage.key } },
+      where: { workspace_id_key: { workspace_id: demoWorkspace.id, key: stage.key } },
       update: { name: stage.name, display_order: stage.display_order },
-      create: { ...stage, account_id: demoAccount.id },
+      create: { ...stage, account_id: demoAccount.id, workspace_id: demoWorkspace.id },
     })
   }
   console.log(`✓ Pipeline stages: ${PIPELINE_STAGES.length}`)
@@ -218,9 +226,9 @@ async function main() {
   // Seed lead sources
   for (const source of LEAD_SOURCES) {
     await prisma.leadSource.upsert({
-      where: { account_id_key: { account_id: demoAccount.id, key: source.key } },
+      where: { workspace_id_key: { workspace_id: demoWorkspace.id, key: source.key } },
       update: { name: source.name, intent_baseline: source.intent_baseline, reliability_score: source.reliability_score },
-      create: { ...source, account_id: demoAccount.id },
+      create: { ...source, account_id: demoAccount.id, workspace_id: demoWorkspace.id },
     })
   }
   console.log(`✓ Lead sources: ${LEAD_SOURCES.length}`)
@@ -228,10 +236,11 @@ async function main() {
   // Seed follow-up configs
   for (const config of FOLLOW_UP_CONFIGS) {
     await prisma.followUpConfig.upsert({
-      where: { account_id_grade: { account_id: demoAccount.id, grade: config.grade } },
+      where: { workspace_id_grade: { workspace_id: demoWorkspace.id, grade: config.grade } },
       update: { schedule: config.schedule as object },
       create: {
         account_id: demoAccount.id,
+        workspace_id: demoWorkspace.id,
         grade: config.grade,
         schedule: config.schedule as object,
       },

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { requireAuth, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
+import { rateLimited, LIMITS } from "@/lib/rate-limit"
 
 /**
  * POST /api/settings/onboarding-complete
@@ -10,6 +11,9 @@ import { apiSuccess, apiError } from "@/lib/api/response"
 export async function POST() {
   try {
     const session = await requireAuth()
+
+    const _rl = await rateLimited(`onboarding:${session.user.id}`, LIMITS.write)
+    if (_rl) return _rl
 
     await prisma.account.update({
       where: { id: session.account.id },

@@ -1,6 +1,10 @@
+import { cookies } from "next/headers"
 import { createServerClient } from "@/lib/supabase/server"
 import { prisma } from "@/lib/prisma"
 import type { UserRole } from "@prisma/client"
+
+/** Cookie that pins the active workspace for the session. */
+export const WORKSPACE_COOKIE = "lk_ws"
 
 /**
  * Dev-only bypass: when DEV_AUTH_BYPASS=true (AND NODE_ENV !== production),
@@ -33,9 +37,59 @@ export type SessionAccount = {
   sqlIntentThreshold: number
 }
 
+export type SessionWorkspace = {
+  id: string
+  name: string
+  slug: string
+  isDefault: boolean
+}
+
 export type AuthSession = {
   user: SessionUser
   account: SessionAccount
+  /** The active workspace, or null if this user has none assigned yet. */
+  workspace: SessionWorkspace | null
+  /** Every workspace this user can access (ADMIN: all; others: assigned). */
+  workspaces: SessionWorkspace[]
+}
+
+/**
+ * Resolve the user's accessible workspaces + the active one. ADMIN sees every
+ * (non-archived) workspace in the account; MANAGER/REP see only the ones they
+ * are a member of. Active = the `lk_ws` cookie if it's accessible, else the
+ * default, else the first — or null when the user has no workspace at all.
+ */
+async function resolveWorkspaces(
+  accountId: string,
+  userId: string,
+  role: UserRole,
+): Promise<{ workspace: SessionWorkspace | null; workspaces: SessionWorkspace[] }> {
+  const rows = role === "ADMIN"
+    ? await prisma.workspace.findMany({
+        where: { account_id: accountId, archived_at: null },
+        orderBy: [{ is_default: "desc" }, { name: "asc" }],
+        select: { id: true, name: true, slug: true, is_default: true },
+      })
+    : (await prisma.workspaceMember.findMany({
+        where: { user_id: userId, workspace: { account_id: accountId, archived_at: null } },
+        orderBy: { workspace: { is_default: "desc" } },
+        select: { workspace: { select: { id: true, name: true, slug: true, is_default: true } } },
+      })).map((m) => m.workspace)
+
+  const workspaces: SessionWorkspace[] = rows.map((w) => ({
+    id: w.id, name: w.name, slug: w.slug, isDefault: w.is_default,
+  }))
+  if (workspaces.length === 0) return { workspace: null, workspaces }
+
+  let activeId: string | undefined
+  try { activeId = (await cookies()).get(WORKSPACE_COOKIE)?.value } catch { /* not in a request scope */ }
+
+  const active =
+    workspaces.find((w) => w.id === activeId) ??
+    workspaces.find((w) => w.isDefault) ??
+    workspaces[0]
+
+  return { workspace: active, workspaces }
 }
 
 /**
@@ -110,6 +164,8 @@ export async function getServerSession(): Promise<AuthSession | null> {
     if (!dbUser || !dbUser.is_active) return null
   }
 
+  const { workspace, workspaces } = await resolveWorkspaces(dbUser.account_id, dbUser.id, dbUser.role)
+
   return {
     user: {
       id: dbUser.id,
@@ -128,5 +184,7 @@ export async function getServerSession(): Promise<AuthSession | null> {
       sqlFitThreshold: dbUser.account.sql_fit_threshold,
       sqlIntentThreshold: dbUser.account.sql_intent_threshold,
     },
+    workspace,
+    workspaces,
   }
 }

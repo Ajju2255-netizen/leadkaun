@@ -5,12 +5,17 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import Link from "next/link"
 import {
-  ArrowRight, Trophy, X, MoveRight, Clock, Flame, Settings2,
-  KanbanSquare, MoreHorizontal,
+  ArrowRight, Trophy, X, MoveRight, Clock, Settings2,
+  KanbanSquare,
   Phone, MessageSquare, Mail, Sparkles, Activity,
 } from "lucide-react"
 import { GradeBadge } from "@/components/shared/GradeBadge"
 import { DeltaChip } from "@/components/shared/DeltaChip"
+import { LeadSlideOver } from "@/components/shared/LeadSlideOver"
+import { ThemedSelect } from "@/components/shared/ThemedSelect"
+import { ModalPortal } from "@/components/shared/ModalPortal"
+import { timeAgo } from "@/lib/format"
+import { startOfIstDay } from "@/lib/time/ist"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
 
@@ -66,7 +71,11 @@ function formatValue(v: number): string {
 }
 
 function daysInStage(enteredAt: string): number {
-  return Math.floor((Date.now() - new Date(enteredAt).getTime()) / 86_400_000)
+  // Count IST calendar days crossed, so "Today" means entered today in IST
+  // (not a rolling 24h window that flips at UTC midnight).
+  const a = startOfIstDay(new Date(enteredAt)).getTime()
+  const b = startOfIstDay(new Date()).getTime()
+  return Math.max(0, Math.round((b - a) / 86_400_000))
 }
 
 function stuckThreshold(stageKey: string): number {
@@ -74,18 +83,6 @@ function stuckThreshold(stageKey: string): number {
   if (stageKey === "contacted")     return 3
   if (stageKey === "proposal_sent") return 5
   return 7
-}
-
-function relativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const m = Math.floor(diff / 60_000)
-  if (m < 1) return "just now"
-  if (m < 60) return `${m}m ago`
-  const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
-  const d = Math.floor(h / 24)
-  if (d < 7) return `${d}d ago`
-  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
 }
 
 // ── Fetch ─────────────────────────────────────────────────────────────────────
@@ -200,7 +197,6 @@ export default function PipelinePage() {
     return acc
   }, {})
 
-  const peekLead = peekLeadId ? allLeads.find((l) => l.id === peekLeadId) ?? null : null
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ["pipeline"] })
@@ -256,7 +252,7 @@ export default function PipelinePage() {
             <KanbanSquare className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-[24px] font-bold text-slate-900 tracking-tight leading-tight">Pipeline</h1>
+            <h1 className="text-[28px] font-bold text-ink tracking-[-0.02em] leading-tight">Pipeline</h1>
             <p className="text-[13px] text-slate-500 mt-0.5">
               Auto-stage tracker for every deal in motion — moves when calls and WhatsApp signals land
             </p>
@@ -326,24 +322,19 @@ export default function PipelinePage() {
                 className={`w-[270px] shrink-0 flex flex-col rounded-2xl glass-2 gloss-edge p-3 max-h-[640px] transition-all ${dragOverStageId === stage.id ? "ring-2 ring-sky-400 bg-sky-50/50" : ""}`}>
 
                 {/* Column header */}
-                <div className="flex items-center justify-between px-1 pt-0.5 pb-2.5">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className={`w-2 h-2 rounded-full ${palette.dot}`} />
-                    <p className="text-[13px] font-bold text-slate-900 leading-none truncate">{stage.name}</p>
+                <div className="px-1 pb-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${palette.dot}`} />
+                      <p className="text-[13px] font-bold text-slate-900 leading-none truncate">{stage.name}</p>
+                      <span className="text-[11px] font-bold text-slate-400 tabular-nums shrink-0">{stageLeads.length}</span>
+                    </div>
+                    {stageValue > 0 && (
+                      <p className="text-[11px] font-bold text-slate-600 tabular-nums shrink-0">{formatValue(stageValue)}</p>
+                    )}
                   </div>
-                  <button className="w-6 h-6 rounded-full text-slate-400 hover:text-slate-700 hover:bg-white/70 flex items-center justify-center transition-colors">
-                    <MoreHorizontal className="w-3.5 h-3.5" />
-                  </button>
+                  <div className={`h-1 rounded-full bg-gradient-to-r ${palette.track} opacity-70 mt-2.5`} />
                 </div>
-                <div className="flex items-center justify-between px-1 pb-2">
-                  <p className="text-[11px] text-slate-500 font-mono">
-                    <span className="font-bold text-slate-700 tabular-nums">{stageLeads.length}</span> Deals
-                  </p>
-                  {stageValue > 0 && (
-                    <p className="text-[11px] font-bold text-slate-600 tabular-nums">{formatValue(stageValue)}</p>
-                  )}
-                </div>
-                <div className={`h-1 rounded-full bg-gradient-to-r ${palette.track} opacity-70 mb-3`} />
 
                 {/* Lead cards */}
                 <div className="flex flex-col gap-2 overflow-y-auto pr-1 -mr-1 flex-1
@@ -377,12 +368,6 @@ export default function PipelinePage() {
                     </div>
                   )}
                 </div>
-
-                <button className="mt-2 h-8 rounded-xl text-[12px] font-semibold text-sky-600
-                                   hover:bg-white/70 hover:text-sky-700 transition-colors
-                                   flex items-center justify-center gap-1">
-                  <span className="text-[14px] font-bold leading-none">+</span> Add Lead
-                </button>
               </div>
             )
           })}
@@ -392,7 +377,7 @@ export default function PipelinePage() {
               <div className="w-12 h-12 rounded-xl bg-sky-50 flex items-center justify-center mx-auto mb-4">
                 <Settings2 className="w-6 h-6 text-sky-500" />
               </div>
-              <p className="text-[15px] font-semibold text-slate-900">No pipeline stages configured</p>
+              <p className="text-[16px] font-semibold text-slate-900">No pipeline stages configured</p>
               <p className="text-[12px] text-slate-500 mt-1.5 max-w-[260px] mx-auto leading-relaxed">
                 {isAdmin
                   ? "Set up your stages in ICP Settings to start tracking deals."
@@ -412,11 +397,12 @@ export default function PipelinePage() {
           )}
         </div>
 
-        {/* Floating lead peek overlay (right-anchored over the board) */}
-        {peekLead && (
-          <LeadPeekCard lead={peekLead} stages={stages} onClose={() => setPeekLeadId(null)} />
-        )}
       </div>
+
+      {/* Full lead detail — opens for any card click */}
+      {peekLeadId && (
+        <LeadSlideOver leadId={peekLeadId} onClose={() => setPeekLeadId(null)} />
+      )}
 
       {/* ── Bottom analytics row ───────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
@@ -484,7 +470,7 @@ function KpiCard({
         </div>
       </div>
       <div className="flex items-end gap-2">
-        <p className="text-[28px] font-bold text-slate-900 tabular-nums leading-none">
+        <p className="text-[30px] font-bold text-slate-900 tabular-nums leading-none">
           {value.toLocaleString("en-IN")}{suffix ?? ""}
         </p>
         <DeltaChip delta={delta} invert={invertDelta} className="mb-0.5" />
@@ -583,7 +569,8 @@ function PipelineLeadCard({
         ) : null}
       </div>
 
-      {/* Pills row */}
+      {/* Meta row — time in stage + next action (Hot is already shown by the
+          A/B grade badge + the sky ring, so no separate pill). */}
       <div className="flex items-center gap-1.5 mt-2 flex-wrap">
         <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
           !isStuck
@@ -596,13 +583,7 @@ function PipelineLeadCard({
           {days === 0 ? "Today" : `${days}d`}
           {isStuck && (days >= 30 ? " · stuck" : " · slowing")}
         </span>
-        {isHot && !isWonColumn && (
-          <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full
-                           bg-orange-100 text-orange-700 border border-orange-200/60">
-            <Flame className="w-2.5 h-2.5" /> Hot
-          </span>
-        )}
-        {lead.next_action && (
+        {lead.next_action && !isWonColumn && (
           <span className={`inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${lead.next_action.color}`}>
             {lead.next_action.label}
           </span>
@@ -641,70 +622,6 @@ function PipelineLeadCard({
           </button>
         </div>
       )}
-    </div>
-  )
-}
-
-// ── Lead Peek Card ────────────────────────────────────────────────────────────
-
-function LeadPeekCard({
-  lead, stages, onClose,
-}: { lead: PipelineLead; stages: Stage[]; onClose: () => void }) {
-  const stage = stages.find((s) => s.id === lead.stage_id)
-  const initials = `${lead.first_name[0] ?? ""}${(lead.last_name ?? "")[0] ?? ""}`.toUpperCase() || "?"
-  return (
-    <div className="absolute right-4 bottom-4 w-[360px] rounded-2xl glass-3 gloss-edge p-5 z-30
-                    animate-in fade-in slide-in-from-bottom-2 duration-200">
-      <div className="flex items-start gap-3">
-        <div className="w-12 h-12 rounded-full flex items-center justify-center text-white text-[15px] font-bold
-                        bg-gradient-to-br from-sky-400 to-sky-600
-                        shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_4px_12px_rgba(14,165,233,0.28)]">
-          {initials}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-[15px] font-bold text-slate-900 truncate">{lead.first_name} {lead.last_name ?? ""}</p>
-          <p className="text-[12px] text-slate-500 truncate">{lead.email ?? "—"}</p>
-        </div>
-        {stage && (
-          <span className="text-[10px] font-bold text-emerald-700 px-2 py-0.5 rounded-full bg-emerald-100 border border-emerald-200/60 shrink-0">
-            {stage.name}
-          </span>
-        )}
-        <button onClick={onClose}
-          className="w-7 h-7 flex items-center justify-center rounded-full text-slate-400 hover:text-slate-700 hover:bg-white/70 transition-all">
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-
-      <div className="grid grid-cols-2 gap-y-2 gap-x-3 mt-4">
-        <PeekRow label="Deal Value" value={lead.expected_value ? formatValue(lead.expected_value) : "—"} />
-        <PeekRow label="Company"    value={lead.company_name ?? "—"} />
-        <PeekRow label="Grade"      value={lead.grade} />
-        <PeekRow label="Days in stage" value={`${daysInStage(lead.stage_entered_at)}d`} />
-      </div>
-
-      <div className="flex items-center gap-3 mt-4 pt-3 border-t border-white/60">
-        <Link href={`/leads/${lead.id}`}
-          className="flex-1 text-[12px] font-semibold text-sky-600 hover:text-sky-700 transition-colors">
-          View Details →
-        </Link>
-        <Link href={`/leads/${lead.id}#actions`}
-          className="text-[12px] font-semibold text-slate-500 hover:text-slate-700 transition-colors">
-          Add Task
-        </Link>
-        <Link href={`/leads/${lead.id}#log`}
-          className="text-[12px] font-semibold text-slate-500 hover:text-slate-700 transition-colors">
-          Log Activity
-        </Link>
-      </div>
-    </div>
-  )
-}
-function PeekRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">{label}</p>
-      <p className="text-[13px] font-semibold text-slate-800 truncate">{value}</p>
     </div>
   )
 }
@@ -793,7 +710,7 @@ function SourceDonut({ sources, totalLeads }: { sources: SourceRow[]; totalLeads
             ))}
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <p className="text-[20px] font-bold text-slate-900 tabular-nums leading-none">{totalLeads}</p>
+            <p className="text-[18px] font-bold text-slate-900 tabular-nums leading-none">{totalLeads}</p>
             <p className="text-[9px] font-mono uppercase text-slate-400 mt-1 tracking-wider">Total Deals</p>
           </div>
         </div>
@@ -844,7 +761,7 @@ function ActivityFeed({ activities }: { activities: Activity[] }) {
                   <span className="font-semibold text-slate-900 group-hover:text-sky-700 transition-colors">{a.lead_name}</span>
                   <span className="text-slate-500"> · {a.label}</span>
                 </p>
-                <p className="text-[10px] text-slate-400 mt-0.5 font-mono">{relativeTime(a.ts)}</p>
+                <p className="text-[10px] text-slate-400 mt-0.5 font-mono">{timeAgo(a.ts)}</p>
               </div>
             </Link>
           )
@@ -887,11 +804,12 @@ function MoveStageModal({ leadId, stages, currentStageId, onClose, onSuccess }: 
   const otherStages = stages.filter((s) => s.id !== currentStageId)
 
   return (
-    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
+    <ModalPortal>
+    <div className="fixed inset-0 bg-slate-900/55 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
       <div className="rounded-2xl glass-3 gloss-edge p-6 w-full max-w-sm space-y-4
                       shadow-[0_24px_48px_rgba(15,23,42,0.18)]">
         <div className="flex items-center justify-between">
-          <h2 className="text-[17px] font-bold text-slate-900">Move Stage</h2>
+          <h2 className="text-[16px] font-bold text-slate-900">Move Stage</h2>
           <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full
                                                text-slate-400 hover:text-slate-700 hover:bg-white/70 transition-all">
             <X className="w-4 h-4" />
@@ -958,6 +876,7 @@ function MoveStageModal({ leadId, stages, currentStageId, onClose, onSuccess }: 
         </div>
       </div>
     </div>
+    </ModalPortal>
   )
 }
 
@@ -982,11 +901,12 @@ function WonModal({ leadId, onClose, onSuccess }: { leadId: string; onClose: () 
   }
 
   return (
-    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
+    <ModalPortal>
+    <div className="fixed inset-0 bg-slate-900/55 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
       <div className="rounded-2xl glass-3 gloss-edge p-6 w-full max-w-sm space-y-4
                       shadow-[0_24px_48px_rgba(15,23,42,0.18)]">
         <div className="flex items-center justify-between">
-          <h2 className="text-[17px] font-bold text-slate-900">Mark as Won</h2>
+          <h2 className="text-[16px] font-bold text-slate-900">Mark as Won</h2>
           <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full
                                                text-slate-400 hover:text-slate-700 hover:bg-white/70 transition-all">
             <X className="w-4 h-4" />
@@ -1005,13 +925,12 @@ function WonModal({ leadId, onClose, onSuccess }: { leadId: string; onClose: () 
           <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
             Win Reason <span className="text-rose-500">*</span>
           </label>
-          <select className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-[14px] bg-white/80
-                             focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
-            value={reason} onChange={(e) => setReason(e.target.value)}>
-            <option value="">Select reason…</option>
-            {["COMPETITIVE_PRICE","BEST_FIT","REFERRAL_TRUST","FAST_DELIVERY","EXISTING_RELATIONSHIP","OTHER"]
-              .map(r => <option key={r} value={r}>{r.replace(/_/g," ")}</option>)}
-          </select>
+          <ThemedSelect
+            value={reason} onValueChange={setReason}
+            options={["COMPETITIVE_PRICE","BEST_FIT","REFERRAL_TRUST","FAST_DELIVERY","EXISTING_RELATIONSHIP","OTHER"]
+              .map(r => ({ value: r, label: r.replace(/_/g," ") }))}
+            placeholder="Select reason…" aria-label="Win reason"
+          />
         </div>
         <div className="flex gap-2 pt-1">
           <button onClick={onClose}
@@ -1029,6 +948,7 @@ function WonModal({ leadId, onClose, onSuccess }: { leadId: string; onClose: () 
         </div>
       </div>
     </div>
+    </ModalPortal>
   )
 }
 
@@ -1051,11 +971,12 @@ function LostModal({ leadId, onClose, onSuccess }: { leadId: string; onClose: ()
   }
 
   return (
-    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
+    <ModalPortal>
+    <div className="fixed inset-0 bg-slate-900/55 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
       <div className="rounded-2xl glass-3 gloss-edge p-6 w-full max-w-sm space-y-4
                       shadow-[0_24px_48px_rgba(15,23,42,0.18)]">
         <div className="flex items-center justify-between">
-          <h2 className="text-[17px] font-bold text-slate-900">Mark as Lost</h2>
+          <h2 className="text-[16px] font-bold text-slate-900">Mark as Lost</h2>
           <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full
                                                text-slate-400 hover:text-slate-700 hover:bg-white/70 transition-all">
             <X className="w-4 h-4" />
@@ -1065,13 +986,12 @@ function LostModal({ leadId, onClose, onSuccess }: { leadId: string; onClose: ()
           <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
             Loss Reason <span className="text-rose-500">*</span>
           </label>
-          <select className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-[14px] bg-white/80
-                             focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
-            value={reason} onChange={(e) => setReason(e.target.value)}>
-            <option value="">Select reason…</option>
-            {["PRICE_TOO_HIGH","WENT_COMPETITOR","NO_BUDGET","NO_RESPONSE","REQUIREMENT_CHANGED","WRONG_FIT","OTHER"]
-              .map(r => <option key={r} value={r}>{r.replace(/_/g," ")}</option>)}
-          </select>
+          <ThemedSelect
+            value={reason} onValueChange={setReason}
+            options={["PRICE_TOO_HIGH","WENT_COMPETITOR","NO_BUDGET","NO_RESPONSE","REQUIREMENT_CHANGED","WRONG_FIT","OTHER"]
+              .map(r => ({ value: r, label: r.replace(/_/g," ") }))}
+            placeholder="Select reason…" aria-label="Loss reason"
+          />
         </div>
         <div className="flex gap-2 pt-1">
           <button onClick={onClose}
@@ -1089,5 +1009,6 @@ function LostModal({ leadId, onClose, onSuccess }: { leadId: string; onClose: ()
         </div>
       </div>
     </div>
+    </ModalPortal>
   )
 }

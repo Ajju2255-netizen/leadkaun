@@ -1,8 +1,9 @@
 import { z } from "zod"
 import { prisma } from "@/lib/prisma"
-import { requireAuth, requireRole } from "@/lib/auth/middleware"
+import { requireWorkspace } from "@/lib/auth/middleware"
 import { handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError, parseBody } from "@/lib/api/response"
+import { rateLimited, LIMITS } from "@/lib/rate-limit"
 
 const MAX_TEMPLATES = 20
 
@@ -21,14 +22,14 @@ const TemplateSchema = z.object({
  */
 export async function GET(req: Request) {
   try {
-    const session = await requireAuth()
+    const session = await requireWorkspace()
     const { searchParams } = new URL(req.url)
     const type  = searchParams.get("type")  ?? undefined
     const stage = searchParams.get("stage") ?? undefined
 
     const templates = await prisma.smartTemplate.findMany({
       where: {
-        account_id: session.account.id,
+        account_id: session.account.id, workspace_id: session.workspace.id,
         is_active:  true,
         ...(type  ? { type: type as "WHATSAPP" | "CALL_SCRIPT" } : {}),
         ...(stage ? { stages: { has: stage } } : {}),
@@ -51,13 +52,16 @@ export async function GET(req: Request) {
  */
 export async function POST(req: Request) {
   try {
-    const session = await requireRole("ADMIN", "MANAGER")
+    const session = await requireWorkspace("ADMIN", "MANAGER")
+
+    const _rl = await rateLimited(`templates:${session.user.id}`, LIMITS.write)
+    if (_rl) return _rl
 
     const { data, error } = await parseBody(req, TemplateSchema)
     if (error) return error
 
     const count = await prisma.smartTemplate.count({
-      where: { account_id: session.account.id, is_active: true },
+      where: { account_id: session.account.id, workspace_id: session.workspace.id, is_active: true },
     })
     if (count >= MAX_TEMPLATES) {
       return apiError(`Maximum ${MAX_TEMPLATES} templates per account`, "LIMIT_REACHED", 422)
@@ -65,7 +69,7 @@ export async function POST(req: Request) {
 
     const template = await prisma.smartTemplate.create({
       data: {
-        account_id: session.account.id,
+        account_id: session.account.id, workspace_id: session.workspace.id,
         name:       data.name,
         type:       data.type,
         body:       data.body,

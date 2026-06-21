@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma"
-import { requireAuth, handleAuthError } from "@/lib/auth/middleware"
+import { requireWorkspace, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
 
 /**
@@ -11,13 +11,14 @@ import { apiSuccess, apiError } from "@/lib/api/response"
  */
 export async function GET(_req: Request) {
   try {
-    const session   = await requireAuth()
+    const session   = await requireWorkspace()
     const accountId = session.account.id
+    const workspaceId = session.workspace.id
     const since     = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
 
     const notifications = await prisma.notification.findMany({
       where: {
-        account_id: accountId,
+        account_id: accountId, workspace_id: workspaceId,
         OR: [
           { user_id: null },
           { user_id: session.user.id },

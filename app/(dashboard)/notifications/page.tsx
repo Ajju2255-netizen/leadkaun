@@ -252,7 +252,7 @@ export default function NotificationsPage() {
             <Bell className="w-6 h-6 text-white" strokeWidth={2.4} />
           </div>
           <div>
-            <h1 className="text-[26px] font-extrabold text-slate-900 tracking-tight leading-tight">Notifications</h1>
+            <h1 className="text-[28px] font-bold text-ink tracking-[-0.02em] leading-tight">Notifications</h1>
             <p className="text-[13px] text-slate-500 mt-0.5">
               {isLoading
                 ? "Loading…"
@@ -286,7 +286,7 @@ export default function NotificationsPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 leading-none">{cfg.label}</p>
-                  <p className="text-[20px] font-extrabold text-slate-900 tabular-nums leading-none mt-1.5 font-mono">{c}</p>
+                  <p className="text-[18px] font-extrabold text-slate-900 tabular-nums leading-none mt-1.5 font-mono">{c}</p>
                 </div>
               </div>
             )
@@ -306,7 +306,7 @@ export default function NotificationsPage() {
               <AlertTriangle className="w-5 h-5 text-white" strokeWidth={2.4} />
             </div>
             <div className="flex-1">
-              <p className="text-[15px] font-bold text-slate-900">
+              <p className="text-[16px] font-bold text-slate-900">
                 {highPri.length} high-priority alert{highPri.length > 1 ? "s" : ""} — act now
               </p>
               <p className="text-[12px] text-slate-500 mt-0.5">These leads are at risk of being lost.</p>
@@ -364,7 +364,7 @@ export default function NotificationsPage() {
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-400 to-sky-500 flex items-center justify-center mx-auto mb-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_6px_18px_rgba(14,165,233,0.32)]">
             <Bell className="w-6 h-6 text-white" strokeWidth={2.4} />
           </div>
-          <p className="text-[15px] font-bold text-slate-900">All clear</p>
+          <p className="text-[16px] font-bold text-slate-900">All clear</p>
           <p className="text-[12px] text-slate-500 mt-1.5 max-w-[300px] mx-auto leading-relaxed">
             No alerts right now. Notifications fire when leads go at-risk, follow-ups come due, or Grade A leads are missed.
           </p>

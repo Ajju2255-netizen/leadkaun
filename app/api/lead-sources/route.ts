@@ -1,7 +1,8 @@
 import { z } from "zod"
 import { prisma } from "@/lib/prisma"
-import { requireAuth, requireRole, handleAuthError } from "@/lib/auth/middleware"
+import { requireWorkspace, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError, parseBody } from "@/lib/api/response"
+import { rateLimited, LIMITS } from "@/lib/rate-limit"
 
 /**
  * GET /api/lead-sources
@@ -10,10 +11,10 @@ import { apiSuccess, apiError, parseBody } from "@/lib/api/response"
  */
 export async function GET() {
   try {
-    const session = await requireAuth()
+    const session = await requireWorkspace()
 
     let sources = await prisma.leadSource.findMany({
-      where:   { account_id: session.account.id },
+      where:   { account_id: session.account.id, workspace_id: session.workspace.id },
       orderBy: { name: "asc" },
       select:  { id: true, name: true, key: true, intent_baseline: true, is_custom: true },
     })
@@ -36,11 +37,11 @@ export async function GET() {
         { name: "Other",                key: "other",                intent_baseline: 10, reliability_score: 50.0,  is_custom: false },
       ]
       await prisma.leadSource.createMany({
-        data:           defaults.map((s) => ({ ...s, account_id: session.account.id })),
+        data:           defaults.map((s) => ({ ...s, account_id: session.account.id, workspace_id: session.workspace.id })),
         skipDuplicates: true,
       })
       sources = await prisma.leadSource.findMany({
-        where:   { account_id: session.account.id },
+        where:   { account_id: session.account.id, workspace_id: session.workspace.id },
         orderBy: { name: "asc" },
         select:  { id: true, name: true, key: true, intent_baseline: true, is_custom: true },
       })
@@ -65,7 +66,11 @@ const CreateSchema = z.object({
  */
 export async function POST(req: Request) {
   try {
-    const session = await requireRole("ADMIN")
+    const session = await requireWorkspace("ADMIN")
+
+    const _rl = await rateLimited(`lead-sources:${session.account.id}`, LIMITS.write)
+    if (_rl) return _rl
+
     const { data, error } = await parseBody(req, CreateSchema)
     if (error) return error
 
@@ -76,7 +81,7 @@ export async function POST(req: Request) {
 
     // Ensure key is unique within the account
     const existing = await prisma.leadSource.findFirst({
-      where: { account_id: session.account.id, key },
+      where: { account_id: session.account.id, workspace_id: session.workspace.id, key },
     })
     const finalKey = existing ? `${key}_${Date.now()}` : key
 

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { requireRole } from "@/lib/auth/middleware"
 import { handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError, parseBody } from "@/lib/api/response"
+import { rateLimited, LIMITS } from "@/lib/rate-limit"
 import { createSupabaseAdminClient } from "@/lib/supabase/admin"
 
 const InviteSchema = z.object({
@@ -22,6 +23,9 @@ const InviteSchema = z.object({
 export async function POST(req: Request) {
   try {
     const session = await requireRole("ADMIN")
+
+    const limited = await rateLimited(`team:invite:${session.account.id}`, LIMITS.workspace)
+    if (limited) return limited
 
     const { data, error } = await parseBody(req, InviteSchema)
     if (error) return error
