@@ -53,13 +53,35 @@ export async function POST(req: Request) {
     )
 
     if (inviteError) {
-      return apiError(inviteError.message, "INVITE_FAILED", 500)
+      // Surface Supabase's reason with the right status so the toast is clear
+      // instead of a generic "Internal server error" 500.
+      const msg = inviteError.message || "Could not send the invite"
+      const lower = msg.toLowerCase()
+      if (lower.includes("invalid") && lower.includes("email")) {
+        return apiError(
+          `"${data.email}" was rejected as an invalid email. Use a real, deliverable address (test domains like example.com are blocked).`,
+          "INVALID_EMAIL",
+          422,
+        )
+      }
+      if (lower.includes("already been registered") || lower.includes("already registered")) {
+        return apiError(`${data.email} already has an account.`, "CONFLICT", 409)
+      }
+      if (lower.includes("rate limit") || lower.includes("too many")) {
+        return apiError(
+          "Email sending limit reached. The default Supabase email service allows only a few invites per hour — configure custom SMTP in Supabase Auth to lift this.",
+          "RATE_LIMITED",
+          429,
+        )
+      }
+      console.error("Supabase invite error:", msg)
+      return apiError(msg, "INVITE_FAILED", 422)
     }
 
     // Create placeholder user record. auth_id is linked now (Supabase issues it
     // at invite time); is_active flips true when the invitee accepts the magic
     // link and hits /auth/callback (see app/api/auth/callback/route.ts).
-    await prisma.user.create({
+    const newUser = await prisma.user.create({
       data: {
         account_id: session.account.id,
         auth_id:    inviteData.user.id,
@@ -72,6 +94,16 @@ export async function POST(req: Request) {
         invited_at: new Date(),
       },
     })
+
+    // Add the invitee to the inviter's active workspace so a MANAGER/REP lands
+    // in a usable environment on acceptance instead of the "no workspace" empty
+    // state. (ADMINs see every workspace regardless; this is harmless for them.)
+    // Admins can reassign workspaces later in Settings → Workspaces.
+    if (session.workspace) {
+      await prisma.workspaceMember.create({
+        data: { workspace_id: session.workspace.id, user_id: newUser.id },
+      }).catch((e) => console.warn("[invite] could not add workspace member:", String(e)))
+    }
 
     return apiSuccess({ invited: true, email: data.email }, 201)
   } catch (err) {
