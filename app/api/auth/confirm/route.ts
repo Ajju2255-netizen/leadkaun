@@ -47,7 +47,11 @@ export async function GET(req: NextRequest) {
           data: { is_active: true, joined_at: new Date() },
         })
       }
-      return NextResponse.redirect(new URL(next, origin))
+      // Invited users have no password yet (they accepted via the one-time
+      // link), so send them to set one before the dashboard. Other flows
+      // (recovery, magic link) honour the requested `next`.
+      const dest = type === "invite" ? "/set-password" : next
+      return NextResponse.redirect(new URL(dest, origin))
     }
 
     return NextResponse.redirect(
