@@ -43,7 +43,7 @@ export async function POST(req: Request) {
     const { data: inviteData, error: inviteError } = await admin.auth.admin.inviteUserByEmail(
       data.email,
       {
-        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
+        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/callback?next=/dashboard`,
         data: {
           account_id: session.account.id,
           role:       data.role,
