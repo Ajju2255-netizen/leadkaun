@@ -32,6 +32,13 @@ export async function GET(req: NextRequest) {
 
   if (tokenHash && type && ALLOWED_TYPES.includes(type)) {
     const supabase = createServerClient()
+    // Clear any pre-existing session first. Opening an invite/recovery link
+    // while already signed in (e.g. an admin testing their own invite) collides
+    // with verifyOtp and leaves a half-set cookie, which getServerSession then
+    // rejects — producing a /login ↔ /queue redirect loop. A local sign-out
+    // guarantees a clean session swap into the link's account.
+    await supabase.auth.signOut({ scope: "local" }).catch(() => {})
+
     const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash })
 
     if (!error) {
