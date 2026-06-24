@@ -96,7 +96,7 @@ export async function PATCH(
         if (!targetRep) return apiError("Target rep not found or inactive", "NOT_FOUND", 404)
 
         await prisma.lead.updateMany({
-          where: { account_id: session.account.id, assigned_rep_id: id, won_at: null, lost_at: null },
+          where: { account_id: session.account.id, assigned_rep_id: id, won_at: null, lost_at: null, is_junk: false },
           data:  { assigned_rep_id: data.reassign_to_rep_id },
         })
       }
@@ -111,6 +111,23 @@ export async function PATCH(
       select: { id: true, email: true, first_name: true, last_name: true, role: true, is_active: true },
     })
 
+    // An ADMIN sees every workspace implicitly (no WorkspaceMember rows). When
+    // demoted to MANAGER/REP, resolveWorkspaces() would return nothing and lock
+    // them out — so grant explicit membership to every active workspace. The
+    // admin can then trim access per-member via the workspaces endpoint.
+    if (demotingAdmin) {
+      const workspaces = await prisma.workspace.findMany({
+        where:  { account_id: session.account.id, archived_at: null },
+        select: { id: true },
+      })
+      if (workspaces.length) {
+        await prisma.workspaceMember.createMany({
+          data: workspaces.map((w) => ({ workspace_id: w.id, user_id: id })),
+          skipDuplicates: true,
+        })
+      }
+    }
+
     return apiSuccess({ member: updated })
   } catch (err) {
     const authResponse = handleAuthError(err)
@@ -120,20 +137,22 @@ export async function PATCH(
 }
 
 /**
- * DELETE /api/team/members/[id]?reassign_to_rep_id=...
+ * DELETE /api/team/members/[id]
  *
- * Permanently removes a team member: revokes their login (Supabase auth) and
- * deletes the user record (workspace memberships cascade away).
+ * Permanently removes a team member: deletes the user record (workspace
+ * memberships cascade away) and revokes their Supabase login.
  *
- * Safeguards:
- *  - Admin only; you cannot remove yourself.
- *  - The last active admin cannot be removed.
- *  - Active leads must be reassigned first (pass reassign_to_rep_id).
- *  - Members with sales history (lead notes or won-deal attributions) cannot be
- *    hard-deleted — those are required relations. Deactivate them instead.
+ * Hard delete is only allowed for members with NO footprint — no assigned
+ * leads (ever), notes, behavioural signals, or won-deal attributions. Deleting
+ * a user with a footprint would either violate required FKs (notes, wins) or
+ * silently SET NULL their lead/signal attribution (the core data of a Sales
+ * Behaviour OS). Anyone with history must be deactivated instead, which
+ * preserves the record while revoking access.
+ *
+ * Safeguards: admin only; cannot remove yourself or the last active admin.
  */
 export async function DELETE(
-  req: Request,
+  _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
@@ -161,44 +180,28 @@ export async function DELETE(
       )
     }
 
-    // Sales history relations (lead notes, win attributions) are required FKs —
-    // a hard delete would violate them. Refuse and steer the admin to deactivate.
-    const [noteCount, winCount] = await Promise.all([
+    // Footprint check. Any assigned lead (any status), note, signal, or win
+    // attribution means deleting this user would destroy or orphan history —
+    // refuse and steer the admin to deactivate instead.
+    const [leadCount, noteCount, signalCount, winCount] = await Promise.all([
+      prisma.lead.count({ where: { account_id: session.account.id, assigned_rep_id: id } }),
       prisma.leadNote.count({ where: { user_id: id } }),
+      prisma.signal.count({ where: { user_id: id } }),
       prisma.winAttribution.count({ where: { user_id: id } }),
     ])
-    if (noteCount > 0 || winCount > 0) {
+    if (leadCount > 0 || noteCount > 0 || signalCount > 0 || winCount > 0) {
       return apiError(
-        "This member has recorded activity (notes or won deals) and can't be permanently deleted. Deactivate them instead to preserve history.",
+        "This member has recorded activity (assigned leads, notes, signals, or won deals) and can't be permanently deleted. Deactivate them instead to preserve history.",
         "HAS_HISTORY",
         409,
       )
     }
 
-    // Reassign any active leads before deleting (otherwise they'd be orphaned).
-    const reassignToRepId = new URL(req.url).searchParams.get("reassign_to_rep_id")
-    const assignedCount = await activeLeadCount(session.account.id, id)
-    if (assignedCount > 0) {
-      if (!reassignToRepId) {
-        return apiError(
-          `This rep has ${assignedCount} active leads. Provide reassign_to_rep_id to continue.`,
-          "REASSIGNMENT_REQUIRED",
-          422,
-        )
-      }
-      const targetRep = await prisma.user.findFirst({
-        where: { id: reassignToRepId, account_id: session.account.id, is_active: true },
-      })
-      if (!targetRep) return apiError("Target rep not found or inactive", "NOT_FOUND", 404)
+    // Delete the app record first: if this fails nothing has changed and the
+    // member can still log in. Only once it succeeds do we revoke their login —
+    // best-effort, since a never-accepted invite may have no live auth user.
+    await prisma.user.delete({ where: { id } })
 
-      await prisma.lead.updateMany({
-        where: { account_id: session.account.id, assigned_rep_id: id, won_at: null, lost_at: null },
-        data:  { assigned_rep_id: reassignToRepId },
-      })
-    }
-
-    // Revoke login. Best-effort — the auth user may already be gone for a
-    // placeholder invite that was never accepted.
     if (member.auth_id) {
       try {
         const admin = createSupabaseAdminClient()
@@ -207,8 +210,6 @@ export async function DELETE(
         console.warn("[team:remove] could not delete supabase auth user:", String(e))
       }
     }
-
-    await prisma.user.delete({ where: { id } })
 
     return apiSuccess({ removed: true })
   } catch (err) {

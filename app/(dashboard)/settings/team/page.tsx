@@ -56,7 +56,7 @@ function Avatar({ name, active }: { name: string; active: boolean }) {
 
 export default function TeamPage() {
   const qc = useQueryClient()
-  const { data: me } = useCurrentUser()
+  const { data: me, isLoading: meLoading } = useCurrentUser()
   const isAdmin = me?.user.role === "ADMIN"
   const myId = me?.user.id
 
@@ -80,7 +80,6 @@ export default function TeamPage() {
   const [wsTarget, setWsTarget] = useState<Member | null>(null)
 
   const [removeTarget,  setRemoveTarget]  = useState<Member | null>(null)
-  const [removeReassign, setRemoveReassign] = useState("")
   const [removing,      setRemoving]       = useState(false)
 
   const members    = data?.members ?? []
@@ -145,19 +144,30 @@ export default function TeamPage() {
   async function handleRemove() {
     if (!removeTarget) return
     setRemoving(true)
-    const qs  = removeReassign ? `?reassign_to_rep_id=${removeReassign}` : ""
-    const res = await fetch(`/api/team/members/${removeTarget.id}${qs}`, { method: "DELETE" })
+    const res = await fetch(`/api/team/members/${removeTarget.id}`, { method: "DELETE" })
     const json = await res.json().catch(() => ({}))
     setRemoving(false)
     if (!res.ok) { toast.error(json.error ?? "Failed to remove"); return }
     toast.success(`${removeTarget.first_name} removed`)
     setRemoveTarget(null)
-    setRemoveReassign("")
     qc.invalidateQueries({ queryKey: ["team-members"] })
   }
 
+  // ── Role still resolving: hold the management UI back so a non-admin never
+  //    sees admin controls flash before their role is known. ────────────────────
+  if (meLoading) {
+    return (
+      <div className="max-w-2xl mx-auto space-y-6">
+        <Header />
+        <div className="glass-card px-5 py-5 space-y-3">
+          {[1,2,3].map(i => <Skeleton key={i} className="h-14 rounded-xl" />)}
+        </div>
+      </div>
+    )
+  }
+
   // ── Non-admin: read-only view ──────────────────────────────────────────────
-  if (me && !isAdmin) {
+  if (!isAdmin) {
     return (
       <div className="max-w-2xl mx-auto space-y-6">
         <Header />
@@ -318,7 +328,7 @@ export default function TeamPage() {
                       </button>
                     )}
                     <button
-                      onClick={() => { setRemoveTarget(m); setRemoveReassign("") }}
+                      onClick={() => setRemoveTarget(m)}
                       className="flex items-center justify-center text-slate-400
                                  border border-slate-200 rounded-full w-7 h-7 hover:border-red-300
                                  hover:text-red-600 hover:bg-red-50 transition-all duration-150"
@@ -458,24 +468,11 @@ export default function TeamPage() {
             <p className="text-[13px] text-slate-500">
               This <span className="font-semibold text-red-600">permanently removes</span> {removeTarget.first_name} —
               their login is revoked and they're removed from every workspace. This can't be undone.
-              {(removeTarget._count.assigned_leads ?? 0) > 0
-                ? " Reassign their active leads first."
-                : ""}
             </p>
-            {(removeTarget._count.assigned_leads ?? 0) > 0 && (
-              <div className="space-y-1.5">
-                <label className="text-[12px] font-semibold text-slate-500 uppercase tracking-wider">
-                  Reassign {removeTarget._count.assigned_leads} lead{removeTarget._count.assigned_leads !== 1 ? "s" : ""} to
-                </label>
-                <ThemedSelect
-                  value={removeReassign}
-                  onValueChange={setRemoveReassign}
-                  options={activeReps.filter((r) => r.id !== removeTarget.id).map((r) => ({ value: r.id, label: `${r.first_name} ${r.last_name ?? ""}`.trim() }))}
-                  placeholder="Select a rep…"
-                  aria-label="Reassign leads to"
-                />
-              </div>
-            )}
+            <p className="text-[12px] text-slate-400">
+              Only members with no recorded activity (assigned leads, notes, signals, or won deals) can be permanently
+              removed. For anyone with history, use <span className="font-semibold text-slate-600">Off</span> to deactivate instead — it preserves their record.
+            </p>
             <div className="flex gap-2 pt-1">
               <button onClick={() => setRemoveTarget(null)}
                 className="flex-1 h-10 rounded-full border border-slate-200 text-[13px] font-semibold
@@ -484,7 +481,7 @@ export default function TeamPage() {
               </button>
               <button
                 onClick={handleRemove}
-                disabled={removing || ((removeTarget._count.assigned_leads ?? 0) > 0 && !removeReassign)}
+                disabled={removing}
                 className="flex-1 h-10 rounded-full bg-red-600 hover:bg-red-700 text-white
                            text-[13px] font-semibold transition-all disabled:opacity-50">
                 {removing ? "Removing…" : "Remove"}
@@ -519,9 +516,13 @@ interface WorkspaceAccess { id: string; name: string; is_default: boolean; membe
 
 function WorkspaceAccessModal({ member, onClose }: { member: Member; onClose: () => void }) {
   const qc = useQueryClient()
-  const { data, isLoading } = useQuery<{ workspaces: WorkspaceAccess[]; role: string }>({
+  const { data, isLoading, isError } = useQuery<{ workspaces: WorkspaceAccess[]; role: string }>({
     queryKey: ["member-workspaces", member.id],
-    queryFn:  () => fetch(`/api/team/members/${member.id}/workspaces`).then((r) => r.json()),
+    queryFn:  async () => {
+      const res = await fetch(`/api/team/members/${member.id}/workspaces`)
+      if (!res.ok) throw new Error("Failed to load workspace access")
+      return res.json()
+    },
   })
   const [busy, setBusy] = useState<string | null>(null)
 
@@ -537,7 +538,7 @@ function WorkspaceAccessModal({ member, onClose }: { member: Member; onClose: ()
           body: JSON.stringify({ workspace_id: ws.id }),
         })
     setBusy(null)
-    if (!res.ok) { toast.error("Failed to update access"); return }
+    if (!res.ok) { const j = await res.json().catch(() => ({})); toast.error(j.error ?? "Failed to update access"); return }
     refresh()
   }
 
@@ -566,6 +567,8 @@ function WorkspaceAccessModal({ member, onClose }: { member: Member; onClose: ()
           <div className="space-y-1.5 overflow-y-auto">
             {isLoading ? (
               [1, 2, 3].map((i) => <Skeleton key={i} className="h-12 w-full rounded-xl" />)
+            ) : isError ? (
+              <p className="text-[13px] text-red-500 text-center py-6">Couldn&apos;t load workspace access. Close and try again.</p>
             ) : workspaces.length === 0 ? (
               <p className="text-[13px] text-slate-400 text-center py-6">No workspaces yet.</p>
             ) : (
