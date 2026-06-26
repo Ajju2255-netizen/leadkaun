@@ -467,7 +467,7 @@ export default function TeamPage() {
             </div>
             <p className="text-[13px] text-slate-500">
               This <span className="font-semibold text-red-600">permanently removes</span> {removeTarget.first_name} —
-              their login is revoked and they're removed from every workspace. This can't be undone.
+              their login is revoked and they&apos;re removed from every workspace. This can&apos;t be undone.
             </p>
             <p className="text-[12px] text-slate-400">
               Only members with no recorded activity (assigned leads, notes, signals, or won deals) can be permanently
