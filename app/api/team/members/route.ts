@@ -23,7 +23,9 @@ export async function GET(_req: Request) {
         is_active:  true,
         invited_at: true,
         _count: {
-          select: { assigned_leads: true },
+          // Active leads only — matches the reassignment gate in the member
+          // PATCH/DELETE routes so the UI count and server logic agree.
+          select: { assigned_leads: { where: { won_at: null, lost_at: null, is_junk: false } } },
         },
       },
       orderBy: [{ role: "asc" }, { first_name: "asc" }],
