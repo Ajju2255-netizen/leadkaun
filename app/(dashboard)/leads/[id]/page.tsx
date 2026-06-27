@@ -13,6 +13,7 @@ import {
 import { GradeBadge } from "@/components/shared/GradeBadge"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { ScoreBar } from "@/components/shared/ScoreBar"
+import { ScoreExplanation } from "@/components/shared/ScoreExplanation"
 import { LeadRealtimeListener } from "@/components/leads/LeadRealtimeListener"
 import { LogWhatsAppModal } from "@/components/queue/LogWhatsAppModal"
 import { ContactActions } from "@/components/shared/ContactActions"
@@ -442,6 +443,7 @@ export default function LeadRecordPage() {
             <ScoreBar value={lead.intent_score}  label="Intent"  type="intent"  showValue />
             <ScoreBar value={lead.quality_score} label="Quality" type="quality" showValue />
           </div>
+          <ScoreExplanation lead={lead} />
         </div>
 
         {/* ── Details ──────────────────────────────────────────────────── */}
