@@ -1,5 +1,6 @@
 import { Resend } from "resend"
 import * as React from "react"
+import { prisma } from "@/lib/prisma"
 
 const FROM_ADDRESS = process.env.RESEND_FROM_EMAIL ?? "noreply@leadkaun.com"
 
@@ -8,12 +9,34 @@ interface SendEmailOptions {
   subject: string
   react: React.ReactElement
   replyTo?: string
+  // Telemetry (Mission Control email log) — optional, best-effort.
+  template?: string
+  accountId?: string | null
 }
 
 interface SendEmailResult {
   success: boolean
   id?: string
   error?: string
+}
+
+// Best-effort EmailLog write. Only called for real send attempts (key present).
+async function logEmail(opts: SendEmailOptions, result: SendEmailResult): Promise<void> {
+  try {
+    await prisma.emailLog.create({
+      data: {
+        account_id:  opts.accountId ?? null,
+        to_email:    Array.isArray(opts.to) ? opts.to[0] ?? "" : opts.to,
+        template:    opts.template ?? "unknown",
+        subject:     opts.subject,
+        provider_id: result.id ?? null,
+        status:      result.success ? "sent" : "failed",
+        error:       result.error ?? null,
+      },
+    })
+  } catch (e) {
+    console.error("[email-log] failed to record", e)
+  }
 }
 
 export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult> {
@@ -41,13 +64,19 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult
 
     if (error) {
       console.error("Resend error:", error)
-      return { success: false, error: error.message }
+      const result = { success: false, error: error.message }
+      await logEmail(opts, result)
+      return result
     }
 
-    return { success: true, id: data?.id }
+    const result = { success: true, id: data?.id }
+    await logEmail(opts, result)
+    return result
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error"
     console.error("sendEmail failed:", message)
-    return { success: false, error: message }
+    const result = { success: false, error: message }
+    await logEmail(opts, result)
+    return result
   }
 }

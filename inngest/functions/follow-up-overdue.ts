@@ -1,4 +1,5 @@
 import { inngest } from "@/inngest/client"
+import { recordJobRun } from "@/lib/events/job-run"
 import { prisma } from "@/lib/prisma"
 import { broadcastToUser } from "@/lib/realtime/broadcast"
 
@@ -15,6 +16,7 @@ import { broadcastToUser } from "@/lib/realtime/broadcast"
 export const followUpOverdueFn = inngest.createFunction(
   { id: "follow-up-overdue", name: "Follow-up Overdue Checker", triggers: [{ cron: "*/30 * * * *" }] },
   async ({ step, logger }) => {
+    await step.run("record-job-run", () => recordJobRun("follow-up-overdue"))
     const now = new Date()
 
     // Find all actions that are past due and still PENDING

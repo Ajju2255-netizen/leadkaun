@@ -1,4 +1,5 @@
 import { inngest } from "@/inngest/client"
+import { recordJobRun } from "@/lib/events/job-run"
 import { prisma } from "@/lib/prisma"
 
 /**
@@ -33,6 +34,7 @@ type SheetsConfig = {
 export const sheetsSyncFn = inngest.createFunction(
   { id: "sheets-sync", name: "Google Sheets Sync", triggers: [{ cron: "*/5 * * * *" }] },
   async ({ step, logger }) => {
+    await step.run("record-job-run", () => recordJobRun("sheets-sync"))
     // ── Load all active sheets configs ────────────────────────────────────────
     // Phase 7 adds the google_sheets_configs table. Until then this returns [].
     const configs = await step.run("load-sheets-configs", async () => {

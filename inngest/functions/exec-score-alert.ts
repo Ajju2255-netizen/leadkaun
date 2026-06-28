@@ -1,4 +1,5 @@
 import { inngest } from "@/inngest/client"
+import { recordJobRun } from "@/lib/events/job-run"
 import { prisma } from "@/lib/prisma"
 import { computeExecutionScore } from "@/lib/scoring/execution-score"
 import { startOfIstDay, hourIST } from "@/lib/time/ist"
@@ -31,6 +32,7 @@ export const execScoreAlertFn = inngest.createFunction(
     triggers: [{ cron: "30 9 * * 1-6" }],
   },
   async ({ step, logger }) => {
+    await step.run("record-job-run", () => recordJobRun("exec-score-alert"))
     if (process.env.EXEC_SCORE_ALERT_ENABLED === "false") {
       logger.info("EXEC_SCORE_ALERT_ENABLED=false — skipping")
       return { skipped: true }

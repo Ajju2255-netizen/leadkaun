@@ -19,19 +19,29 @@ export type PlatformDashboard = {
   // Filled in later phases; surfaced as honest "not yet" in the UI.
   billing: { payingCustomers: number | null; trials: number | null; mrrInr: number | null }
   emailsToday: number | null
+  health: { api: boolean; db: boolean; queue: boolean | null; email: boolean | null; workers: boolean | null }
 }
 
 export async function getPlatformDashboard(): Promise<PlatformDashboard> {
   const dayStart = startOfIstDay()
+  const since48 = new Date(Date.now() - 48 * 60 * 60 * 1000)
 
-  const [companies, signupsToday, activeAccts, importsToday, importedToday, totalLeads] = await Promise.all([
+  const [companies, signupsToday, activeAccts, importsToday, importedToday, totalLeads, dbOk, emailsToday, emailFailToday, recentJobs] = await Promise.all([
     prisma.account.count(),
     prisma.account.count({ where: { created_at: { gte: dayStart } } }),
     prisma.signal.findMany({ where: { created_at: { gte: dayStart } }, distinct: ["account_id"], select: { account_id: true } }),
     prisma.importJobStatus.count({ where: { created_at: { gte: dayStart } } }),
     prisma.importJobStatus.aggregate({ where: { created_at: { gte: dayStart } }, _sum: { inserted: true } }),
     prisma.lead.count(),
+    prisma.$queryRaw`SELECT 1`.then(() => true).catch(() => false),
+    prisma.emailLog.count({ where: { created_at: { gte: dayStart }, status: "sent" } }),
+    prisma.emailLog.count({ where: { created_at: { gte: dayStart }, status: "failed" } }),
+    prisma.jobRun.count({ where: { started_at: { gte: since48 } } }),
   ])
+
+  // queue/workers healthy if any cron ran in the last 48h; null = no data yet.
+  const jobsHealthy = recentJobs > 0 ? true : null
+  const totalEmailToday = emailsToday + emailFailToday
 
   return {
     totals: {
@@ -43,7 +53,14 @@ export async function getPlatformDashboard(): Promise<PlatformDashboard> {
       totalLeads,
     },
     billing: { payingCustomers: null, trials: null, mrrInr: null }, // Phase 5
-    emailsToday: null, // Phase 3 (EmailLog)
+    emailsToday,
+    health: {
+      api: true,
+      db: dbOk,
+      queue: jobsHealthy,
+      workers: jobsHealthy,
+      email: totalEmailToday > 0 ? emailFailToday === 0 : null,
+    },
   }
 }
 

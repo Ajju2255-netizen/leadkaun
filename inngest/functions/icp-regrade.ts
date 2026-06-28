@@ -1,4 +1,5 @@
 import { inngest } from "@/inngest/client"
+import { recordJobRun } from "@/lib/events/job-run"
 import { prisma } from "@/lib/prisma"
 import { processSignalAndUpdateScores } from "@/lib/scoring/orchestrator"
 
@@ -23,6 +24,7 @@ export const icpRegradeFn = inngest.createFunction(
     concurrency: [{ key: "event.data.account_id", limit: 1 }],
   },
   async ({ event, step, logger }) => {
+    await step.run("record-job-run", () => recordJobRun("icp-regrade"))
     const accountId = event.data?.account_id as string | undefined
     if (!accountId) {
       logger.warn("icp-regrade: missing account_id")
