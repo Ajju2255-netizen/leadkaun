@@ -839,3 +839,70 @@ model FeatureFlag {
   @@index([account_id])
   @@map("feature_flags")
 }
+
+// ─────────────────────────────────────────────
+// BILLING — full model now, manual entry until a payment provider is wired.
+// MRR/trials/plan are set by the founder from Company 360; Payment/Invoice stay
+// empty until Razorpay/Stripe integration populates them (purely additive).
+// ─────────────────────────────────────────────
+
+model Plan {
+  id        String  @id @default(cuid())
+  key       String  @unique // trial | starter | growth | scale
+  name      String
+  price_inr Int     @default(0) // monthly, in paise
+  is_active Boolean @default(true)
+
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+model Subscription {
+  id                       String    @id @default(cuid())
+  account_id               String    @unique
+  plan_id                  String
+  status                   String    @default("trialing") // trialing | active | past_due | canceled
+  mrr_inr                  Int       @default(0) // in paise; denormalised for quick MRR sums
+  trial_ends_at            DateTime?
+  started_at               DateTime  @default(now())
+  canceled_at              DateTime?
+  provider                 String? // razorpay | stripe (null until integrated)
+  provider_subscription_id String?
+
+  plan Plan @relation(fields: [plan_id], references: [id])
+
+  @@index([status])
+  @@map("subscriptions")
+}
+
+model Payment {
+  id           String   @id @default(cuid())
+  account_id   String
+  amount_inr   Int // in paise
+  status       String   @default("succeeded") // succeeded | failed | refunded
+  provider     String?
+  provider_ref String?
+  created_at   DateTime @default(now())
+
+  @@index([account_id, created_at])
+  @@index([status, created_at])
+  @@map("payments")
+}
+
+model Invoice {
+  id           String    @id @default(cuid())
+  account_id   String
+  number       String?
+  amount_inr   Int
+  status       String    @default("paid") // paid | open | void
+  period_start DateTime?
+  period_end   DateTime?
+  pdf_url      String?
+  provider     String?
+  provider_ref String?
+  created_at   DateTime  @default(now())
+
+  @@index([account_id, created_at])
+  @@map("invoices")
+}

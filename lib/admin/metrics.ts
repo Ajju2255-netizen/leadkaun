@@ -26,7 +26,7 @@ export async function getPlatformDashboard(): Promise<PlatformDashboard> {
   const dayStart = startOfIstDay()
   const since48 = new Date(Date.now() - 48 * 60 * 60 * 1000)
 
-  const [companies, signupsToday, activeAccts, importsToday, importedToday, totalLeads, dbOk, emailsToday, emailFailToday, recentJobs] = await Promise.all([
+  const [companies, signupsToday, activeAccts, importsToday, importedToday, totalLeads, dbOk, emailsToday, emailFailToday, recentJobs, payingCount, trialCount, mrrAgg] = await Promise.all([
     prisma.account.count(),
     prisma.account.count({ where: { created_at: { gte: dayStart } } }),
     prisma.signal.findMany({ where: { created_at: { gte: dayStart } }, distinct: ["account_id"], select: { account_id: true } }),
@@ -37,11 +37,15 @@ export async function getPlatformDashboard(): Promise<PlatformDashboard> {
     prisma.emailLog.count({ where: { created_at: { gte: dayStart }, status: "sent" } }),
     prisma.emailLog.count({ where: { created_at: { gte: dayStart }, status: "failed" } }),
     prisma.jobRun.count({ where: { started_at: { gte: since48 } } }),
+    prisma.subscription.count({ where: { status: "active" } }),
+    prisma.subscription.count({ where: { status: "trialing" } }),
+    prisma.subscription.aggregate({ where: { status: "active" }, _sum: { mrr_inr: true } }),
   ])
 
   // queue/workers healthy if any cron ran in the last 48h; null = no data yet.
   const jobsHealthy = recentJobs > 0 ? true : null
   const totalEmailToday = emailsToday + emailFailToday
+  const mrrPaise = mrrAgg._sum.mrr_inr ?? 0
 
   return {
     totals: {
@@ -52,7 +56,7 @@ export async function getPlatformDashboard(): Promise<PlatformDashboard> {
       leadsImportedToday: importedToday._sum.inserted ?? 0,
       totalLeads,
     },
-    billing: { payingCustomers: null, trials: null, mrrInr: null }, // Phase 5
+    billing: { payingCustomers: payingCount, trials: trialCount, mrrInr: Math.round(mrrPaise / 100) },
     emailsToday,
     health: {
       api: true,
@@ -77,6 +81,9 @@ export type CustomerRow = {
   lastActiveAt: Date | null
   recommendationsUsed: number
   healthBand: "healthy" | "warning" | "critical"
+  planName: string | null
+  mrrInr: number | null
+  subStatus: string | null
 }
 
 // Cheap list-level band (no per-row queries) from recency + whether they've
@@ -91,7 +98,7 @@ function quickBand(leads: number, lastActiveAt: Date | null): "healthy" | "warni
 }
 
 export async function getCustomersList(): Promise<CustomerRow[]> {
-  const [accounts, leadsBy, wonBy, lastBy, adoptionBy] = await Promise.all([
+  const [accounts, leadsBy, wonBy, lastBy, adoptionBy, subs] = await Promise.all([
     prisma.account.findMany({
       select: { id: true, name: true, industry: true, created_at: true, _count: { select: { users: true, workspaces: true } } },
       orderBy: { created_at: "desc" },
@@ -100,12 +107,14 @@ export async function getCustomersList(): Promise<CustomerRow[]> {
     prisma.lead.groupBy({ by: ["account_id"], where: { won_at: { not: null } }, _count: { _all: true } }),
     prisma.signal.groupBy({ by: ["account_id"], _max: { created_at: true } }),
     prisma.lead.groupBy({ by: ["account_id"], where: { first_action_rank: { not: null, lte: RECOMMENDATION_TOP_N } }, _count: { _all: true } }),
+    prisma.subscription.findMany({ include: { plan: { select: { name: true } } } }),
   ])
 
   const leadsMap = new Map(leadsBy.map((r) => [r.account_id, r._count._all]))
   const wonMap = new Map(wonBy.map((r) => [r.account_id, r._count._all]))
   const lastMap = new Map(lastBy.map((r) => [r.account_id, r._max.created_at]))
   const adoptMap = new Map(adoptionBy.map((r) => [r.account_id, r._count._all]))
+  const subMap = new Map(subs.map((s) => [s.account_id, { planName: s.plan.name, mrrInr: Math.round(s.mrr_inr / 100), status: s.status }]))
 
   return accounts.map((a) => {
     const leads = leadsMap.get(a.id) ?? 0
@@ -123,6 +132,9 @@ export async function getCustomersList(): Promise<CustomerRow[]> {
       lastActiveAt: lastMap.get(a.id) ?? null,
       recommendationsUsed: adoptMap.get(a.id) ?? 0,
       healthBand: quickBand(leads, lastMap.get(a.id) ?? null),
+      planName: subMap.get(a.id)?.planName ?? null,
+      mrrInr: subMap.get(a.id)?.mrrInr ?? null,
+      subStatus: subMap.get(a.id)?.status ?? null,
     }
   })
 }
