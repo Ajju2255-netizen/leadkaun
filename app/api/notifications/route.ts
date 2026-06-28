@@ -23,7 +23,8 @@ export async function GET(_req: Request) {
           { user_id: null },
           { user_id: session.user.id },
         ],
-        created_at: { gte: since },
+        created_at:   { gte: since },
+        dismissed_at: null,   // dismissed alerts drop out of the feed
       },
       include: {
         lead: {

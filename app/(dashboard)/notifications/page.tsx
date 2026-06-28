@@ -104,13 +104,15 @@ async function fetchNotifications(): Promise<{ items: NotifItem[] }> {
 
 // ── Notification Card ─────────────────────────────────────────────────────────
 
-function NotifCard({ item, onRead }: {
+function NotifCard({ item, onRead, onDismiss }: {
   item:   NotifItem
   onRead: (id: string, url: string | null) => void
+  onDismiss: (id: string, reason: string) => void
 }) {
   const cfg      = TYPE_CONFIG[item.type] ?? TYPE_CONFIG.MISSED
   const isHigh   = item.priority === "high"
   const isUnread = !item.is_read
+  const [dismissOpen, setDismissOpen] = useState(false)
 
   return (
     <div
@@ -147,7 +149,27 @@ function NotifCard({ item, onRead }: {
               )}
             </div>
           </div>
-          <span className="text-[11px] text-slate-400 font-medium shrink-0">{timeAgo(item.created_at)}</span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-[11px] text-slate-400 font-medium">{timeAgo(item.created_at)}</span>
+            <div className="relative">
+              <button
+                onClick={(e) => { e.stopPropagation(); setDismissOpen((o) => !o) }}
+                title="Dismiss this alert"
+                className="w-5 h-5 flex items-center justify-center rounded-full text-slate-300 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-3 h-3" />
+              </button>
+              {dismissOpen && (
+                <div className="absolute right-0 top-6 z-20 w-40 rounded-xl border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.14)] py-1" onClick={(e) => e.stopPropagation()}>
+                  <p className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Dismiss — why?</p>
+                  <button onClick={(e) => { e.stopPropagation(); setDismissOpen(false); onDismiss(item.id, "already_handled") }}
+                    className="w-full text-left px-3 py-1.5 text-[12px] text-slate-600 hover:bg-slate-50 transition-colors">Already handled</button>
+                  <button onClick={(e) => { e.stopPropagation(); setDismissOpen(false); onDismiss(item.id, "not_relevant") }}
+                    className="w-full text-left px-3 py-1.5 text-[12px] text-slate-600 hover:bg-slate-50 transition-colors">Not relevant</button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         <p className="text-[14px] font-bold text-slate-900 leading-snug">{item.title}</p>
@@ -225,6 +247,17 @@ export default function NotificationsPage() {
 
   const groupedUnread = filtered.filter((i) => !i.is_read)
   const groupedRead   = filtered.filter((i) =>  i.is_read)
+
+  async function markDismiss(id: string, reason: string) {
+    await fetch(`/api/notifications/${id}/dismiss`, {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason }),
+    })
+    queryClient.invalidateQueries({ queryKey: ["notifications"] })
+    queryClient.invalidateQueries({ queryKey: ["notif-count"] })
+    toast.success("Alert dismissed")
+  }
 
   async function markRead(id: string, url: string | null) {
     await fetch(`/api/notifications/${id}/read`, { method: "POST", credentials: "include" })
@@ -387,7 +420,7 @@ export default function NotificationsPage() {
             <div className="flex-1 h-px bg-gradient-to-r from-sky-200/60 to-transparent ml-2" />
           </div>
           {groupedUnread.map((item) => (
-            <NotifCard key={item.id} item={item} onRead={markRead} />
+            <NotifCard key={item.id} item={item} onRead={markRead} onDismiss={markDismiss} />
           ))}
         </div>
       )}
@@ -401,7 +434,7 @@ export default function NotificationsPage() {
             <div className="flex-1 h-px bg-gradient-to-r from-slate-200/60 to-transparent ml-2" />
           </div>
           {groupedRead.map((item) => (
-            <NotifCard key={item.id} item={item} onRead={markRead} />
+            <NotifCard key={item.id} item={item} onRead={markRead} onDismiss={markDismiss} />
           ))}
         </div>
       )}
