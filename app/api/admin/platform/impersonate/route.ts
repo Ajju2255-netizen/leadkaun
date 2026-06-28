@@ -4,6 +4,7 @@ import { handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError, parseBody } from "@/lib/api/response"
 import { createSupabaseAdminClient } from "@/lib/supabase/admin"
 import { signImpersonation } from "@/lib/auth/impersonation"
+import { recordAccountEvent } from "@/lib/events/account-events"
 import { z } from "zod"
 
 const Body = z.object({ accountId: z.string().min(1), targetUserId: z.string().optional(), reason: z.string().max(200).optional() })
@@ -42,6 +43,13 @@ export async function POST(req: Request) {
         reason:        data.reason ?? null,
         ip:            req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
       },
+    })
+
+    await recordAccountEvent({
+      accountId: data.accountId,
+      type: "IMPERSONATED",
+      summary: `Admin ${admin.email} logged in as ${target.email}`,
+      detail: { adminEmail: admin.email, targetEmail: target.email, reason: data.reason ?? null },
     })
 
     const marker = signImpersonation({

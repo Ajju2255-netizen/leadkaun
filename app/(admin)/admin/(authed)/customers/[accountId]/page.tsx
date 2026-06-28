@@ -2,6 +2,8 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import { ChevronLeft } from "lucide-react"
 import { getCompany360 } from "@/lib/admin/metrics"
+import { getCompanyTimeline } from "@/lib/admin/timeline"
+import { Timeline } from "../../_components/Timeline"
 import { LoginAsButton } from "./LoginAsButton"
 
 export const dynamic = "force-dynamic"
@@ -27,7 +29,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 export default async function Company360({ params }: { params: { accountId: string } }) {
-  const c = await getCompany360(params.accountId)
+  const [c, timeline] = await Promise.all([getCompany360(params.accountId), getCompanyTimeline(params.accountId, 40)])
   if (!c) notFound()
 
   return (
@@ -104,7 +106,15 @@ export default async function Company360({ params }: { params: { accountId: stri
         </div>
       </div>
 
-      <p className="text-[11px] text-slate-600">Timeline, health score, plan/MRR editor and feature flags arrive in later phases.</p>
+      {/* Timeline */}
+      <div>
+        <p className="text-[12px] font-bold uppercase tracking-wider text-slate-400 mb-3">Timeline</p>
+        <div className="rounded-xl border border-white/10 bg-slate-900/40 px-5 py-4">
+          <Timeline events={timeline} />
+        </div>
+      </div>
+
+      <p className="text-[11px] text-slate-600">Health score, plan/MRR editor and feature flags arrive in later phases.</p>
     </div>
   )
 }

@@ -1,4 +1,6 @@
 import { getPlatformDashboard } from "@/lib/admin/metrics"
+import { getRecentActivity } from "@/lib/admin/timeline"
+import { Timeline } from "./_components/Timeline"
 
 export const dynamic = "force-dynamic"
 
@@ -25,7 +27,7 @@ function HealthPill({ label, state }: { label: string; state: "ok" | "pending" }
 const inr = (n: number) => `₹${new Intl.NumberFormat("en-IN").format(n)}`
 
 export default async function AdminDashboard() {
-  const d = await getPlatformDashboard()
+  const [d, activity] = await Promise.all([getPlatformDashboard(), getRecentActivity(20)])
   const t = d.totals
 
   return (
@@ -63,6 +65,13 @@ export default async function AdminDashboard() {
       <p className="text-[12px] text-slate-500">
         Total leads across all accounts: <span className="font-semibold text-slate-300 tabular-nums">{t.totalLeads.toLocaleString("en-IN")}</span>
       </p>
+
+      <div>
+        <p className="text-[12px] font-bold uppercase tracking-wider text-slate-400 mb-3">Live Activity</p>
+        <div className="rounded-2xl border border-white/10 bg-slate-900/40 px-5 py-4">
+          <Timeline events={activity} showAccount />
+        </div>
+      </div>
     </div>
   )
 }
