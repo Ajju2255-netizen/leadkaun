@@ -14,6 +14,7 @@ import { GradeBadge } from "@/components/shared/GradeBadge"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { ScoreBar } from "@/components/shared/ScoreBar"
 import { ScoreExplanation } from "@/components/shared/ScoreExplanation"
+import { ConfidenceCard } from "@/components/shared/ConfidenceCard"
 import { LeadRealtimeListener } from "@/components/leads/LeadRealtimeListener"
 import { LogWhatsAppModal } from "@/components/queue/LogWhatsAppModal"
 import { ContactActions } from "@/components/shared/ContactActions"
@@ -438,6 +439,7 @@ export default function LeadRecordPage() {
         {/* ── Scores ───────────────────────────────────────────────────── */}
         <div className="glass-card px-5 py-4">
           <p className="section-label mb-3">Lead Score</p>
+          <ConfidenceCard lead={lead} />
           <div className="grid grid-cols-3 gap-4">
             <ScoreBar value={lead.fit_score}     label="Fit"     type="fit"     showValue />
             <ScoreBar value={lead.intent_score}  label="Intent"  type="intent"  showValue />
