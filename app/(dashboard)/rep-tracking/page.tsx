@@ -227,6 +227,8 @@ export default function RepTrackingPage() {
     (a, b) => (b.rep_score ?? 0) - (a.rep_score ?? 0) || b.revenue_recovered - a.revenue_recovered,
   )
   const leader = sortedReps[0] ?? null
+  // Solo-team mode: ranking ("Leader", "Top Performer") is meaningless with one rep.
+  const isSolo = sortedReps.length <= 1
 
   // Find max values for proportional bar scaling
   const maxRevenue   = Math.max(...sortedReps.map((r) => r.revenue_recovered), 1)
@@ -407,7 +409,7 @@ export default function RepTrackingPage() {
                       <AvatarCircle seed={rep.first_name} size="md" />
                       <div className="min-w-0">
                         <p className="text-[14px] font-semibold text-ink truncate">{fullName}</p>
-                        {idx === 0 && <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 leading-none mt-0.5">Leader</p>}
+                        {idx === 0 && !isSolo && <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 leading-none mt-0.5">Leader</p>}
                       </div>
                     </div>
 
@@ -495,8 +497,8 @@ export default function RepTrackingPage() {
         )}
       </div>
 
-      {/* ── Top Performer card — highest Rep Score (matches the sorted list) ── */}
-      {!isLoading && leader && (leader.rep_score > 0 || leader.revenue_recovered > 0) && (
+      {/* ── Top Performer card — highest Rep Score (hidden for solo teams) ── */}
+      {!isLoading && !isSolo && leader && (leader.rep_score > 0 || leader.revenue_recovered > 0) && (
         <div className="glass-2 gloss-edge rounded-2xl px-5 py-4 flex items-center gap-4">
           <div
             className="w-12 h-12 rounded-full flex items-center justify-center shrink-0"

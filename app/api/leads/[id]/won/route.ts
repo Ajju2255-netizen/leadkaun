@@ -61,6 +61,9 @@ export async function POST(req: Request, { params }: Params) {
         grade:         lead.grade,
         stage:         lead.stage.name,
         won_at:        new Date().toISOString(),
+        // Win-quality audit: was there any logged outreach before the win? (FM-11)
+        had_outreach:     lead.first_contact_at != null,
+        first_contact_at: lead.first_contact_at?.toISOString() ?? null,
       }
 
       await tx.lead.update({

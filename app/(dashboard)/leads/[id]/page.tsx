@@ -8,7 +8,7 @@ import Link from "next/link"
 import {
   Phone, MessageCircle, Trophy, X, MoreHorizontal,
   MapPin, Building2, Briefcase, Clock, Zap, ChevronLeft,
-  PhoneOff, TrendingDown, FileText, UserCheck, SearchX, Ban, type LucideIcon,
+  PhoneOff, TrendingDown, FileText, UserCheck, SearchX, Ban, AlertTriangle, type LucideIcon,
 } from "lucide-react"
 import { GradeBadge } from "@/components/shared/GradeBadge"
 import { EmptyState } from "@/components/shared/EmptyState"
@@ -271,6 +271,16 @@ export default function LeadRecordPage() {
 
         {/* ── Hero card ────────────────────────────────────────────────── */}
         <div className="glass-card px-5 pt-5 pb-4 space-y-4">
+
+          {/* Won without any logged outreach — FM-11 win-quality flag */}
+          {lead.won_at && !lead.first_contact_at && (
+            <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-[12px] text-amber-800 leading-relaxed">
+                <span className="font-bold">Won without logged outreach.</span> No calls or WhatsApp were recorded before this win — if it closed off-platform, log the activity so scores &amp; analytics stay accurate.
+              </p>
+            </div>
+          )}
 
           {/* Identity row */}
           <div className="flex items-start justify-between gap-3">
