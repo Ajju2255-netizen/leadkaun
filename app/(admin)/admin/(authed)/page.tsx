@@ -1,8 +1,12 @@
+import Link from "next/link"
 import { getPlatformDashboard } from "@/lib/admin/metrics"
 import { getRecentActivity } from "@/lib/admin/timeline"
+import { getLatestInsights } from "@/lib/admin/insights"
 import { Timeline } from "./_components/Timeline"
 
 export const dynamic = "force-dynamic"
+
+const SEV_DOT: Record<string, string> = { info: "bg-sky-400", warn: "bg-amber-400", critical: "bg-rose-400" }
 
 function Kpi({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
@@ -28,7 +32,7 @@ function HealthPill({ label, state }: { label: string; state: boolean | null }) 
 const inr = (n: number) => `₹${new Intl.NumberFormat("en-IN").format(n)}`
 
 export default async function AdminDashboard() {
-  const [d, activity] = await Promise.all([getPlatformDashboard(), getRecentActivity(20)])
+  const [d, activity, insights] = await Promise.all([getPlatformDashboard(), getRecentActivity(20), getLatestInsights()])
   const t = d.totals
 
   return (
@@ -36,6 +40,24 @@ export default async function AdminDashboard() {
       <div>
         <h1 className="text-[24px] font-bold tracking-tight">Mission Control</h1>
         <p className="text-[13px] text-slate-400 mt-1">Is the business healthy? Are customers successful? Is the product healthy?</p>
+      </div>
+
+      {/* AI Insights — what should I do today? */}
+      <div className="rounded-2xl border border-violet-500/20 bg-gradient-to-br from-violet-950/40 to-slate-900/40 px-5 py-4">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-violet-300 mb-2.5">Today · what needs attention</p>
+        <div className="space-y-1.5">
+          {insights.map((i, idx) => {
+            const body = (
+              <span className="flex items-center gap-2.5">
+                <span className={`w-2 h-2 rounded-full shrink-0 ${SEV_DOT[i.severity]}`} />
+                <span className="text-[13px] text-slate-200">{i.label}</span>
+              </span>
+            )
+            return i.href
+              ? <Link key={idx} href={i.href} className="block hover:opacity-80 transition-opacity">{body}</Link>
+              : <div key={idx}>{body}</div>
+          })}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

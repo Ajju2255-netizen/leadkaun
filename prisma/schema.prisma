@@ -906,3 +906,15 @@ model Invoice {
   @@index([account_id, created_at])
   @@map("invoices")
 }
+
+// Daily "what should I do today?" digest for Mission Control. Computed by an
+// Inngest cron and stored so the dashboard can show today's snapshot + history.
+model AdminInsight {
+  id         String   @id @default(cuid())
+  for_date   String // YYYY-MM-DD (IST)
+  items      Json // Insight[] — { label, count, severity, href? }
+  created_at DateTime @default(now())
+
+  @@unique([for_date])
+  @@map("admin_insights")
+}
