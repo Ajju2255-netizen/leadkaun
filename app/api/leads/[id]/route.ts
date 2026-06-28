@@ -4,6 +4,8 @@ import { requireWorkspace, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError, parseBody, NOT_FOUND } from "@/lib/api/response"
 import { rateLimited, LIMITS } from "@/lib/rate-limit"
 import { getNextAction, buildActionReason } from "@/lib/scoring/next-action"
+import { recordScoreEvent, diffEnrichment } from "@/lib/scoring/score-events"
+import { recomputeFitQualityGrade } from "@/lib/scoring/recompute"
 
 type Params = { params: { id: string } }
 
@@ -117,6 +119,63 @@ export async function PATCH(req: Request, { params }: Params) {
         ...(custom_values !== undefined ? { custom_values: custom_values as object } : {}),
       },
     })
+
+    // Score Evolution: if the edit added/changed data-quality fields, log an
+    // ENRICHED timeline entry — and re-grade when scoring-relevant fields moved
+    // (so "Company added" can lift fit/grade, not just confidence). Best-effort.
+    try {
+      const diff = diffEnrichment(lead, updated)
+      if (diff.summary) {
+        const SCORING_KEYS = ["company_name", "designation", "city", "state", "expected_value", "email", "inquiry_text"] as const
+        const touchedScoring = SCORING_KEYS.some((k) => k in data)
+        let snap = updated
+
+        if (touchedScoring) {
+          const [account, source, activityCount] = await Promise.all([
+            prisma.account.findUnique({
+              where: { id: session.account.id },
+              select: { icp_configured: true, icp_industries: true, icp_states: true, icp_business_types: true, icp_roles: true, icp_budget_min: true, icp_budget_max: true },
+            }),
+            prisma.leadSource.findUnique({ where: { id: updated.source_id }, select: { reliability_score: true } }),
+            prisma.signal.count({ where: { lead_id: updated.id, signal_type: { not: "SOURCE_BASELINE" } } }),
+          ])
+          if (account && source) {
+            const rs = recomputeFitQualityGrade({
+              lead: {
+                company_name: updated.company_name, designation: updated.designation, city: updated.city, state: updated.state,
+                expected_value: updated.expected_value, phone: updated.phone, email: updated.email, inquiry_text: updated.inquiry_text,
+                junk_flags: updated.junk_flags as string[], is_junk: updated.is_junk,
+              },
+              icp: account, sourceReliability: source.reliability_score, intentScore: updated.intent_score, hasActivity: activityCount > 0,
+            })
+            const gradeChanged = rs.grade !== updated.grade
+            snap = await prisma.lead.update({
+              where: { id: updated.id },
+              data: {
+                fit_score: rs.fit_score, quality_score: rs.quality_score, grade: rs.grade,
+                fit_score_breakdown: rs.fit_breakdown as object, quality_score_breakdown: rs.quality_breakdown as object,
+                ...(gradeChanged ? { grade_changed_at: new Date(), previous_grade: updated.grade } : {}),
+              },
+            })
+          }
+        }
+
+        await recordScoreEvent(prisma, {
+          lead: {
+            id: snap.id, account_id: snap.account_id, workspace_id: snap.workspace_id,
+            grade: snap.grade, fit_score: snap.fit_score, intent_score: snap.intent_score, quality_score: snap.quality_score,
+            first_name: snap.first_name, phone: snap.phone, email: snap.email, company_name: snap.company_name,
+            designation: snap.designation, city: snap.city, state: snap.state, expected_value: snap.expected_value, inquiry_text: snap.inquiry_text,
+          },
+          kind: "ENRICHED",
+          summary: diff.summary,
+          detail: { fields_added: diff.fieldsAdded, fields_changed: diff.fieldsChanged },
+        })
+        return apiSuccess(snap)
+      }
+    } catch (e) {
+      console.warn("[lead:enrich-event]", String(e))
+    }
 
     return apiSuccess(updated)
   } catch (e) {

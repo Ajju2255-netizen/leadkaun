@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { requireWorkspace, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError, parseBody, NOT_FOUND } from "@/lib/api/response"
 import { rateLimited, LIMITS } from "@/lib/rate-limit"
+import { recordScoreEvent } from "@/lib/scoring/score-events"
 
 type Params = { params: { id: string } }
 
@@ -82,6 +83,18 @@ export async function POST(req: Request, { params }: Params) {
           changed_by:    session.user.id,
           note:          data.note ?? `Won — ${data.win_reason.replace(/_/g, " ").toLowerCase()}`,
         },
+      })
+
+      await recordScoreEvent(tx, {
+        lead: {
+          id: lead.id, account_id: lead.account_id, workspace_id: lead.workspace_id,
+          grade: lead.grade, fit_score: lead.fit_score, intent_score: lead.intent_score, quality_score: lead.quality_score,
+          first_name: lead.first_name, phone: lead.phone, email: lead.email, company_name: lead.company_name,
+          designation: lead.designation, city: lead.city, state: lead.state, expected_value: lead.expected_value, inquiry_text: lead.inquiry_text,
+        },
+        kind: "WON",
+        summary: `Won · ₹${data.won_value.toLocaleString("en-IN")}`,
+        detail: { win_reason: data.win_reason },
       })
 
       // Win attribution for assigned rep (FULL) and current user if different (CONTRIBUTED)

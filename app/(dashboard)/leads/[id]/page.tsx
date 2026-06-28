@@ -16,6 +16,7 @@ import { ScoreBar } from "@/components/shared/ScoreBar"
 import { ScoreExplanation } from "@/components/shared/ScoreExplanation"
 import { ConfidenceCard } from "@/components/shared/ConfidenceCard"
 import { FreshnessBadge } from "@/components/shared/FreshnessBadge"
+import { ScoreTimeline } from "@/components/shared/ScoreTimeline"
 import { LeadRealtimeListener } from "@/components/leads/LeadRealtimeListener"
 import { LogWhatsAppModal } from "@/components/queue/LogWhatsAppModal"
 import { ContactActions } from "@/components/shared/ContactActions"
@@ -448,6 +449,12 @@ export default function LeadRecordPage() {
             <ScoreBar value={lead.quality_score} label="Quality" type="quality" showValue />
           </div>
           <ScoreExplanation lead={lead} />
+        </div>
+
+        {/* ── Score Evolution ──────────────────────────────────────────── */}
+        <div className="glass-card px-5 py-4">
+          <p className="section-label mb-3">Score Evolution</p>
+          <ScoreTimeline leadId={leadId} />
         </div>
 
         {/* ── Details ──────────────────────────────────────────────────── */}
