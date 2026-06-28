@@ -2,7 +2,8 @@
 
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { User, IndianRupee, Clock, CheckCircle, Trophy, ChevronDown } from "lucide-react"
+import { User, IndianRupee, Clock, CheckCircle, Trophy, ChevronDown, Target } from "lucide-react"
+import { RECOMMENDATION_TOP_N } from "@/lib/analytics/recommendation-rank"
 import { DeltaChip } from "@/components/shared/DeltaChip"
 import { Skeleton } from "@/components/ui/skeleton"
 import { AvatarCircle } from "@/components/shared/AvatarCircle"
@@ -34,6 +35,10 @@ interface RepStat {
   conversion_rate:          number | null
   /** Missed-revenue recovered as % MTD. null = no missed pool. */
   missed_recovery_pct:      number | null
+  /** Recommendation Adoption (MTD): worked a top-N queue lead at first touch. */
+  recommendations_accepted:    number
+  recommendations_ignored:     number
+  recommendation_adoption_pct: number | null
   /** 5-component Rep Score 0..100. */
   rep_score:                number
   rep_score_components:     RepScoreComponents
@@ -65,6 +70,9 @@ interface RepTrackingData {
     avg_response_time_pct_change:     number | null
     follow_up_completion_pct:         number | null
     follow_up_completion_pct_change:  number | null
+    recommendation_adoption_pct:      number | null
+    recommendations_accepted:         number
+    recommendations_total:            number
   }
   reps: RepStat[]
   top_performer: { id: string; first_name: string; last_name: string; revenue_recovered: number } | null
@@ -249,8 +257,8 @@ export default function RepTrackingPage() {
         </div>
       </div>
 
-      {/* ── Top stats — 3 cards ─────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* ── Top stats — 4 cards ─────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
         {/* ₹ Recovered (mint) */}
         <StatCard
@@ -292,6 +300,23 @@ export default function RepTrackingPage() {
           iconBg="linear-gradient(180deg, rgba(221,214,254,0.85) 0%, rgba(196,181,253,0.65) 100%)"
           icon={<CheckCircle className="w-7 h-7" strokeWidth={2.5} />}
           valueColor="text-violet-600"
+        />
+
+        {/* Recommendation Adoption — North Star (sky) */}
+        <StatCard
+          label="Recommendation Adoption"
+          value={isLoading
+            ? <Skeleton className="h-9 w-20" />
+            : (account?.recommendation_adoption_pct == null ? "—" : `${account.recommendation_adoption_pct}%`)}
+          caption={account && account.recommendations_total > 0
+            ? `${account.recommendations_accepted}/${account.recommendations_total} worked from top ${RECOMMENDATION_TOP_N}`
+            : "This month"}
+          delta={null}
+          deltaPositive={true}
+          iconColor="#0EA5E9"
+          iconBg="linear-gradient(180deg, rgba(186,230,253,0.85) 0%, rgba(125,211,252,0.65) 100%)"
+          icon={<Target className="w-7 h-7" strokeWidth={2.5} />}
+          valueColor="text-sky-600"
         />
       </div>
 
@@ -445,6 +470,20 @@ export default function RepTrackingPage() {
                               </div>
                             )
                           })}
+                        </div>
+                        {/* Recommendation adoption — separate from Rep Score; the North Star */}
+                        <div className="mt-3 pt-3 border-t border-slate-200/70 flex items-center justify-between gap-2">
+                          <span className="text-[11px] text-ink-soft inline-flex items-center gap-1.5">
+                            <Target className="w-3 h-3 text-sky-500" />
+                            Recommendation adoption
+                            <span className="text-slate-400">· worked top-{RECOMMENDATION_TOP_N} leads first</span>
+                          </span>
+                          <span className="text-[12px] font-bold tabular-nums text-sky-700">
+                            {rep.recommendation_adoption_pct == null ? "—" : `${rep.recommendation_adoption_pct}%`}
+                            {(rep.recommendations_accepted + rep.recommendations_ignored) > 0 && (
+                              <span className="text-slate-400 font-medium"> ({rep.recommendations_accepted}/{rep.recommendations_accepted + rep.recommendations_ignored})</span>
+                            )}
+                          </span>
                         </div>
                       </div>
                     </div>
