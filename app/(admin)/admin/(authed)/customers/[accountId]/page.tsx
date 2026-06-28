@@ -3,10 +3,16 @@ import Link from "next/link"
 import { ChevronLeft } from "lucide-react"
 import { getCompany360 } from "@/lib/admin/metrics"
 import { getCompanyTimeline } from "@/lib/admin/timeline"
+import { computeAccountHealth } from "@/lib/admin/health"
+import { getAccountFlags, FEATURE_KEYS, FEATURE_LABELS } from "@/lib/feature-flags"
 import { Timeline } from "../../_components/Timeline"
 import { LoginAsButton } from "./LoginAsButton"
+import { FlagToggles } from "./FlagToggles"
 
 export const dynamic = "force-dynamic"
+
+const BAND_COLOR: Record<string, string> = { healthy: "text-emerald-400", warning: "text-amber-400", critical: "text-rose-400" }
+const RISK_COLOR: Record<string, string> = { low: "text-emerald-400", medium: "text-amber-400", high: "text-rose-400" }
 
 const inr = (n: number) => `₹${new Intl.NumberFormat("en-IN").format(n)}`
 const date = (d: Date) => new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
@@ -29,8 +35,15 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 export default async function Company360({ params }: { params: { accountId: string } }) {
-  const [c, timeline] = await Promise.all([getCompany360(params.accountId), getCompanyTimeline(params.accountId, 40)])
+  const [c, timeline, health, flags] = await Promise.all([
+    getCompany360(params.accountId),
+    getCompanyTimeline(params.accountId, 40),
+    computeAccountHealth(params.accountId),
+    getAccountFlags(params.accountId),
+  ])
   if (!c) notFound()
+
+  const flagItems = FEATURE_KEYS.map((k) => ({ key: k, label: FEATURE_LABELS[k], enabled: flags[k] }))
 
   return (
     <div className="space-y-7">
@@ -58,7 +71,11 @@ export default async function Company360({ params }: { params: { accountId: stri
         <Stat label="Plan" value="—" />
         <Stat label="MRR" value="—" />
         <Stat label="Owner" value={c.owner?.name || "—"} />
-        <Stat label="Health" value="—" />
+        <div className="rounded-xl border border-white/10 bg-slate-900/50 px-4 py-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Health</p>
+          <p className={`text-[18px] font-bold tabular-nums mt-0.5 ${BAND_COLOR[health.band]}`}>{health.score}<span className="text-[12px] text-slate-500"> / 100</span></p>
+          <p className={`text-[10px] font-semibold uppercase tracking-wider ${RISK_COLOR[health.churnRisk]}`}>{health.churnRisk} churn risk</p>
+        </div>
       </div>
 
       {/* Usage */}
@@ -106,6 +123,30 @@ export default async function Company360({ params }: { params: { accountId: stri
         </div>
       </div>
 
+      {/* Health + Feature flags */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div>
+          <p className="text-[12px] font-bold uppercase tracking-wider text-slate-400 mb-3">Health · <span className={BAND_COLOR[health.band]}>{health.band}</span></p>
+          <div className="rounded-xl border border-white/10 bg-slate-900/40 px-5 py-4">
+            {health.reasons.length === 0 ? (
+              <p className="text-[13px] text-emerald-400">All health signals look good.</p>
+            ) : (
+              <ul className="space-y-1.5">
+                {health.reasons.map((r) => (
+                  <li key={r} className="text-[13px] text-slate-300 flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />{r}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+        <div>
+          <p className="text-[12px] font-bold uppercase tracking-wider text-slate-400 mb-3">Feature Flags</p>
+          <FlagToggles accountId={c.account.id} items={flagItems} />
+        </div>
+      </div>
+
       {/* Timeline */}
       <div>
         <p className="text-[12px] font-bold uppercase tracking-wider text-slate-400 mb-3">Timeline</p>
@@ -114,7 +155,7 @@ export default async function Company360({ params }: { params: { accountId: stri
         </div>
       </div>
 
-      <p className="text-[11px] text-slate-600">Health score, plan/MRR editor and feature flags arrive in later phases.</p>
+      <p className="text-[11px] text-slate-600">Plan / MRR editor arrives with the billing phase.</p>
     </div>
   )
 }

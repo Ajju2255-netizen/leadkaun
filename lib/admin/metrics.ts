@@ -76,6 +76,18 @@ export type CustomerRow = {
   conversionPct: number | null
   lastActiveAt: Date | null
   recommendationsUsed: number
+  healthBand: "healthy" | "warning" | "critical"
+}
+
+// Cheap list-level band (no per-row queries) from recency + whether they've
+// imported. Full weighted health lives on the Company 360.
+function quickBand(leads: number, lastActiveAt: Date | null): "healthy" | "warning" | "critical" {
+  if (leads === 0) return "critical"
+  if (!lastActiveAt) return "critical"
+  const days = (Date.now() - new Date(lastActiveAt).getTime()) / 86_400_000
+  if (days <= 7) return "healthy"
+  if (days <= 14) return "warning"
+  return "critical"
 }
 
 export async function getCustomersList(): Promise<CustomerRow[]> {
@@ -110,6 +122,7 @@ export async function getCustomersList(): Promise<CustomerRow[]> {
       conversionPct: leads > 0 ? Math.round((won / leads) * 100) : null,
       lastActiveAt: lastMap.get(a.id) ?? null,
       recommendationsUsed: adoptMap.get(a.id) ?? 0,
+      healthBand: quickBand(leads, lastMap.get(a.id) ?? null),
     }
   })
 }
