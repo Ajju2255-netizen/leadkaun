@@ -17,6 +17,9 @@ CREATE TYPE "SalesCycle" AS ENUM ('SAME_DAY', 'THREE_DAYS', 'TWO_WEEKS', 'FOUR_W
 CREATE TYPE "LeadGrade" AS ENUM ('A', 'B', 'C', 'D', 'E', 'F');
 
 -- CreateEnum
+CREATE TYPE "ScoreEventKind" AS ENUM ('CREATED', 'ENRICHED', 'ACTIVITY', 'GRADE_CHANGE', 'WON', 'LOST');
+
+-- CreateEnum
 CREATE TYPE "WaStage" AS ENUM ('INQUIRY', 'DISCUSSION', 'NEGOTIATION', 'CLOSING', 'STALLED');
 
 -- CreateEnum
@@ -76,6 +79,41 @@ CREATE TABLE "accounts" (
 );
 
 -- CreateTable
+CREATE TABLE "workspaces" (
+    "id" TEXT NOT NULL,
+    "account_id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "slug" TEXT NOT NULL,
+    "description" TEXT,
+    "color" TEXT,
+    "is_default" BOOLEAN NOT NULL DEFAULT false,
+    "archived_at" TIMESTAMP(3),
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "workspaces_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "workspace_members" (
+    "id" TEXT NOT NULL,
+    "workspace_id" TEXT NOT NULL,
+    "user_id" TEXT NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "workspace_members_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "rate_limits" (
+    "key" TEXT NOT NULL,
+    "count" INTEGER NOT NULL DEFAULT 0,
+    "window_start" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "rate_limits_pkey" PRIMARY KEY ("key")
+);
+
+-- CreateTable
 CREATE TABLE "users" (
     "id" TEXT NOT NULL,
     "account_id" TEXT NOT NULL,
@@ -98,6 +136,7 @@ CREATE TABLE "users" (
 CREATE TABLE "leads" (
     "id" TEXT NOT NULL,
     "account_id" TEXT NOT NULL,
+    "workspace_id" TEXT,
     "assigned_rep_id" TEXT,
     "first_name" TEXT NOT NULL,
     "last_name" TEXT,
@@ -112,6 +151,7 @@ CREATE TABLE "leads" (
     "source_id" TEXT NOT NULL,
     "import_job_id" TEXT,
     "imported_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "source_collected_at" TIMESTAMP(3),
     "inquiry_text" TEXT,
     "expected_value" INTEGER,
     "fit_score" INTEGER NOT NULL DEFAULT 0,
@@ -128,6 +168,7 @@ CREATE TABLE "leads" (
     "handoff_brief" TEXT,
     "first_contact_at" TIMESTAMP(3),
     "speed_to_lead_hours" DOUBLE PRECISION,
+    "first_action_rank" INTEGER,
     "stage_id" TEXT NOT NULL,
     "stage_entered_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "stage_reason" TEXT,
@@ -157,6 +198,7 @@ CREATE TABLE "leads" (
 CREATE TABLE "signals" (
     "id" TEXT NOT NULL,
     "account_id" TEXT NOT NULL,
+    "workspace_id" TEXT,
     "lead_id" TEXT NOT NULL,
     "user_id" TEXT,
     "signal_type" "SignalType" NOT NULL,
@@ -185,6 +227,7 @@ CREATE TABLE "lead_notes" (
 CREATE TABLE "pipeline_stages" (
     "id" TEXT NOT NULL,
     "account_id" TEXT NOT NULL,
+    "workspace_id" TEXT,
     "name" TEXT NOT NULL,
     "key" TEXT NOT NULL,
     "display_order" INTEGER NOT NULL,
@@ -209,9 +252,29 @@ CREATE TABLE "stage_history" (
 );
 
 -- CreateTable
+CREATE TABLE "lead_score_events" (
+    "id" TEXT NOT NULL,
+    "account_id" TEXT NOT NULL,
+    "workspace_id" TEXT,
+    "lead_id" TEXT NOT NULL,
+    "kind" "ScoreEventKind" NOT NULL,
+    "occurred_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "grade" "LeadGrade" NOT NULL,
+    "confidence" INTEGER NOT NULL,
+    "fit_score" INTEGER NOT NULL,
+    "intent_score" INTEGER NOT NULL,
+    "quality_score" INTEGER NOT NULL,
+    "summary" TEXT NOT NULL,
+    "detail" JSONB,
+
+    CONSTRAINT "lead_score_events_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "follow_up_actions" (
     "id" TEXT NOT NULL,
     "account_id" TEXT NOT NULL,
+    "workspace_id" TEXT,
     "lead_id" TEXT NOT NULL,
     "assigned_rep_id" TEXT NOT NULL,
     "day_number" INTEGER NOT NULL,
@@ -234,6 +297,7 @@ CREATE TABLE "follow_up_actions" (
 CREATE TABLE "follow_up_configs" (
     "id" TEXT NOT NULL,
     "account_id" TEXT NOT NULL,
+    "workspace_id" TEXT,
     "grade" "LeadGrade" NOT NULL,
     "schedule" JSONB NOT NULL,
     "updated_at" TIMESTAMP(3) NOT NULL,
@@ -245,6 +309,7 @@ CREATE TABLE "follow_up_configs" (
 CREATE TABLE "lead_sources" (
     "id" TEXT NOT NULL,
     "account_id" TEXT NOT NULL,
+    "workspace_id" TEXT,
     "name" TEXT NOT NULL,
     "key" TEXT NOT NULL,
     "intent_baseline" INTEGER NOT NULL DEFAULT 10,
@@ -270,6 +335,7 @@ CREATE TABLE "win_attributions" (
 CREATE TABLE "smart_templates" (
     "id" TEXT NOT NULL,
     "account_id" TEXT NOT NULL,
+    "workspace_id" TEXT,
     "name" TEXT NOT NULL,
     "type" "TemplateType" NOT NULL,
     "stages" TEXT[],
@@ -287,6 +353,7 @@ CREATE TABLE "smart_templates" (
 CREATE TABLE "import_job_status" (
     "id" TEXT NOT NULL,
     "account_id" TEXT NOT NULL,
+    "workspace_id" TEXT,
     "user_id" TEXT NOT NULL,
     "status" "ImportStatus" NOT NULL DEFAULT 'PENDING',
     "name" TEXT,
@@ -310,6 +377,7 @@ CREATE TABLE "import_job_status" (
 CREATE TABLE "custom_fields" (
     "id" TEXT NOT NULL,
     "account_id" TEXT NOT NULL,
+    "workspace_id" TEXT,
     "label" TEXT NOT NULL,
     "key" TEXT NOT NULL,
     "field_type" "FieldType" NOT NULL,
@@ -324,6 +392,7 @@ CREATE TABLE "custom_fields" (
 CREATE TABLE "notifications" (
     "id" TEXT NOT NULL,
     "account_id" TEXT NOT NULL,
+    "workspace_id" TEXT,
     "user_id" TEXT,
     "lead_id" TEXT,
     "type" "NotifType" NOT NULL,
@@ -338,6 +407,18 @@ CREATE TABLE "notifications" (
 );
 
 -- CreateIndex
+CREATE INDEX "workspaces_account_id_idx" ON "workspaces"("account_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "workspaces_account_id_slug_key" ON "workspaces"("account_id", "slug");
+
+-- CreateIndex
+CREATE INDEX "workspace_members_user_id_idx" ON "workspace_members"("user_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "workspace_members_workspace_id_user_id_key" ON "workspace_members"("workspace_id", "user_id");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "users_auth_id_key" ON "users"("auth_id");
 
 -- CreateIndex
@@ -350,19 +431,22 @@ CREATE UNIQUE INDEX "users_account_id_email_key" ON "users"("account_id", "email
 CREATE INDEX "leads_account_id_idx" ON "leads"("account_id");
 
 -- CreateIndex
-CREATE INDEX "leads_account_id_assigned_rep_id_idx" ON "leads"("account_id", "assigned_rep_id");
+CREATE INDEX "leads_workspace_id_idx" ON "leads"("workspace_id");
 
 -- CreateIndex
-CREATE INDEX "leads_account_id_stage_id_idx" ON "leads"("account_id", "stage_id");
+CREATE INDEX "leads_workspace_id_assigned_rep_id_idx" ON "leads"("workspace_id", "assigned_rep_id");
 
 -- CreateIndex
-CREATE INDEX "leads_account_id_is_sql_idx" ON "leads"("account_id", "is_sql");
+CREATE INDEX "leads_workspace_id_stage_id_idx" ON "leads"("workspace_id", "stage_id");
 
 -- CreateIndex
-CREATE INDEX "leads_account_id_imported_at_idx" ON "leads"("account_id", "imported_at");
+CREATE INDEX "leads_workspace_id_is_sql_idx" ON "leads"("workspace_id", "is_sql");
 
 -- CreateIndex
-CREATE INDEX "leads_account_id_is_junk_idx" ON "leads"("account_id", "is_junk");
+CREATE INDEX "leads_workspace_id_imported_at_idx" ON "leads"("workspace_id", "imported_at");
+
+-- CreateIndex
+CREATE INDEX "leads_workspace_id_is_junk_idx" ON "leads"("workspace_id", "is_junk");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "leads_account_id_phone_key" ON "leads"("account_id", "phone");
@@ -380,13 +464,22 @@ CREATE INDEX "signals_account_id_idx" ON "signals"("account_id");
 CREATE INDEX "signals_account_id_created_at_idx" ON "signals"("account_id", "created_at");
 
 -- CreateIndex
+CREATE INDEX "signals_workspace_id_created_at_idx" ON "signals"("workspace_id", "created_at");
+
+-- CreateIndex
 CREATE INDEX "lead_notes_lead_id_idx" ON "lead_notes"("lead_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "pipeline_stages_account_id_key_key" ON "pipeline_stages"("account_id", "key");
+CREATE INDEX "pipeline_stages_workspace_id_idx" ON "pipeline_stages"("workspace_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "pipeline_stages_workspace_id_key_key" ON "pipeline_stages"("workspace_id", "key");
 
 -- CreateIndex
 CREATE INDEX "stage_history_lead_id_idx" ON "stage_history"("lead_id");
+
+-- CreateIndex
+CREATE INDEX "lead_score_events_lead_id_occurred_at_idx" ON "lead_score_events"("lead_id", "occurred_at");
 
 -- CreateIndex
 CREATE INDEX "follow_up_actions_lead_id_idx" ON "follow_up_actions"("lead_id");
@@ -395,25 +488,49 @@ CREATE INDEX "follow_up_actions_lead_id_idx" ON "follow_up_actions"("lead_id");
 CREATE INDEX "follow_up_actions_account_id_due_date_idx" ON "follow_up_actions"("account_id", "due_date");
 
 -- CreateIndex
+CREATE INDEX "follow_up_actions_workspace_id_due_date_idx" ON "follow_up_actions"("workspace_id", "due_date");
+
+-- CreateIndex
 CREATE INDEX "follow_up_actions_assigned_rep_id_due_date_idx" ON "follow_up_actions"("assigned_rep_id", "due_date");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "follow_up_configs_account_id_grade_key" ON "follow_up_configs"("account_id", "grade");
+CREATE UNIQUE INDEX "follow_up_configs_workspace_id_grade_key" ON "follow_up_configs"("workspace_id", "grade");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "lead_sources_account_id_key_key" ON "lead_sources"("account_id", "key");
+CREATE INDEX "lead_sources_workspace_id_idx" ON "lead_sources"("workspace_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "lead_sources_workspace_id_key_key" ON "lead_sources"("workspace_id", "key");
+
+-- CreateIndex
+CREATE INDEX "smart_templates_workspace_id_idx" ON "smart_templates"("workspace_id");
 
 -- CreateIndex
 CREATE INDEX "import_job_status_account_id_idx" ON "import_job_status"("account_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "custom_fields_account_id_key_key" ON "custom_fields"("account_id", "key");
+CREATE INDEX "import_job_status_workspace_id_idx" ON "import_job_status"("workspace_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "custom_fields_workspace_id_key_key" ON "custom_fields"("workspace_id", "key");
 
 -- CreateIndex
 CREATE INDEX "notifications_account_id_is_read_created_at_idx" ON "notifications"("account_id", "is_read", "created_at");
 
 -- CreateIndex
+CREATE INDEX "notifications_workspace_id_is_read_created_at_idx" ON "notifications"("workspace_id", "is_read", "created_at");
+
+-- CreateIndex
 CREATE INDEX "notifications_user_id_is_read_idx" ON "notifications"("user_id", "is_read");
+
+-- AddForeignKey
+ALTER TABLE "workspaces" ADD CONSTRAINT "workspaces_account_id_fkey" FOREIGN KEY ("account_id") REFERENCES "accounts"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "workspace_members" ADD CONSTRAINT "workspace_members_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "workspace_members" ADD CONSTRAINT "workspace_members_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "users" ADD CONSTRAINT "users_account_id_fkey" FOREIGN KEY ("account_id") REFERENCES "accounts"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -450,6 +567,9 @@ ALTER TABLE "pipeline_stages" ADD CONSTRAINT "pipeline_stages_account_id_fkey" F
 
 -- AddForeignKey
 ALTER TABLE "stage_history" ADD CONSTRAINT "stage_history_lead_id_fkey" FOREIGN KEY ("lead_id") REFERENCES "leads"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "lead_score_events" ADD CONSTRAINT "lead_score_events_lead_id_fkey" FOREIGN KEY ("lead_id") REFERENCES "leads"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "follow_up_actions" ADD CONSTRAINT "follow_up_actions_lead_id_fkey" FOREIGN KEY ("lead_id") REFERENCES "leads"("id") ON DELETE CASCADE ON UPDATE CASCADE;
