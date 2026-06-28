@@ -34,13 +34,14 @@ export default async function AdminCustomers() {
               <th className="px-4 py-3">Leads</th>
               <th className="px-4 py-3">Conv.</th>
               <th className="px-4 py-3">Recs used</th>
+              <th className="px-4 py-3">Plan</th>
               <th className="px-4 py-3">Last active</th>
               <th className="px-4 py-3">Created</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
             {rows.length === 0 ? (
-              <tr><td colSpan={9} className="px-4 py-10 text-center text-[13px] text-slate-500">No companies yet.</td></tr>
+              <tr><td colSpan={10} className="px-4 py-10 text-center text-[13px] text-slate-500">No companies yet.</td></tr>
             ) : rows.map((r) => (
               <tr key={r.id} className="hover:bg-white/[0.03] transition-colors">
                 <td className="px-4 py-3">
@@ -57,6 +58,11 @@ export default async function AdminCustomers() {
                 <td className="px-4 py-3 text-[13px] text-slate-300 tabular-nums">{r.leads.toLocaleString("en-IN")}</td>
                 <td className="px-4 py-3 text-[13px] tabular-nums">{r.conversionPct == null ? <span className="text-slate-600">—</span> : <span className="text-emerald-400">{r.conversionPct}%</span>}</td>
                 <td className="px-4 py-3 text-[13px] text-slate-300 tabular-nums">{r.recommendationsUsed}</td>
+                <td className="px-4 py-3 text-[12px]">
+                  {r.planName ? (
+                    <span className="text-slate-200">{r.planName}{r.mrrInr ? <span className="text-slate-500"> · ₹{r.mrrInr.toLocaleString("en-IN")}</span> : null}</span>
+                  ) : <span className="text-slate-600">—</span>}
+                </td>
                 <td className="px-4 py-3 text-[12px] text-slate-400">{ago(r.lastActiveAt)}</td>
                 <td className="px-4 py-3 text-[12px] text-slate-400">{date(r.createdAt)}</td>
               </tr>

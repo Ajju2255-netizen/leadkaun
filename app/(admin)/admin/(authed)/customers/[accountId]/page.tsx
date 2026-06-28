@@ -5,9 +5,11 @@ import { getCompany360 } from "@/lib/admin/metrics"
 import { getCompanyTimeline } from "@/lib/admin/timeline"
 import { computeAccountHealth } from "@/lib/admin/health"
 import { getAccountFlags, FEATURE_KEYS, FEATURE_LABELS } from "@/lib/feature-flags"
+import { getAccountSubscription, listPlans } from "@/lib/admin/billing"
 import { Timeline } from "../../_components/Timeline"
 import { LoginAsButton } from "./LoginAsButton"
 import { FlagToggles } from "./FlagToggles"
+import { PlanEditor } from "./PlanEditor"
 
 export const dynamic = "force-dynamic"
 
@@ -35,15 +37,19 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 export default async function Company360({ params }: { params: { accountId: string } }) {
-  const [c, timeline, health, flags] = await Promise.all([
+  const [c, timeline, health, flags, sub, plans] = await Promise.all([
     getCompany360(params.accountId),
     getCompanyTimeline(params.accountId, 40),
     computeAccountHealth(params.accountId),
     getAccountFlags(params.accountId),
+    getAccountSubscription(params.accountId),
+    listPlans(),
   ])
   if (!c) notFound()
 
   const flagItems = FEATURE_KEYS.map((k) => ({ key: k, label: FEATURE_LABELS[k], enabled: flags[k] }))
+  const planOptions = plans.map((p) => ({ key: p.key, name: p.name, priceRupees: Math.round(p.price_inr / 100) }))
+  const currentSub = sub ? { planKey: sub.planKey, status: sub.status, mrrRupees: Math.round(sub.mrrInr / 100) } : null
 
   return (
     <div className="space-y-7">
@@ -68,8 +74,8 @@ export default async function Company360({ params }: { params: { accountId: stri
 
       {/* Top facts */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Stat label="Plan" value="—" />
-        <Stat label="MRR" value="—" />
+        <Stat label="Plan" value={sub ? `${sub.planName}` : "—"} />
+        <Stat label="MRR" value={sub && sub.mrrInr > 0 ? inr(Math.round(sub.mrrInr / 100)) : "—"} />
         <Stat label="Owner" value={c.owner?.name || "—"} />
         <div className="rounded-xl border border-white/10 bg-slate-900/50 px-4 py-3">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Health</p>
@@ -155,7 +161,14 @@ export default async function Company360({ params }: { params: { accountId: stri
         </div>
       </div>
 
-      <p className="text-[11px] text-slate-600">Plan / MRR editor arrives with the billing phase.</p>
+      {/* Billing — manual plan/MRR editor */}
+      <div className="max-w-xl">
+        <p className="text-[12px] font-bold uppercase tracking-wider text-slate-400 mb-3">
+          Billing {sub && <span className="text-slate-500 normal-case font-normal">· {sub.status}</span>}
+        </p>
+        <PlanEditor accountId={c.account.id} plans={planOptions} current={currentSub} />
+        <p className="text-[11px] text-slate-600 mt-2">Manual until a payment provider is connected — payments/invoices then appear automatically.</p>
+      </div>
     </div>
   )
 }
