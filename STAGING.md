@@ -57,11 +57,16 @@ bash scripts/migrate-staging.sh   # applies any unapplied prisma/migrations/* ov
 Workflow going forward: test a migration against **staging** first, then apply
 to **prod** with a backup (`prisma migrate deploy` against `.env.local.prod`).
 
-## ⚠️ Caveat — migration files don't fully reproduce prod
+## Migration history (baselined 2026-06-28)
 
-Prod has tables (`workspaces`, `workspace_members`, `rate_limits`) created via
-`db push` with **no migration files**, so building a DB purely from
-`prisma/migrations/` yields an incomplete schema. That's why staging is cloned
-from the prod schema, not replayed from migrations. Worth reconciling the
-migration history (baseline the current prod schema into a fresh init migration)
-so the repo can reproduce prod on its own.
+Previously the repo's migrations didn't reproduce prod — `workspaces`,
+`workspace_members`, `rate_limits` had been `db push`'d with no migration files.
+This was **fixed by squashing to a single complete baseline**:
+`prisma/migrations/00000000000000_init/migration.sql` is generated from
+`prisma/schema.prisma` (verified to exactly match live prod) and reproduces the
+entire schema (19 tables, 17 enums, 55 indexes/FKs). It was proven on a scratch
+DB (column-identical to prod) and marked applied on prod + staging
+(`_prisma_migrations` has the single baseline row; `prisma migrate status` →
+"up to date"). A fresh DB can now be built from migrations alone, so rebuilding
+staging no longer needs the prod-schema clone — though the clone steps above
+still work.
