@@ -823,3 +823,19 @@ model JobRun {
   @@index([status, started_at])
   @@map("job_runs")
 }
+
+// Per-account feature toggles set from Mission Control. A missing row means the
+// feature uses its default (usually ON); a row with enabled=false turns it off
+// for that account. Read via lib/feature-flags.ts (neutral helper).
+model FeatureFlag {
+  id         String   @id @default(cuid())
+  account_id String
+  key        String // "learning_engine" | "queue" | "pipeline" | "analytics" | "confidence"
+  enabled    Boolean  @default(true)
+  updated_by String? // platform admin auth_id
+  updated_at DateTime @updatedAt
+
+  @@unique([account_id, key])
+  @@index([account_id])
+  @@map("feature_flags")
+}

@@ -27,6 +27,7 @@ export default async function AdminCustomers() {
         <table className="w-full text-left">
           <thead>
             <tr className="text-[10px] font-bold uppercase tracking-wider text-slate-500 bg-white/[0.02]">
+              <th className="px-4 py-3"></th>
               <th className="px-4 py-3">Company</th>
               <th className="px-4 py-3">Users</th>
               <th className="px-4 py-3">WS</th>
@@ -39,9 +40,12 @@ export default async function AdminCustomers() {
           </thead>
           <tbody className="divide-y divide-white/5">
             {rows.length === 0 ? (
-              <tr><td colSpan={8} className="px-4 py-10 text-center text-[13px] text-slate-500">No companies yet.</td></tr>
+              <tr><td colSpan={9} className="px-4 py-10 text-center text-[13px] text-slate-500">No companies yet.</td></tr>
             ) : rows.map((r) => (
               <tr key={r.id} className="hover:bg-white/[0.03] transition-colors">
+                <td className="px-4 py-3">
+                  <span className={`block w-2.5 h-2.5 rounded-full ${r.healthBand === "healthy" ? "bg-emerald-400" : r.healthBand === "warning" ? "bg-amber-400" : "bg-rose-400"}`} title={r.healthBand} />
+                </td>
                 <td className="px-4 py-3">
                   <Link href={`/admin/customers/${r.id}`} className="block">
                     <p className="text-[13px] font-semibold text-white">{r.name}</p>
