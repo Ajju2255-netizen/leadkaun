@@ -3,6 +3,7 @@ import { requireWorkspace, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
 import { rateLimited, LIMITS } from "@/lib/rate-limit"
 import { MAX_STORED_ERRORS } from "@/lib/import/process-rows"
+import { recordAccountEvent } from "@/lib/events/account-events"
 
 /**
  * POST /api/import/csv/complete
@@ -54,6 +55,17 @@ export async function POST(req: Request) {
           },
         }),
       },
+    })
+
+    await recordAccountEvent({
+      accountId: session.account.id,
+      workspaceId: session.workspace.id,
+      actorUserId: session.user.id,
+      type: aborted ? "IMPORT_FAILED" : "IMPORT_COMPLETED",
+      summary: aborted
+        ? `Import did not finish (${errCount} errors)`
+        : `Imported ${updated.inserted} leads${updated.duplicates ? `, ${updated.duplicates} duplicates` : ""}`,
+      detail: { inserted: updated.inserted, duplicates: updated.duplicates, errors: errCount, fileName: updated.file_name },
     })
 
     return apiSuccess(updated)

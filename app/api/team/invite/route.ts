@@ -1,5 +1,6 @@
 import { z } from "zod"
 import { prisma } from "@/lib/prisma"
+import { recordAccountEvent } from "@/lib/events/account-events"
 import { requireRole } from "@/lib/auth/middleware"
 import { handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError, parseBody } from "@/lib/api/response"
@@ -104,6 +105,15 @@ export async function POST(req: Request) {
         data: { workspace_id: session.workspace.id, user_id: newUser.id },
       }).catch((e) => console.warn("[invite] could not add workspace member:", String(e)))
     }
+
+    await recordAccountEvent({
+      accountId: session.account.id,
+      workspaceId: session.workspace?.id ?? null,
+      actorUserId: session.user.id,
+      type: "USER_INVITED",
+      summary: `Invited ${data.email} as ${data.role}`,
+      detail: { email: data.email, role: data.role },
+    })
 
     return apiSuccess({ invited: true, email: data.email }, 201)
   } catch (err) {

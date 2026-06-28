@@ -1,9 +1,11 @@
 "use server"
 
+import { headers, cookies } from "next/headers"
 import { createSupabaseAdminClient } from "@/lib/supabase/admin"
 import { prisma } from "@/lib/prisma"
 import { sendWelcomeAdminEmail } from "@/lib/email/lead-alerts"
 import { provisionWorkspaceDefaults } from "@/lib/workspace/provision"
+import { recordAccountEvent } from "@/lib/events/account-events"
 
 type RegisterInput = {
   orgName: string
@@ -33,10 +35,22 @@ export async function registerAction(input: RegisterInput): Promise<RegisterResu
     return { success: false, error: authError?.message ?? "Failed to create user" }
   }
 
+  // Signup attribution (best-effort): IP/country from edge headers, UTM from
+  // cookies the marketing site may have set. Null when absent — never fabricated.
+  const h = headers()
+  const c = cookies()
+  const attribution = {
+    signup_ip:           h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
+    signup_country:      h.get("x-vercel-ip-country") ?? null,
+    signup_utm_source:   c.get("utm_source")?.value ?? null,
+    signup_utm_campaign: c.get("utm_campaign")?.value ?? null,
+  }
+
+  let created: { accountId: string; workspaceId: string; userId: string } | null = null
   try {
     // 2. Create Account + User + default pipeline stages + lead sources in one transaction
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await prisma.$transaction(async (tx: any) => {
+    created = await prisma.$transaction(async (tx: any) => {
       const account = await tx.account.create({
         data: {
           name: orgName,
@@ -45,6 +59,7 @@ export async function registerAction(input: RegisterInput): Promise<RegisterResu
           state: "",
           team_size: "SOLO",
           monthly_lead_vol: "UNDER_50",
+          ...attribution,
         },
       })
 
@@ -75,12 +90,25 @@ export async function registerAction(input: RegisterInput): Promise<RegisterResu
         data: { workspace_id: workspace.id, user_id: user.id },
       })
       await provisionWorkspaceDefaults(tx, { accountId: account.id, workspaceId: workspace.id })
+      return { accountId: account.id, workspaceId: workspace.id, userId: user.id }
     })
   } catch (dbError) {
     // Rollback: delete the Supabase auth user we just created
     await admin.auth.admin.deleteUser(authData.user.id)
     console.error("Register DB error:", dbError)
     return { success: false, error: "Account creation failed. Please try again." }
+  }
+
+  // First Company Timeline event (best-effort).
+  if (created) {
+    await recordAccountEvent({
+      accountId: created.accountId,
+      workspaceId: created.workspaceId,
+      actorUserId: created.userId,
+      type: "SIGNUP",
+      summary: `${orgName} signed up`,
+      detail: { email, source: attribution.signup_utm_source, country: attribution.signup_country },
+    })
   }
 
   // Send the admin welcome email (audit B8). Guarded — never blocks/fails signup.

@@ -4,6 +4,7 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import type { EmailOtpType } from "@supabase/supabase-js"
 import { verifyImpersonation, IMPERSONATION_COOKIE } from "@/lib/auth/impersonation"
+import { recordAccountEvent } from "@/lib/events/account-events"
 
 /**
  * Supabase email-link confirmation handler (SSR / PKCE-safe).
@@ -50,10 +51,16 @@ export async function GET(req: NextRequest) {
         data: { user },
       } = await supabase.auth.getUser()
       if (user) {
-        await prisma.user.updateMany({
+        const flipped = await prisma.user.updateMany({
           where: { auth_id: user.id, is_active: false },
           data: { is_active: true, joined_at: new Date() },
         })
+        if (flipped.count > 0) {
+          const joined = await prisma.user.findFirst({ where: { auth_id: user.id }, select: { account_id: true, email: true } })
+          if (joined) {
+            await recordAccountEvent({ accountId: joined.account_id, actorUserId: undefined, type: "USER_JOINED", summary: `${joined.email} accepted their invite` })
+          }
+        }
       }
       // Invited users have no password yet (they accepted via the one-time
       // link), so send them to set one before the dashboard. Other flows

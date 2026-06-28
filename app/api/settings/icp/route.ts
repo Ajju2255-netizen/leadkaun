@@ -1,6 +1,7 @@
 import { z } from "zod"
 import { prisma } from "@/lib/prisma"
 import { inngest } from "@/inngest/client"
+import { recordAccountEvent } from "@/lib/events/account-events"
 import { requireAuth, requireRole } from "@/lib/auth/middleware"
 import { handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError, parseBody } from "@/lib/api/response"
@@ -87,6 +88,17 @@ export async function PUT(req: Request) {
         ...(data.icp_configured      !== undefined ? { icp_configured:      data.icp_configured      } : {}),
         ...(data.sql_fit_threshold   !== undefined ? { sql_fit_threshold:   data.sql_fit_threshold   } : {}),
         ...(data.sql_intent_threshold !== undefined ? { sql_intent_threshold: data.sql_intent_threshold } : {}),
+      },
+    })
+
+    await recordAccountEvent({
+      accountId: session.account.id,
+      actorUserId: session.user.id,
+      type: "ICP_CONFIGURED",
+      summary: "ICP / scoring settings updated",
+      detail: {
+        industries: data.icp_industries, states: data.icp_states,
+        sql_fit: data.sql_fit_threshold, sql_intent: data.sql_intent_threshold,
       },
     })
 

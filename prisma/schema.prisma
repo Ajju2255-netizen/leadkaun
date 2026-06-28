@@ -219,6 +219,12 @@ model Account {
   // Signal weight overrides (null = use system defaults)
   weight_overrides Json?
 
+  // Signup attribution (captured at register; null when not provided)
+  signup_utm_source   String?
+  signup_utm_campaign String?
+  signup_country      String?
+  signup_ip           String?
+
   // Relations
   users             User[]
   leads             Lead[]
@@ -741,4 +747,41 @@ model ImpersonationLog {
   @@index([account_id, started_at])
   @@index([admin_auth_id, started_at])
   @@map("impersonation_logs")
+}
+
+// Unified per-account event stream powering the Company Timeline + live activity
+// feed in Mission Control. Append-only; written best-effort at key lifecycle
+// points (never blocks the core path). Read by the admin panel only.
+enum AccountEventType {
+  SIGNUP
+  ICP_CONFIGURED
+  WORKSPACE_CREATED
+  WORKSPACE_ARCHIVED
+  USER_INVITED
+  USER_JOINED
+  USER_DEACTIVATED
+  IMPORT_COMPLETED
+  IMPORT_FAILED
+  PLAN_CHANGED
+  TRIAL_STARTED
+  TRIAL_ENDED
+  PAYMENT_SUCCEEDED
+  PAYMENT_FAILED
+  FEATURE_FLAG_CHANGED
+  IMPERSONATED
+}
+
+model AccountEvent {
+  id            String           @id @default(cuid())
+  account_id    String
+  workspace_id  String?
+  actor_user_id String? // null = system / platform admin
+  type          AccountEventType
+  summary       String
+  detail        Json?
+  created_at    DateTime         @default(now())
+
+  @@index([account_id, created_at])
+  @@index([type, created_at])
+  @@map("account_events")
 }
