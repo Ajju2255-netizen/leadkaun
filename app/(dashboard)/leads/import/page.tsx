@@ -16,6 +16,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { ThemedSelect } from "@/components/shared/ThemedSelect"
+import { sourceAgeToDate, SOURCE_AGE_OPTIONS } from "@/lib/scoring/freshness"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -259,13 +260,13 @@ function ImportFromCard({
 // ── Upload form (the right column when idle) ────────────────────────────────
 
 function UploadForm({
-  sources, stages, sourceId, stageId, sessionName,
-  setSourceId, setStageId, setSessionName,
+  sources, stages, sourceId, stageId, sessionName, freshness,
+  setSourceId, setStageId, setSessionName, setFreshness,
   uploading, metaError, onRetryMeta,
 }: {
   sources: LeadSource[]; stages: PipelineStage[]
-  sourceId: string; stageId: string; sessionName: string
-  setSourceId: (v: string) => void; setStageId: (v: string) => void; setSessionName: (v: string) => void
+  sourceId: string; stageId: string; sessionName: string; freshness: string
+  setSourceId: (v: string) => void; setStageId: (v: string) => void; setSessionName: (v: string) => void; setFreshness: (v: string) => void
   uploading: boolean
   metaError: boolean; onRetryMeta: () => void
 }) {
@@ -288,7 +289,7 @@ function UploadForm({
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="space-y-1.5">
           <label className="text-[10px] font-semibold text-ink-soft uppercase tracking-[0.08em] block">Batch Name</label>
           <input
@@ -320,6 +321,16 @@ function UploadForm({
             placeholder={metaError ? "Couldn't load" : stages.length ? "Select stage" : "Loading…"}
             disabled={!stages.length || uploading}
             aria-label="Initial stage"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-semibold text-ink-soft uppercase tracking-[0.08em] block">How old is this list?</label>
+          <ThemedSelect
+            value={freshness}
+            onValueChange={setFreshness}
+            options={SOURCE_AGE_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+            disabled={uploading}
+            aria-label="Source data age"
           />
         </div>
       </div>
@@ -477,6 +488,7 @@ export default function ImportPage() {
   const [sourceId,    setSourceId]    = useState<string>("")
   const [stageId,     setStageId]     = useState<string>("")
   const [sessionName, setSessionName] = useState<string>("")
+  const [freshness,   setFreshness]   = useState<string>("unknown")
 
   // Upload state
   const [uploading, setUploading] = useState(false)
@@ -608,6 +620,8 @@ export default function ImportPage() {
       const { jobId } = await initRes.json()
 
       // ── Stream rows in small batches with real progress ──────────────────
+      // Source-collection date for freshness (computed once for the whole import).
+      const sourceCollectedAt = sourceAgeToDate(freshness)?.toISOString() ?? null
       const BATCH = 10
       let inserted = 0, duplicates = 0, errors = 0, highIntent = 0, totalValue = 0
       const errorReasons: string[] = []
@@ -621,6 +635,7 @@ export default function ImportPage() {
           body: JSON.stringify({
             jobId, source_id: sourceId, stage_id: stageId,
             rows: batch, startRowIndex: i + 2,   // +2: 1-based + header row
+            source_collected_at: sourceCollectedAt,
           }),
         })
         if (!bRes.ok) { aborted = true; break }
@@ -751,8 +766,8 @@ export default function ImportPage() {
             {stage === "idle" ? (
               <UploadForm
                 sources={sources} stages={stages}
-                sourceId={sourceId} stageId={stageId} sessionName={sessionName}
-                setSourceId={setSourceId} setStageId={setStageId} setSessionName={setSessionName}
+                sourceId={sourceId} stageId={stageId} sessionName={sessionName} freshness={freshness}
+                setSourceId={setSourceId} setStageId={setStageId} setSessionName={setSessionName} setFreshness={setFreshness}
                 uploading={uploading}
                 metaError={metaError} onRetryMeta={loadMeta}
               />

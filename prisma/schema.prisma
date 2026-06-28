@@ -323,6 +323,10 @@ model Lead {
   source_id      String
   import_job_id  String?
   imported_at    DateTime @default(now())
+  // Approximate date the SOURCE data was collected (set from the import's
+  // "how old is this list?" answer). Null = unspecified → freshness falls back
+  // to imported_at. Lets a year-old list imported today read as stale, not new.
+  source_collected_at DateTime?
   inquiry_text   String?
   expected_value Int? // INR
 

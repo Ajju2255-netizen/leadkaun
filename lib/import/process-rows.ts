@@ -40,10 +40,12 @@ export interface ProcessRowsOpts {
   stageId:       string
   jobId:         string
   source:        { key: string; intent_baseline: number }
+  /** Approximate source-collection date for this import (freshness). Null = unspecified. */
+  sourceCollectedAt?: Date | null
 }
 
 export async function processImportRows(opts: ProcessRowsOpts): Promise<ProcessRowsResult> {
-  const { rows, startRowIndex, accountId, workspaceId, sourceId, stageId, jobId, source } = opts
+  const { rows, startRowIndex, accountId, workspaceId, sourceId, stageId, jobId, source, sourceCollectedAt } = opts
 
   let inserted = 0, duplicates = 0, errors = 0, highIntentCount = 0, totalValue = 0
   const errorReasons: string[] = []
@@ -107,6 +109,7 @@ export async function processImportRows(opts: ProcessRowsOpts): Promise<ProcessR
             source_id:      sourceId,
             stage_id:       stageId,
             import_job_id:  jobId,
+            source_collected_at: sourceCollectedAt ?? null,
             inquiry_text:   vr.inquiry_text,
             expected_value: vr.expected_value,
             signals: {
