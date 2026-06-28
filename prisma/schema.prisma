@@ -348,6 +348,12 @@ model Lead {
   first_contact_at    DateTime?
   speed_to_lead_hours Float?
 
+  // Recommendation Adoption (North Star): the lead's 1-based rank in its
+  // assigned rep's priority queue at the moment of first contact. <= TOP_N
+  // means the rep worked a recommended (top-of-queue) lead. Null = never
+  // contacted, or contacted while unassigned.
+  first_action_rank Int?
+
   // Pipeline
   stage_id         String
   stage_entered_at DateTime @default(now())

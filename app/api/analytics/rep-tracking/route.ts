@@ -4,6 +4,7 @@ import { apiSuccess, apiError } from "@/lib/api/response"
 import { computeExecutionScore } from "@/lib/scoring/execution-score"
 import { computeRepScore, type RepScoreComponents } from "@/lib/scoring/rep-score"
 import { startOfIstDay, startOfIstMonth, hourIST } from "@/lib/time/ist"
+import { RECOMMENDATION_TOP_N } from "@/lib/analytics/recommendation-rank"
 
 /**
  * GET /api/analytics/rep-tracking
@@ -133,6 +134,7 @@ export async function GET() {
           revAgg, respAgg, fuComp, fuOver,
           execInputs, wonCount, qualifiedCount,
           missedRecovered, missedAtRisk,
+          recsAccepted, recsIgnored,
         ] = await Promise.all([
           prisma.lead.aggregate({
             where: {
@@ -191,6 +193,22 @@ export async function GET() {
             },
             _sum: { expected_value: true },
           }),
+          // Recommendation Adoption (MTD): leads first-contacted this month that
+          // were in the rep's top-N queue at first touch ("accepted") vs below it.
+          prisma.lead.count({
+            where: {
+              account_id: accountId, workspace_id: workspaceId, assigned_rep_id: rep.id,
+              first_contact_at: { gte: monthStart },
+              first_action_rank: { not: null, lte: RECOMMENDATION_TOP_N },
+            },
+          }),
+          prisma.lead.count({
+            where: {
+              account_id: accountId, workspace_id: workspaceId, assigned_rep_id: rep.id,
+              first_contact_at: { gte: monthStart },
+              first_action_rank: { gt: RECOMMENDATION_TOP_N },
+            },
+          }),
         ])
 
         const revenue       = revAgg._sum.won_value ?? 0
@@ -213,6 +231,10 @@ export async function GET() {
         const recovPct  = (recovered + atRisk) > 0
           ? Math.round((recovered / (recovered + atRisk)) * 100)
           : null
+
+        // Recommendation adoption %: accepted / (accepted + ignored)
+        const recsTotal   = recsAccepted + recsIgnored
+        const adoptionPct = recsTotal > 0 ? Math.round((recsAccepted / recsTotal) * 100) : null
 
         const repResult = computeRepScore({
           follow_up_pct:    fuPct ?? 0,
@@ -237,6 +259,9 @@ export async function GET() {
           daily_execution_score:    execResult.score,
           conversion_rate:          convRate,
           missed_recovery_pct:      recovPct,
+          recommendations_accepted:    recsAccepted,
+          recommendations_ignored:     recsIgnored,
+          recommendation_adoption_pct: adoptionPct,
           rep_score:                repResult.score,
           rep_score_components:     repResult.components as RepScoreComponents,
         }
@@ -245,8 +270,14 @@ export async function GET() {
 
     // Filter to reps that have at least one KPI present (cleaner table)
     const activeRepStats = repStats.filter((r) =>
-      r.revenue_recovered > 0 || r.response_time_seconds != null || r.follow_up_completion_pct != null
+      r.revenue_recovered > 0 || r.response_time_seconds != null || r.follow_up_completion_pct != null ||
+      (r.recommendations_accepted + r.recommendations_ignored) > 0
     )
+
+    // Account-level recommendation adoption (sum across reps)
+    const acctRecsAccepted = activeRepStats.reduce((s, r) => s + r.recommendations_accepted, 0)
+    const acctRecsTotal    = acctRecsAccepted + activeRepStats.reduce((s, r) => s + r.recommendations_ignored, 0)
+    const acctAdoptionPct  = acctRecsTotal > 0 ? Math.round((acctRecsAccepted / acctRecsTotal) * 100) : null
 
     // Top performer = highest revenue_recovered this month
     const topPerformer = activeRepStats.length > 0
@@ -261,6 +292,9 @@ export async function GET() {
         avg_response_time_pct_change:     pctChange(avgRespHrs, avgRespLast),
         follow_up_completion_pct:         fuPctThis,
         follow_up_completion_pct_change:  pctChange(fuPctThis, fuPctLast),
+        recommendation_adoption_pct:      acctAdoptionPct,
+        recommendations_accepted:         acctRecsAccepted,
+        recommendations_total:            acctRecsTotal,
       },
       reps:           activeRepStats,
       top_performer:  topPerformer ? {

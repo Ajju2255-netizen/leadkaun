@@ -4,6 +4,7 @@ import { requireWorkspace, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError, parseBody, NOT_FOUND } from "@/lib/api/response"
 import { rateLimited, LIMITS } from "@/lib/rate-limit"
 import { processSignalAndUpdateScores } from "@/lib/scoring/orchestrator"
+import { computeFirstActionRank } from "@/lib/analytics/recommendation-rank"
 import { SIGNAL_WEIGHTS } from "@/lib/scoring/signal-weights"
 import { applyAutoStage } from "@/lib/pipeline/auto-stage"
 import { scheduleFollowUp } from "@/lib/follow-ups/schedule"
@@ -138,15 +139,17 @@ export async function POST(req: Request) {
         })
       }
 
-      // Record speed-to-lead on first contact
+      // Record speed-to-lead + recommendation rank on first contact
       if (!lead.first_contact_at) {
         const hoursToContact =
           (Date.now() - lead.imported_at.getTime()) / (1000 * 60 * 60)
+        const firstActionRank = await computeFirstActionRank(tx, lead)
         await tx.lead.update({
           where: { id: data.lead_id },
           data: {
             first_contact_at:    new Date(),
             speed_to_lead_hours: Math.round(hoursToContact * 10) / 10,
+            ...(firstActionRank !== null ? { first_action_rank: firstActionRank } : {}),
           },
         })
       }
