@@ -19,6 +19,7 @@ import {
   Menu,
   X,
   Layers,
+  Brain,
   type LucideIcon,
 } from "lucide-react"
 import { ThemedSelect } from "@/components/shared/ThemedSelect"
@@ -70,6 +71,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/activity",     label: "Activity",     icon: Activity,        roles: ["ADMIN","MANAGER","REP"] },
       { href: "/analytics",    label: "Analytics",    icon: BarChart2,       roles: ["ADMIN","MANAGER"]       },
       { href: "/rep-tracking", label: "Rep Tracking", icon: Trophy,          roles: ["ADMIN","MANAGER"]       },
+      { href: "/learning",     label: "Learning",     icon: Brain,           roles: ["ADMIN","MANAGER"]       },
       { href: "/missed",       label: "Missed Opps",  icon: AlertTriangle,   roles: ["ADMIN","MANAGER"]       },
     ],
   },
