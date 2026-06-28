@@ -1,5 +1,6 @@
 import * as React from "react"
 import { inngest } from "@/inngest/client"
+import { recordJobRun } from "@/lib/events/job-run"
 import { prisma } from "@/lib/prisma"
 import { sendEmail } from "@/lib/email/send"
 import { MorningBriefRep } from "@/emails/MorningBriefRep"
@@ -22,6 +23,7 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://app.leadkaun.com"
 export const morningBriefFn = inngest.createFunction(
   { id: "morning-brief", name: "Morning Brief Emails", triggers: [{ cron: "0 3 * * 1-6" }] },
   async ({ step, logger }) => {
+    await step.run("record-job-run", () => recordJobRun("morning-brief"))
     const accounts = await step.run("load-accounts", async () => {
       return prisma.account.findMany({
         include: {
@@ -122,7 +124,8 @@ export const morningBriefFn = inngest.createFunction(
             }))
 
             await sendEmail({
-              to:      user.email,
+              to:       user.email,
+              template: "morning_brief",
               subject: `Your morning brief — ${callbacksDue} callbacks due today`,
               react:   React.createElement(MorningBriefRep, {
                 rep_first_name:      user.first_name,
@@ -229,7 +232,8 @@ export const morningBriefFn = inngest.createFunction(
               : 0
 
             await sendEmail({
-              to:      user.email,
+              to:       user.email,
+              template: "morning_brief_manager",
               subject: `Team morning brief — ${formatRupee(pipelineValue._sum.expected_value ?? 0)} pipeline`,
               react:   React.createElement(MorningBriefManager, {
                 manager_first_name:   user.first_name,

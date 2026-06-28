@@ -1,4 +1,5 @@
 import { inngest } from "@/inngest/client"
+import { recordJobRun } from "@/lib/events/job-run"
 import { prisma } from "@/lib/prisma"
 
 /**
@@ -46,6 +47,7 @@ function fmtValue(v: number | null): string | null {
 export const missedOpportunityFn = inngest.createFunction(
   { id: "missed-opportunity", name: "Missed Opportunity Checker", triggers: [{ cron: "0 * * * *" }] },
   async ({ step, logger }) => {
+    await step.run("record-job-run", () => recordJobRun("missed-opportunity"))
     const now = new Date()
 
     // ── Find missed leads per grade in parallel ──────────────────────────────

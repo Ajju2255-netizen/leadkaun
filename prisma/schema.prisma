@@ -785,3 +785,41 @@ model AccountEvent {
   @@index([type, created_at])
   @@map("account_events")
 }
+
+// Email send log — instruments lib/email/send.ts so Mission Control can show
+// "emails sent today", deliverability and brief-open rates. opened_at is set by
+// the Resend webhook. Best-effort write; never blocks a send.
+model EmailLog {
+  id          String    @id @default(cuid())
+  account_id  String?
+  to_email    String
+  template    String // "morning_brief" | "recovery_alert" | "welcome_admin" | ...
+  subject     String
+  provider_id String? // Resend message id
+  status      String    @default("sent") // sent | failed
+  error       String?
+  opened_at   DateTime?
+  created_at  DateTime  @default(now())
+
+  @@index([account_id, created_at])
+  @@index([template, created_at])
+  @@index([status, created_at])
+  @@map("email_logs")
+}
+
+// Background-job run log — wraps the Inngest functions so Mission Control can
+// show cron/queue health (success/failure, duration, last run).
+model JobRun {
+  id          String    @id @default(cuid())
+  function    String
+  status      String // running | success | failed
+  account_id  String?
+  items       Int       @default(0)
+  error       String?
+  started_at  DateTime  @default(now())
+  finished_at DateTime?
+
+  @@index([function, started_at])
+  @@index([status, started_at])
+  @@map("job_runs")
+}

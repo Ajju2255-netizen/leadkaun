@@ -14,12 +14,13 @@ function Kpi({ label, value, sub }: { label: string; value: string; sub?: string
   )
 }
 
-function HealthPill({ label, state }: { label: string; state: "ok" | "pending" }) {
+function HealthPill({ label, state }: { label: string; state: boolean | null }) {
+  const dot = state === true ? "bg-emerald-400 shadow-[0_0_8px] shadow-emerald-400/60" : state === false ? "bg-rose-400" : "bg-slate-600"
   return (
     <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-slate-900/50 px-3.5 py-2.5">
-      <span className={`w-2.5 h-2.5 rounded-full ${state === "ok" ? "bg-emerald-400 shadow-[0_0_8px] shadow-emerald-400/60" : "bg-slate-600"}`} />
+      <span className={`w-2.5 h-2.5 rounded-full ${dot}`} />
       <span className="text-[13px] font-medium text-slate-200">{label}</span>
-      {state === "pending" && <span className="ml-auto text-[10px] text-slate-500">monitoring soon</span>}
+      {state === null && <span className="ml-auto text-[10px] text-slate-500">no data yet</span>}
     </div>
   )
 }
@@ -54,11 +55,11 @@ export default async function AdminDashboard() {
       <div>
         <p className="text-[12px] font-bold uppercase tracking-wider text-slate-400 mb-3">System Health</p>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          <HealthPill label="API" state="ok" />
-          <HealthPill label="Database" state="ok" />
-          <HealthPill label="Queue" state="pending" />
-          <HealthPill label="Email" state="pending" />
-          <HealthPill label="Workers" state="pending" />
+          <HealthPill label="API" state={d.health.api} />
+          <HealthPill label="Database" state={d.health.db} />
+          <HealthPill label="Queue" state={d.health.queue} />
+          <HealthPill label="Email" state={d.health.email} />
+          <HealthPill label="Workers" state={d.health.workers} />
         </div>
       </div>
 

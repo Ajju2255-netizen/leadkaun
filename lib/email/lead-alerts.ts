@@ -24,7 +24,8 @@ export async function sendWelcomeAdminEmail(opts: {
 }): Promise<void> {
   try {
     await sendEmail({
-      to:      opts.to,
+      to:       opts.to,
+      template: "welcome_admin",
       subject: `Welcome to Leadkaun, ${opts.adminFirstName}`,
       react:   React.createElement(WelcomeAdmin, {
         admin_first_name: opts.adminFirstName,
@@ -50,7 +51,8 @@ export async function sendSqlAlertEmail(opts: {
 }): Promise<void> {
   try {
     await sendEmail({
-      to:      opts.to,
+      to:       opts.to,
+      template: "sql_alert",
       subject: `🎯 SQL Alert: ${`${opts.leadFirstName} ${opts.leadLastName ?? ""}`.trim()} just qualified`,
       react:   React.createElement(SqlAlert, {
         recipient_name:  opts.recipientName,
@@ -84,7 +86,8 @@ export async function sendGradeDropEmail(opts: {
 }): Promise<void> {
   try {
     await sendEmail({
-      to:      opts.to,
+      to:       opts.to,
+      template: "grade_drop",
       subject: `⚠️ Grade drop: ${`${opts.leadFirstName} ${opts.leadLastName ?? ""}`.trim()} (${opts.gradeFrom} → ${opts.gradeTo})`,
       react:   React.createElement(GradeDrop, {
         recipient_name:     opts.recipientName,

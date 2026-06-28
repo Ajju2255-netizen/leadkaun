@@ -1,4 +1,5 @@
 import { inngest } from "@/inngest/client"
+import { recordJobRun } from "@/lib/events/job-run"
 import { prisma } from "@/lib/prisma"
 import { computeIntentScore } from "@/lib/scoring/intent-score"
 import { assignGrade, checkSqlThreshold } from "@/lib/scoring/grade"
@@ -26,6 +27,7 @@ const MS_PER_DAY = 1000 * 60 * 60 * 24
 export const intentDecayFn = inngest.createFunction(
   { id: "intent-decay", name: "Nightly Intent Decay", triggers: [{ cron: "30 20 * * *" }] },
   async ({ step, logger }) => {
+    await step.run("record-job-run", () => recordJobRun("intent-decay"))
     // Count active leads to process
     const total = await step.run("count-active-leads", async () => {
       return prisma.lead.count({
