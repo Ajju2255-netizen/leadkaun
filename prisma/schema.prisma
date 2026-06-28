@@ -687,6 +687,10 @@ model Notification {
   priority     String    @default("medium") // high | medium | low
   action_url   String?
   is_read      Boolean   @default(false)
+  // Alert feedback (FM-14): dismissing hides the alert + records why, so we can
+  // learn which alerts are noise. dismiss_reason e.g. "already_handled" | "not_relevant".
+  dismissed_at  DateTime?
+  dismiss_reason String?
   created_at   DateTime  @default(now())
 
   account Account @relation(fields: [account_id], references: [id])

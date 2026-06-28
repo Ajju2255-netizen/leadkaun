@@ -17,7 +17,8 @@ export async function GET(_req: Request) {
           { user_id: null },
           { user_id: session.user.id },
         ],
-        is_read: false,
+        is_read:      false,
+        dismissed_at: null,
       },
     })
 
