@@ -31,6 +31,9 @@ export async function POST(req: Request) {
     const stageId       = body.stage_id as string | undefined
     const rows          = body.rows as Record<string, string>[] | undefined
     const startRowIndex = Number(body.startRowIndex) || 2
+    // Optional source-collection date for freshness (ISO string). Ignore if unparseable.
+    const scRaw         = typeof body.source_collected_at === "string" ? new Date(body.source_collected_at) : null
+    const sourceCollectedAt = scRaw && !isNaN(scRaw.getTime()) ? scRaw : null
 
     if (!jobId)               return apiError("jobId is required", "MISSING_JOB", 422)
     if (!sourceId)            return apiError("source_id is required", "MISSING_SOURCE", 422)
@@ -59,6 +62,7 @@ export async function POST(req: Request) {
       stageId,
       jobId,
       source: { key: source.key, intent_baseline: source.intent_baseline },
+      sourceCollectedAt,
     })
 
     // Accumulate counters on the job (history + any pollers stay accurate).
