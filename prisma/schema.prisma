@@ -50,6 +50,16 @@ enum LeadGrade {
   F
 }
 
+// Kind of a Score Evolution timeline entry (see LeadScoreEvent).
+enum ScoreEventKind {
+  CREATED       // lead first entered the system
+  ENRICHED      // data fields added/changed (may re-grade)
+  ACTIVITY      // a rep logged a call / WhatsApp / response
+  GRADE_CHANGE  // grade moved from re-scoring
+  WON
+  LOST
+}
+
 enum WaStage {
   INQUIRY
   DISCUSSION
@@ -404,6 +414,7 @@ model Lead {
   win_attributions  WinAttribution[]
   stage_history     StageHistory[]
   notifications     Notification[]
+  score_events      LeadScoreEvent[]
 
   @@unique([account_id, phone])
   @@index([account_id])
@@ -491,6 +502,34 @@ model StageHistory {
 
   @@index([lead_id])
   @@map("stage_history")
+}
+
+// Score Evolution timeline — one append-only entry per meaningful change to a
+// lead's grade/confidence (creation, enrichment, activity, re-grade, outcome).
+// Each row freezes a snapshot so the timeline is self-contained and confidence
+// history (which is otherwise computed on the fly) becomes durable.
+model LeadScoreEvent {
+  id           String         @id @default(cuid())
+  account_id   String
+  workspace_id String?
+  lead_id      String
+  kind         ScoreEventKind
+  occurred_at  DateTime       @default(now())
+
+  // Frozen snapshot at this point in time
+  grade         LeadGrade
+  confidence    Int            // 0–100 (computeConfidence at this moment)
+  fit_score     Int
+  intent_score  Int
+  quality_score Int
+
+  summary String  // human reason, e.g. "Company added" / "CEO responded" / "Grade C → B"
+  detail  Json?   // optional structured context (fields_added[], signal_type, …)
+
+  lead Lead @relation(fields: [lead_id], references: [id], onDelete: Cascade)
+
+  @@index([lead_id, occurred_at])
+  @@map("lead_score_events")
 }
 
 model FollowUpAction {

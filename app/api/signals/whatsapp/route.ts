@@ -5,6 +5,8 @@ import { apiSuccess, apiError, parseBody, NOT_FOUND } from "@/lib/api/response"
 import { rateLimited, LIMITS } from "@/lib/rate-limit"
 import { processSignalAndUpdateScores } from "@/lib/scoring/orchestrator"
 import { computeFirstActionRank } from "@/lib/analytics/recommendation-rank"
+import { recordScoreEvent } from "@/lib/scoring/score-events"
+import { signalLabel } from "@/lib/activity/signal-labels"
 import { SIGNAL_WEIGHTS } from "@/lib/scoring/signal-weights"
 import { applyAutoStage } from "@/lib/pipeline/auto-stage"
 import { scheduleFollowUp } from "@/lib/follow-ups/schedule"
@@ -169,7 +171,22 @@ export async function POST(req: Request) {
         await scheduleFollowUp(lead, lead.stage.key, tx)
       }
 
-      return processSignalAndUpdateScores(data.lead_id, session.account.id, tx)
+      const scoring = await processSignalAndUpdateScores(data.lead_id, session.account.id, tx)
+      await recordScoreEvent(tx, {
+        lead: {
+          id: lead.id, account_id: session.account.id, workspace_id: session.workspace.id,
+          grade: scoring.grade, fit_score: scoring.fit_score,
+          intent_score: scoring.intent_score, quality_score: scoring.quality_score,
+          first_name: lead.first_name, phone: lead.phone, email: lead.email,
+          company_name: lead.company_name, designation: lead.designation,
+          city: lead.city, state: lead.state, expected_value: lead.expected_value,
+          inquiry_text: lead.inquiry_text,
+        },
+        kind: "ACTIVITY",
+        summary: signalLabel(signalType).label,
+        detail: { signal_type: signalType },
+      })
+      return scoring
     })
 
     // After commit: realtime toast to the assigned rep on SQL crossing / grade

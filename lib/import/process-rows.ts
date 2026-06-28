@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma"
 import { validateRow } from "@/lib/import/validate-row"
 import { generateImportSignals } from "@/lib/import/generate-signals"
 import { processSignalAndUpdateScores } from "@/lib/scoring/orchestrator"
+import { recordScoreEvent } from "@/lib/scoring/score-events"
 
 /**
  * Shared per-row import processing — the single source of truth used by both
@@ -139,7 +140,22 @@ export async function processImportRows(opts: ProcessRowsOpts): Promise<ProcessR
           },
           select: { id: true },
         })
-        return processSignalAndUpdateScores(created.id, accountId, tx)
+        const scoring = await processSignalAndUpdateScores(created.id, accountId, tx)
+        await recordScoreEvent(tx, {
+          lead: {
+            id: created.id, account_id: accountId, workspace_id: workspaceId,
+            grade: scoring.grade, fit_score: scoring.fit_score,
+            intent_score: scoring.intent_score, quality_score: scoring.quality_score,
+            first_name: vr.first_name, phone: vr.phone, email: vr.email,
+            company_name: vr.company_name, designation: vr.designation,
+            city: vr.city, state: vr.state, expected_value: vr.expected_value,
+            inquiry_text: vr.inquiry_text,
+          },
+          kind: "CREATED",
+          summary: `Imported from ${source.key}`,
+          detail: { import_job_id: jobId },
+        })
+        return scoring
       })
       if (scoring.grade === "A" || scoring.grade === "B") highIntentCount++
       if (vr.expected_value) totalValue += vr.expected_value
