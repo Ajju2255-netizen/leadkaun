@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import type { EmailOtpType } from "@supabase/supabase-js"
+import { verifyImpersonation, IMPERSONATION_COOKIE } from "@/lib/auth/impersonation"
 
 /**
  * Supabase email-link confirmation handler (SSR / PKCE-safe).
@@ -58,7 +59,17 @@ export async function GET(req: NextRequest) {
       // link), so send them to set one before the dashboard. Other flows
       // (recovery, magic link) honour the requested `next`.
       const dest = type === "invite" ? "/set-password" : next
-      return NextResponse.redirect(new URL(dest, origin))
+      const out = NextResponse.redirect(new URL(dest, origin))
+      // Platform-admin impersonation hand-off: mark this customer session as
+      // impersonated so the app renders the audited banner. Cookie is scoped to
+      // this (app) host only; the admin's platform session is unaffected.
+      const imp = searchParams.get("imp")
+      if (imp && verifyImpersonation(imp)) {
+        out.cookies.set(IMPERSONATION_COOKIE, imp, {
+          httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 60 * 60,
+        })
+      }
+      return out
     }
 
     return NextResponse.redirect(

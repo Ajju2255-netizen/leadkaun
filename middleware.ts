@@ -26,13 +26,41 @@ function isAuthPath(pathname: string) {
   return AUTH_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))
 }
 
+const ADMIN_HOST_PREFIX = "admin."
+
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next()
+
+  // ── Platform admin (admin.leadkaun.com) — a fully separate surface ─────────
+  // The admin panel lives in the app/(admin) route group, reachable ONLY via the
+  // admin.* host. We keep the URL space distinct by mapping the admin host onto
+  // an internal /admin/* path the (admin) group owns, and we hard-block the
+  // /admin/* path on the customer (app.*) host so the two never overlap.
+  const host = req.headers.get("host") ?? ""
+  const isAdminHost = host.startsWith(ADMIN_HOST_PREFIX)
+  const { pathname } = req.nextUrl
+
+  if (isAdminHost) {
+    // Admin host: map clean URLs (admin.leadkaun.com/customers) onto the
+    // (admin) route group, which physically lives under /admin/*. API routes
+    // (/api/*) are excluded from the matcher and self-guard, so they pass through
+    // untouched. Auth is enforced per-page + per-API, never here.
+    if (!pathname.startsWith("/admin")) {
+      const url = req.nextUrl.clone()
+      url.pathname = pathname === "/" ? "/admin" : `/admin${pathname}`
+      return NextResponse.rewrite(url)
+    }
+    return res
+  }
+
+  // Customer host must never expose the admin surface.
+  if (pathname === "/admin" || pathname.startsWith("/admin/")) {
+    return new NextResponse("Not found", { status: 404 })
+  }
 
   // Dev bypass: let everything through; rewrite auth-page visits to /queue
   // so the local preview matches the post-login behaviour.
   if (DEV_BYPASS) {
-    const { pathname } = req.nextUrl
     if (isAuthPath(pathname)) {
       const url = req.nextUrl.clone()
       url.pathname = "/queue"
@@ -67,8 +95,6 @@ export async function middleware(req: NextRequest) {
   const {
     data: { session },
   } = await supabase.auth.getSession()
-
-  const { pathname } = req.nextUrl
 
   // Unauthenticated user hitting a protected route → redirect to login
   if (!session && isDashboardPath(pathname)) {

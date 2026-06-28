@@ -701,3 +701,44 @@ model Notification {
   @@index([user_id, is_read])
   @@map("notifications")
 }
+
+// ─────────────────────────────────────────────
+// PLATFORM ADMIN ("Mission Control") — separate from per-account UserRole.ADMIN.
+// A PlatformAdmin operates across ALL tenants from admin.leadkaun.com.
+// ─────────────────────────────────────────────
+
+enum PlatformRole {
+  SUPER_ADMIN // full access incl. impersonation + writes
+  SUPPORT     // read-only
+}
+
+model PlatformAdmin {
+  id              String       @id @default(cuid())
+  auth_id         String       @unique // Supabase auth.users.id
+  email           String       @unique
+  role            PlatformRole @default(SUPPORT)
+  is_active       Boolean      @default(true)
+  mfa_enrolled_at DateTime?
+  last_login_at   DateTime?
+  created_at      DateTime     @default(now())
+
+  @@map("platform_admins")
+}
+
+// Audit trail for "Login as Customer". Decoupled (string refs, no FKs) so it
+// never blocks account/user deletion and survives tenant changes.
+model ImpersonationLog {
+  id             String    @id @default(cuid())
+  admin_auth_id  String
+  admin_email    String
+  account_id     String
+  target_user_id String
+  reason         String?
+  ip             String?
+  started_at     DateTime  @default(now())
+  ended_at       DateTime?
+
+  @@index([account_id, started_at])
+  @@index([admin_auth_id, started_at])
+  @@map("impersonation_logs")
+}
