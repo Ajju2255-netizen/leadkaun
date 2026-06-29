@@ -14,6 +14,11 @@ import type { PlatformRole } from "@prisma/client"
 const DEV_BYPASS =
   process.env.NODE_ENV !== "production" && process.env.DEV_AUTH_BYPASS === "true"
 
+// MFA (Supabase TOTP / AAL2) enforcement. Disabled for now; re-enable by setting
+// PLATFORM_MFA_REQUIRED="true" in the env (then redeploy). Strongly recommended
+// to turn back on — a platform admin can impersonate any tenant.
+const MFA_REQUIRED = process.env.PLATFORM_MFA_REQUIRED === "true"
+
 export type PlatformSession = {
   authId: string
   email: string
@@ -50,6 +55,11 @@ export async function getPlatformSession(): Promise<PlatformSession | null> {
 
   const admin = await prisma.platformAdmin.findUnique({ where: { auth_id: user.id } })
   if (!admin || !admin.is_active) return null
+
+  // MFA disabled → treat as fully satisfied so the gate passes on email+password.
+  if (!MFA_REQUIRED) {
+    return { authId: user.id, email: admin.email, role: admin.role, mfaEnrolled: true, mfaElevated: true }
+  }
 
   const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
   return {
