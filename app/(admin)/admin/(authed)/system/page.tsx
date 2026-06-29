@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { getSystemHealth, getRecentErrors } from "@/lib/admin/system"
+import { getEmailStats } from "@/lib/admin/emails"
 
 export const dynamic = "force-dynamic"
 
@@ -13,7 +14,7 @@ function rel(d: Date | null): string {
 }
 
 export default async function SystemPage() {
-  const [h, errors] = await Promise.all([getSystemHealth(), getRecentErrors(25)])
+  const [h, errors, emails] = await Promise.all([getSystemHealth(), getRecentErrors(25), getEmailStats()])
 
   return (
     <div className="space-y-8">
@@ -57,6 +58,41 @@ export default async function SystemPage() {
           ))}
         </div>
         <p className="text-[11px] text-slate-600 mt-2">Heartbeat per run (recorded once via a memoized step). Stale = no run in 48h.</p>
+      </div>
+
+      {/* Email engagement */}
+      <div>
+        <p className="text-[12px] font-bold uppercase tracking-wider text-slate-400 mb-3">
+          Email Engagement {!emails.anyOpens && <span className="text-slate-500 normal-case font-normal">· opens need the Resend webhook</span>}
+        </p>
+        <div className="rounded-xl border border-white/10 overflow-hidden">
+          {emails.templates.length === 0 ? (
+            <p className="px-4 py-6 text-center text-[13px] text-slate-500">No emails sent yet.</p>
+          ) : (
+            <table className="w-full text-left">
+              <thead>
+                <tr className="text-[10px] font-bold uppercase tracking-wider text-slate-500 bg-white/[0.02]">
+                  <th className="px-4 py-2.5">Template</th>
+                  <th className="px-4 py-2.5">Sent</th>
+                  <th className="px-4 py-2.5">Opened</th>
+                  <th className="px-4 py-2.5">Open %</th>
+                  <th className="px-4 py-2.5">Failed</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {emails.templates.map((t) => (
+                  <tr key={t.template}>
+                    <td className="px-4 py-2.5 text-[13px] text-slate-200 font-mono">{t.template}</td>
+                    <td className="px-4 py-2.5 text-[13px] text-slate-300 tabular-nums">{t.sent}</td>
+                    <td className="px-4 py-2.5 text-[13px] text-slate-300 tabular-nums">{t.opened}</td>
+                    <td className="px-4 py-2.5 text-[13px] tabular-nums">{t.openPct == null ? <span className="text-slate-600">—</span> : <span className="text-emerald-400">{t.openPct}%</span>}</td>
+                    <td className="px-4 py-2.5 text-[13px] tabular-nums">{t.failed > 0 ? <span className="text-rose-400">{t.failed}</span> : <span className="text-slate-500">0</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
 
       {/* Errors */}

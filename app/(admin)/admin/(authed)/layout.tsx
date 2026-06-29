@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import Link from "next/link"
 import { LayoutDashboard, Building2, IndianRupee, LifeBuoy, BarChart3, ServerCog, ShieldCheck } from "lucide-react"
 import { getPlatformSession } from "@/lib/auth/platform"
+import { GlobalSearch } from "./_components/GlobalSearch"
 
 // Gate for the entire authed admin surface. Sibling routes /admin/login and
 // /admin/security/mfa are NOT under this group, so they aren't gated here.
@@ -50,6 +51,9 @@ export default async function AdminAuthedLayout({ children }: { children: React.
       </aside>
 
       <main className="flex-1 min-w-0 overflow-y-auto">
+        <div className="sticky top-0 z-10 border-b border-white/10 bg-slate-950/80 backdrop-blur px-8 py-3">
+          <GlobalSearch />
+        </div>
         <div className="max-w-6xl mx-auto px-8 py-8">{children}</div>
       </main>
     </div>
