@@ -45,12 +45,36 @@ export async function middleware(req: NextRequest) {
     // (admin) route group, which physically lives under /admin/*. API routes
     // (/api/*) are excluded from the matcher and self-guard, so they pass through
     // untouched. Auth is enforced per-page + per-API, never here.
+    let response = res
     if (!pathname.startsWith("/admin")) {
       const url = req.nextUrl.clone()
       url.pathname = pathname === "/" ? "/admin" : `/admin${pathname}`
-      return NextResponse.rewrite(url)
+      response = NextResponse.rewrite(url)
     }
-    return res
+    // Keep the Supabase session alive on the admin host too (must run on every
+    // request, exactly like the customer host below) so admin logins don't drop
+    // when the access token expires. No redirect logic here — pages self-gate.
+    if (!DEV_BYPASS) {
+      const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          cookies: {
+            get(name: string) { return req.cookies.get(name)?.value },
+            set(name: string, value: string, options: CookieOptions) {
+              req.cookies.set({ name, value, ...options })
+              response.cookies.set({ name, value, ...options })
+            },
+            remove(name: string, options: CookieOptions) {
+              req.cookies.set({ name, value: "", ...options })
+              response.cookies.set({ name, value: "", ...options })
+            },
+          },
+        }
+      )
+      await supabase.auth.getSession()
+    }
+    return response
   }
 
   // Customer host must never expose the admin surface.
