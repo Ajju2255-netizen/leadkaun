@@ -25,6 +25,13 @@ const envSchema = z.object({
   // Google Sheets (optional in dev)
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
+
+  // Razorpay (optional here so `next dev` works on machines with no billing
+  // credentials; lib/billing/razorpay.ts throws a clear error at call time).
+  // RAZORPAY_WEBHOOK_SECRET is the Dashboard webhook secret, NOT the key secret.
+  RAZORPAY_KEY_ID: z.string().startsWith("rzp_").optional(),
+  RAZORPAY_KEY_SECRET: z.string().min(1).optional(),
+  RAZORPAY_WEBHOOK_SECRET: z.string().min(1).optional(),
 })
 
 const parsed = envSchema.safeParse(process.env)

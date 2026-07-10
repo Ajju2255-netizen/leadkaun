@@ -225,6 +225,10 @@ model Account {
   signup_country      String?
   signup_ip           String?
 
+  // Razorpay Customer entity id (cust_xxx). Created lazily on first checkout so
+  // repeat upgrades reuse the same customer and saved payment methods.
+  razorpay_customer_id String?
+
   // Relations
   users             User[]
   leads             Lead[]
@@ -841,9 +845,9 @@ model FeatureFlag {
 }
 
 // ─────────────────────────────────────────────
-// BILLING — full model now, manual entry until a payment provider is wired.
-// MRR/trials/plan are set by the founder from Company 360; Payment/Invoice stay
-// empty until Razorpay/Stripe integration populates them (purely additive).
+// BILLING — Razorpay Subscriptions wired; the manual founder path (Company 360
+// PlanEditor) still writes the same rows. Provider webhooks are the source of
+// truth for status/Payment/Invoice; the manual path stays for edge cases.
 // ─────────────────────────────────────────────
 
 model Plan {
@@ -852,6 +856,10 @@ model Plan {
   name      String
   price_inr Int     @default(0) // monthly, in paise
   is_active Boolean @default(true)
+
+  // Razorpay Plan entity id (plan_xxx). Populated by scripts/razorpay-sync-plans.ts.
+  // Null for `trial` (no charge) and until the sync script has been run.
+  provider_plan_id String?
 
   subscriptions Subscription[]
 
@@ -867,12 +875,14 @@ model Subscription {
   trial_ends_at            DateTime?
   started_at               DateTime  @default(now())
   canceled_at              DateTime?
-  provider                 String? // razorpay | stripe (null until integrated)
+  provider                 String? // razorpay | stripe (null for manually-set plans)
   provider_subscription_id String?
 
   plan Plan @relation(fields: [plan_id], references: [id])
 
   @@index([status])
+  // Webhooks arrive keyed by the provider's subscription id, never by account.
+  @@index([provider_subscription_id])
   @@map("subscriptions")
 }
 
@@ -887,6 +897,11 @@ model Payment {
 
   @@index([account_id, created_at])
   @@index([status, created_at])
+  // Razorpay retries webhooks on non-2xx. Without this, a retried
+  // subscription.charged writes the payment twice and inflates revenue.
+  // Postgres treats NULLs as distinct, so manual rows (provider_ref = null)
+  // are unaffected.
+  @@unique([provider, provider_ref])
   @@map("payments")
 }
 
@@ -904,7 +919,23 @@ model Invoice {
   created_at   DateTime  @default(now())
 
   @@index([account_id, created_at])
+  @@unique([provider, provider_ref]) // same retry-idempotency reason as Payment
   @@map("invoices")
+}
+
+// Razorpay delivers at-least-once and retries for up to 24h. We record every
+// event id we have fully processed so a retry is a cheap no-op instead of a
+// duplicate write. Rows are safe to prune after ~30 days.
+model WebhookEvent {
+  id           String   @id @default(cuid())
+  provider     String // razorpay
+  event_id     String // x-razorpay-event-id header
+  event_type   String // subscription.charged, etc.
+  processed_at DateTime @default(now())
+
+  @@unique([provider, event_id])
+  @@index([processed_at])
+  @@map("webhook_events")
 }
 
 // Daily "what should I do today?" digest for Mission Control. Computed by an
