@@ -4,6 +4,7 @@ import { requireAuth, requireRole, handleAuthError } from "@/lib/auth/middleware
 import { apiSuccess, apiError, parseBody } from "@/lib/api/response"
 import { rateLimited, LIMITS } from "@/lib/rate-limit"
 import { recordAccountEvent } from "@/lib/events/account-events"
+import { getSeatUsage, seatsExceedPlan } from "@/lib/billing/seats"
 import * as rzp from "@/lib/billing/razorpay"
 
 // Checkout is an ADMIN-only action — a REP must not be able to put the account
@@ -20,7 +21,7 @@ export async function GET() {
   try {
     const session = await requireAuth()
 
-    const [sub, plans] = await Promise.all([
+    const [sub, plans, seats] = await Promise.all([
       prisma.subscription.findUnique({
         where: { account_id: session.account.id },
         include: { plan: { select: { key: true, name: true } } },
@@ -28,8 +29,9 @@ export async function GET() {
       prisma.plan.findMany({
         where: { is_active: true, key: { not: "trial" } },
         orderBy: { price_inr: "asc" },
-        select: { key: true, name: true, price_inr: true, provider_plan_id: true },
+        select: { key: true, name: true, price_inr: true, provider_plan_id: true, max_seats: true },
       }),
+      getSeatUsage(session.account.id),
     ])
 
     return apiSuccess({
@@ -42,13 +44,17 @@ export async function GET() {
         trialEndsAt: sub.trial_ends_at,
         provider: sub.provider,
       },
+      seats,
       // `sellable` is false until scripts/razorpay-sync-plans.ts has run — the
       // UI disables the button rather than failing at checkout.
+      // `tooSmall` marks a plan the current team would not fit on.
       plans: plans.map((p) => ({
         key: p.key,
         name: p.name,
         priceInr: p.price_inr,
+        maxSeats: p.max_seats,
         sellable: Boolean(p.provider_plan_id),
+        tooSmall: seats.used > p.max_seats,
       })),
     })
   } catch (err) {
@@ -93,6 +99,17 @@ export async function POST(req: Request) {
       return apiError(
         "This account already has an active subscription. Cancel it before switching plans.",
         "ALREADY_SUBSCRIBED",
+        409,
+      )
+    }
+
+    // Refuse to sell a plan the team does not fit on. Taking the money and then
+    // leaving them permanently over-limit is the worst of both outcomes.
+    const fit = await seatsExceedPlan(session.account.id, data.planKey)
+    if (fit.exceeds) {
+      return apiError(
+        `${plan.name} includes ${fit.limit} seats but this account has ${fit.used} members. Remove members or choose a larger plan.`,
+        "SEATS_EXCEED_PLAN",
         409,
       )
     }

@@ -857,6 +857,11 @@ model Plan {
   price_inr Int     @default(0) // monthly, in paise
   is_active Boolean @default(true)
 
+  // Seat limit for the account. A "seat" is any user row that is not
+  // deactivated — see lib/billing/seats.ts. Enforced on invite.
+  // trial 30 (matches Growth, per the pricing FAQ) | starter 10 | growth 30 | scale 50
+  max_seats Int @default(10)
+
   // Razorpay Plan entity id (plan_xxx). Populated by scripts/razorpay-sync-plans.ts.
   // Null for `trial` (no charge) and until the sync script has been run.
   provider_plan_id String?
