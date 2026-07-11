@@ -1,0 +1,88 @@
+"use client"
+
+import { useCallback } from "react"
+
+/**
+ * Loads Razorpay Checkout on demand and opens it for a subscription.
+ *
+ * The script is injected lazily rather than in the root layout — only the
+ * billing page ever needs it, and it's ~90KB of third-party JS we don't want on
+ * every dashboard route.
+ */
+
+export type CheckoutSuccess = {
+  razorpay_payment_id: string
+  razorpay_subscription_id: string
+  razorpay_signature: string
+}
+
+type OpenArgs = {
+  keyId: string
+  subscriptionId: string
+  planName: string
+  accountName: string
+  email: string
+  onSuccess: (payload: CheckoutSuccess) => void | Promise<void>
+  onDismiss?: () => void
+}
+
+type RazorpayInstance = { open: () => void }
+type RazorpayCtor = new (options: Record<string, unknown>) => RazorpayInstance
+
+declare global {
+  interface Window {
+    Razorpay?: RazorpayCtor
+  }
+}
+
+const SRC = "https://checkout.razorpay.com/v1/checkout.js"
+
+function loadScript(): Promise<RazorpayCtor> {
+  if (typeof window === "undefined") return Promise.reject(new Error("not in a browser"))
+  if (window.Razorpay) return Promise.resolve(window.Razorpay)
+
+  return new Promise((resolve, reject) => {
+    // A previous call may already have the tag in flight.
+    const existing = document.querySelector<HTMLScriptElement>(`script[src="${SRC}"]`)
+    const script = existing ?? document.createElement("script")
+
+    const onLoad = () => {
+      if (window.Razorpay) resolve(window.Razorpay)
+      else reject(new Error("Razorpay Checkout loaded but exposed no global"))
+    }
+
+    script.addEventListener("load", onLoad, { once: true })
+    script.addEventListener("error", () => reject(new Error("Failed to load Razorpay Checkout")), { once: true })
+
+    if (!existing) {
+      script.src = SRC
+      script.async = true
+      document.body.appendChild(script)
+    }
+  })
+}
+
+export function useRazorpayCheckout() {
+  return useCallback(async (args: OpenArgs) => {
+    const Razorpay = await loadScript()
+
+    const rzp = new Razorpay({
+      key: args.keyId,
+      // `subscription_id` (not `order_id`) puts Checkout in mandate mode, so the
+      // customer authorises recurring charges rather than paying once.
+      subscription_id: args.subscriptionId,
+      name: "Leadkaun",
+      description: `${args.planName} — monthly`,
+      prefill: { email: args.email, name: args.accountName },
+      theme: { color: "#0ea5e9" },
+      handler: (response: CheckoutSuccess) => {
+        void args.onSuccess(response)
+      },
+      modal: {
+        ondismiss: () => args.onDismiss?.(),
+      },
+    })
+
+    rzp.open()
+  }, [])
+}

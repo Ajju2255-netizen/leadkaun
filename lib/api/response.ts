@@ -12,7 +12,9 @@ export function apiSuccess<T>(data: T, status = 200) {
 export function apiError(
   message: string,
   code: string,
-  status: 400 | 401 | 403 | 404 | 409 | 422 | 429 | 500 = 400,
+  // 502 = an upstream we depend on (e.g. the payment provider) failed, as
+  // distinct from 500, which means we did.
+  status: 400 | 401 | 403 | 404 | 409 | 422 | 429 | 500 | 502 = 400,
 ) {
   return NextResponse.json({ error: message, code }, { status })
 }
