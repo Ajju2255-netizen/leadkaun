@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { toast } from "sonner"
 import { Skeleton } from "@/components/ui/skeleton"
-import { CreditCard, Check, Users } from "lucide-react"
+import { CreditCard, Check, Users, TrendingUp } from "lucide-react"
 import { useRazorpayCheckout } from "@/hooks/useRazorpayCheckout"
 
 type PlanRow = {
@@ -11,6 +11,7 @@ type PlanRow = {
   name: string
   priceInr: number
   maxSeats: number
+  leadLimit: number | null
   sellable: boolean
   tooSmall: boolean
 }
@@ -30,8 +31,21 @@ type Seats = {
   planKey: string
   planName: string
 }
+type LeadUsage = {
+  used: number
+  limit: number | null
+  remaining: number | null
+  isOver: boolean
+  planName: string
+}
 
-type BillingState = { configured: boolean; subscription: Sub; seats: Seats; plans: PlanRow[] }
+type BillingState = {
+  configured: boolean
+  subscription: Sub
+  seats: Seats
+  leadUsage: LeadUsage
+  plans: PlanRow[]
+}
 
 const rupees = (paise: number) => `₹${(paise / 100).toLocaleString("en-IN")}`
 
@@ -126,9 +140,14 @@ export default function BillingPage() {
 
   const sub = state.subscription
   const seats = state.seats
+  const leads = state.leadUsage
   const status = sub ? STATUS_COPY[sub.status] ?? STATUS_COPY.trialing : null
   const isPaid = sub?.status === "active" || sub?.status === "past_due"
   const seatsPct = seats.limit > 0 ? Math.min(100, Math.round((seats.used / seats.limit) * 100)) : 0
+  const leadsUnlimited = leads.limit == null
+  const leadsPct = leadsUnlimited || leads.limit === 0
+    ? 0
+    : Math.min(100, Math.round((leads.used / leads.limit!) * 100))
 
   return (
     <div className="space-y-5 max-w-xl">
@@ -227,6 +246,48 @@ export default function BillingPage() {
         </p>
       </div>
 
+      {/* ── Lead usage (this month) ──────────────────────────────────────── */}
+      <div className="glass-card px-5 py-5 space-y-3">
+        <div className="flex items-baseline justify-between">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="w-3.5 h-3.5 text-slate-400" strokeWidth={2.2} />
+            <p className="text-[12px] font-semibold text-slate-500">Leads this month</p>
+          </div>
+          <p className="text-[13px] font-semibold text-ink tabular-nums">
+            {leads.used.toLocaleString("en-IN")}{" "}
+            <span className="font-medium text-slate-400">
+              {leadsUnlimited ? "· unlimited" : `of ${leads.limit!.toLocaleString("en-IN")}`}
+            </span>
+          </p>
+        </div>
+
+        {!leadsUnlimited && (
+          <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-[width] duration-500 ${
+                leads.isOver ? "bg-red-500" : leadsPct >= 80 ? "bg-amber-500" : "bg-sky-500"
+              }`}
+              style={{ width: `${leadsPct}%` }}
+            />
+          </div>
+        )}
+
+        <p className="text-[12px] text-slate-500">
+          {leadsUnlimited ? (
+            <>Unlimited leads on {leads.planName}.</>
+          ) : leads.isOver ? (
+            <span className="text-red-600 font-medium">
+              You&apos;ve hit your {leads.planName} limit. Upgrade to add more leads this month.
+            </span>
+          ) : (
+            <>
+              {leads.remaining!.toLocaleString("en-IN")} more lead{leads.remaining === 1 ? "" : "s"} this
+              month on {leads.planName}. Resets on the 1st.
+            </>
+          )}
+        </p>
+      </div>
+
       {/* ── Plan picker ──────────────────────────────────────────────────── */}
       {!isPaid && (
         <div className="space-y-2.5">
@@ -238,7 +299,8 @@ export default function BillingPage() {
                 <div className="min-w-0">
                   <p className="text-[14px] font-bold text-ink">{plan.name}</p>
                   <p className="text-[13px] text-slate-500 mt-0.5">
-                    {rupees(plan.priceInr)} / month · up to {plan.maxSeats} reps
+                    {rupees(plan.priceInr)} / month · {plan.maxSeats} users ·{" "}
+                    {plan.leadLimit == null ? "unlimited leads" : `${plan.leadLimit.toLocaleString("en-IN")} leads/mo`}
                   </p>
                   {plan.tooSmall && (
                     <p className="text-[11px] text-red-600 mt-1">

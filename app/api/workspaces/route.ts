@@ -4,6 +4,7 @@ import { requireAuth, requireRole, handleAuthError } from "@/lib/auth/middleware
 import { apiSuccess, apiError, parseBody } from "@/lib/api/response"
 import { provisionWorkspaceDefaults, slugify } from "@/lib/workspace/provision"
 import { rateLimited, LIMITS } from "@/lib/rate-limit"
+import { requireEntitlement, handleFeatureLock } from "@/lib/billing/entitlements"
 
 /**
  * GET  /api/workspaces — workspaces the caller can access (ADMIN: all in the
@@ -64,6 +65,15 @@ export async function POST(req: Request) {
     const limited = await rateLimited(`workspace:create:${session.account.id}`, LIMITS.workspace)
     if (limited) return limited
 
+    // Multiple workspaces are a Scale feature. Every account gets one default
+    // workspace at signup, so a second one requires the entitlement.
+    const wsCount = await prisma.workspace.count({
+      where: { account_id: session.account.id, archived_at: null },
+    })
+    if (wsCount >= 1) {
+      await requireEntitlement(session.account.id, "multiple_workspaces")
+    }
+
     const { data, error } = await parseBody(req, CreateSchema)
     if (error) return error
 
@@ -97,6 +107,8 @@ export async function POST(req: Request) {
   } catch (err) {
     const authResponse = handleAuthError(err)
     if (authResponse) return authResponse
+    const locked = handleFeatureLock(err)
+    if (locked) return locked
     console.error("Workspace create error:", err)
     return apiError("Internal server error", "INTERNAL_ERROR", 500)
   }

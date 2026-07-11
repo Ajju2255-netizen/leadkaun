@@ -3,6 +3,7 @@ import { requireWorkspace, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
 import { rateLimited, LIMITS } from "@/lib/rate-limit"
 import { MAX_IMPORT_ROWS } from "@/lib/import/process-rows"
+import { getLeadUsage } from "@/lib/billing/lead-usage"
 
 /**
  * POST /api/import/csv/init
@@ -35,6 +36,17 @@ export async function POST(req: Request) {
     if (!totalRows || totalRows < 1) return apiError("CSV has no rows to import", "EMPTY_CSV", 422)
     if (totalRows > MAX_IMPORT_ROWS) {
       return apiError(`That file has ${totalRows.toLocaleString("en-IN")} rows — the limit is ${MAX_IMPORT_ROWS.toLocaleString("en-IN")} per import. Split it into smaller files.`, "IMPORT_TOO_LARGE", 422)
+    }
+
+    // Monthly lead cap. Reject up front if this account is already at its limit;
+    // the batch route enforces the exact ceiling as rows stream in.
+    const usage = await getLeadUsage(session.account.id)
+    if (usage.isOver) {
+      return apiError(
+        `You've reached your ${usage.planName} plan's limit of ${usage.limit?.toLocaleString("en-IN")} leads this month. Upgrade to import more.`,
+        "LEAD_LIMIT_REACHED",
+        403,
+      )
     }
 
     const [source, stage] = await Promise.all([

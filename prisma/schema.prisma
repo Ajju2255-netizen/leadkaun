@@ -859,11 +859,16 @@ model Plan {
 
   // Seat limit for the account. A "seat" is any user row that is not
   // deactivated — see lib/billing/seats.ts. Enforced on invite.
-  // trial 30 (matches Growth, per the pricing FAQ) | starter 10 | growth 30 | scale 50
-  max_seats Int @default(10)
+  // free 1 | starter 10 | growth 30 | scale 75 | enterprise effectively ∞
+  max_seats Int @default(1)
+
+  // Leads an account may add per calendar month (IST). Null = unlimited.
+  // Enforced on manual create + CSV import — see lib/billing/lead-usage.ts.
+  // free 100 | starter 5,000 | growth 25,000 | scale/enterprise null (unlimited)
+  monthly_lead_limit Int?
 
   // Razorpay Plan entity id (plan_xxx). Populated by scripts/razorpay-sync-plans.ts.
-  // Null for `trial` (no charge) and until the sync script has been run.
+  // Null for `trial`/`enterprise` (not sold online) and until the sync has run.
   provider_plan_id String?
 
   subscriptions Subscription[]

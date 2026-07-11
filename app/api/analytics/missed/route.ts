@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { requireWorkspace } from "@/lib/auth/middleware"
 import { handleAuthError } from "@/lib/auth/middleware"
+import { requireEntitlement, handleFeatureLock } from "@/lib/billing/entitlements"
 import { apiSuccess, apiError } from "@/lib/api/response"
 import { startOfIstDay } from "@/lib/time/ist"
 
@@ -15,6 +16,7 @@ import { startOfIstDay } from "@/lib/time/ist"
 export async function GET(_req: Request) {
   try {
     const session = await requireWorkspace("ADMIN", "MANAGER")
+    await requireEntitlement(session.account.id, "missed_opportunity")
     const accountId = session.account.id
     const workspaceId = session.workspace.id
 
@@ -143,6 +145,8 @@ export async function GET(_req: Request) {
   } catch (err) {
     const authResponse = handleAuthError(err)
     if (authResponse) return authResponse
+    const locked = handleFeatureLock(err)
+    if (locked) return locked
     console.error("Missed analytics error:", err)
     return apiError("Internal server error", "INTERNAL_ERROR", 500)
   }

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { requireWorkspace, handleAuthError } from "@/lib/auth/middleware"
+import { requireEntitlement, handleFeatureLock } from "@/lib/billing/entitlements"
 import { apiSuccess, apiError } from "@/lib/api/response"
 import { computeExecutionScore } from "@/lib/scoring/execution-score"
 import { computeRepScore, type RepScoreComponents } from "@/lib/scoring/rep-score"
@@ -27,6 +28,7 @@ import { RECOMMENDATION_TOP_N } from "@/lib/analytics/recommendation-rank"
 export async function GET() {
   try {
     const session   = await requireWorkspace("ADMIN", "MANAGER")
+    await requireEntitlement(session.account.id, "rep_tracking")
     const accountId = session.account.id
     const workspaceId = session.workspace.id
 
@@ -305,7 +307,7 @@ export async function GET() {
       } : null,
     })
   } catch (e) {
-    return handleAuthError(e) ?? apiError("Internal server error", "SERVER_ERROR", 500)
+    return handleAuthError(e) ?? handleFeatureLock(e) ?? apiError("Internal server error", "SERVER_ERROR", 500)
   }
 }
 
