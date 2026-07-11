@@ -35,7 +35,9 @@ type LeadUsage = {
   used: number
   limit: number | null
   remaining: number | null
+  pct: number
   isOver: boolean
+  nearLimit: boolean
   planName: string
 }
 
@@ -145,9 +147,7 @@ export default function BillingPage() {
   const isPaid = sub?.status === "active" || sub?.status === "past_due"
   const seatsPct = seats.limit > 0 ? Math.min(100, Math.round((seats.used / seats.limit) * 100)) : 0
   const leadsUnlimited = leads.limit == null
-  const leadsPct = leadsUnlimited || leads.limit === 0
-    ? 0
-    : Math.min(100, Math.round((leads.used / leads.limit!) * 100))
+  const leadsPct = leads.pct
 
   return (
     <div className="space-y-5 max-w-xl">
@@ -251,7 +251,7 @@ export default function BillingPage() {
         <div className="flex items-baseline justify-between">
           <div className="flex items-center gap-2">
             <TrendingUp className="w-3.5 h-3.5 text-slate-400" strokeWidth={2.2} />
-            <p className="text-[12px] font-semibold text-slate-500">Leads this month</p>
+            <p className="text-[12px] font-semibold text-slate-500">Active leads</p>
           </div>
           <p className="text-[13px] font-semibold text-ink tabular-nums">
             {leads.used.toLocaleString("en-IN")}{" "}
@@ -274,15 +274,16 @@ export default function BillingPage() {
 
         <p className="text-[12px] text-slate-500">
           {leadsUnlimited ? (
-            <>Unlimited leads on {leads.planName}.</>
+            <>Unlimited active leads on {leads.planName}.</>
           ) : leads.isOver ? (
             <span className="text-red-600 font-medium">
-              You&apos;ve hit your {leads.planName} limit. Upgrade to add more leads this month.
+              You&apos;ve hit your {leads.planName} limit. Close or remove some leads, or upgrade, to add
+              new ones. Existing leads stay fully usable.
             </span>
           ) : (
             <>
-              {leads.remaining!.toLocaleString("en-IN")} more lead{leads.remaining === 1 ? "" : "s"} this
-              month on {leads.planName}. Resets on the 1st.
+              {leads.remaining!.toLocaleString("en-IN")} more active lead{leads.remaining === 1 ? "" : "s"} on{" "}
+              {leads.planName}. Won, lost or removed leads free up space.
             </>
           )}
         </p>

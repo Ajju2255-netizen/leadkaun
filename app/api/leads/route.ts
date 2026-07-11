@@ -130,11 +130,13 @@ export async function POST(req: Request) {
     const limited = await rateLimited(`leads:create:${session.user.id}`, LIMITS.heavyWrite)
     if (limited) return limited
 
-    // Monthly lead cap (Free 100 / Starter 5k / Growth 25k / Scale ∞).
+    // Active-lead cap (Free 100 / Starter 5k / Growth 25k / Scale ∞). Soft
+    // paywall: existing leads stay usable; only adding a new one is blocked.
+    // Closing or removing a lead frees a slot.
     const usage = await getLeadUsage(session.account.id)
     if (usage.isOver) {
       return apiError(
-        `You've reached your ${usage.planName} plan's limit of ${usage.limit?.toLocaleString("en-IN")} leads this month. Upgrade to add more.`,
+        `Your ${usage.planName} workspace has reached its limit of ${usage.limit?.toLocaleString("en-IN")} active leads. Close or remove some, or upgrade, to add new ones.`,
         "LEAD_LIMIT_REACHED",
         403,
       )

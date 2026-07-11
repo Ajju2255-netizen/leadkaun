@@ -862,10 +862,12 @@ model Plan {
   // free 1 | starter 10 | growth 30 | scale 75 | enterprise effectively ∞
   max_seats Int @default(1)
 
-  // Leads an account may add per calendar month (IST). Null = unlimited.
-  // Enforced on manual create + CSV import — see lib/billing/lead-usage.ts.
-  // free 100 | starter 5,000 | growth 25,000 | scale/enterprise null (unlimited)
-  monthly_lead_limit Int?
+  // Max ACTIVE leads an account may hold (open leads — not won/lost/junk).
+  // Null = unlimited. Soft paywall: at the cap, existing leads stay fully usable
+  // and only NEW leads are blocked. Closing/losing a deal frees a slot.
+  // See lib/billing/lead-usage.ts. free 100 | starter 5,000 | growth 25,000 |
+  // scale/enterprise null (unlimited)
+  active_lead_limit Int?
 
   // Razorpay Plan entity id (plan_xxx). Populated by scripts/razorpay-sync-plans.ts.
   // Null for `trial`/`enterprise` (not sold online) and until the sync has run.

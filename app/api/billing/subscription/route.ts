@@ -33,7 +33,7 @@ export async function GET() {
         // from the sellable plan picker.
         where: { is_active: true, key: { notIn: ["trial", "enterprise"] } },
         orderBy: { price_inr: "asc" },
-        select: { key: true, name: true, price_inr: true, provider_plan_id: true, max_seats: true, monthly_lead_limit: true },
+        select: { key: true, name: true, price_inr: true, provider_plan_id: true, max_seats: true, active_lead_limit: true },
       }),
       getSeatUsage(session.account.id),
       getLeadUsage(session.account.id),
@@ -61,7 +61,7 @@ export async function GET() {
         name: p.name,
         priceInr: p.price_inr,
         maxSeats: p.max_seats,
-        leadLimit: p.monthly_lead_limit,
+        leadLimit: p.active_lead_limit,
         sellable: Boolean(p.provider_plan_id),
         tooSmall: seats.used > p.max_seats,
       })),

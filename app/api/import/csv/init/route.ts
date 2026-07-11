@@ -38,12 +38,13 @@ export async function POST(req: Request) {
       return apiError(`That file has ${totalRows.toLocaleString("en-IN")} rows — the limit is ${MAX_IMPORT_ROWS.toLocaleString("en-IN")} per import. Split it into smaller files.`, "IMPORT_TOO_LARGE", 422)
     }
 
-    // Monthly lead cap. Reject up front if this account is already at its limit;
-    // the batch route enforces the exact ceiling as rows stream in.
+    // Active-lead cap. Reject up front if already at the limit; the batch route
+    // enforces the exact ceiling as rows stream in. Existing leads stay usable —
+    // only new imports are blocked until some leads are closed or the plan grows.
     const usage = await getLeadUsage(session.account.id)
     if (usage.isOver) {
       return apiError(
-        `You've reached your ${usage.planName} plan's limit of ${usage.limit?.toLocaleString("en-IN")} leads this month. Upgrade to import more.`,
+        `Your ${usage.planName} workspace has reached its limit of ${usage.limit?.toLocaleString("en-IN")} active leads. Close or remove some, or upgrade, to import more.`,
         "LEAD_LIMIT_REACHED",
         403,
       )
