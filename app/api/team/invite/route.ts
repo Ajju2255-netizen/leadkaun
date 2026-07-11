@@ -6,6 +6,7 @@ import { handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError, parseBody } from "@/lib/api/response"
 import { rateLimited, LIMITS } from "@/lib/rate-limit"
 import { createSupabaseAdminClient } from "@/lib/supabase/admin"
+import { getSeatUsage } from "@/lib/billing/seats"
 
 const InviteSchema = z.object({
   email: z.string().email(),
@@ -37,6 +38,17 @@ export async function POST(req: Request) {
     })
     if (existing) {
       return apiError(`${data.email} is already a member of this account`, "CONFLICT", 409)
+    }
+
+    // Seat limit. This must run BEFORE the Supabase invite is sent — otherwise
+    // the invitee gets an email for a seat we then refuse to give them.
+    const seats = await getSeatUsage(session.account.id)
+    if (seats.isFull) {
+      return apiError(
+        `Your ${seats.planName} plan includes ${seats.limit} seat${seats.limit === 1 ? "" : "s"} and all of them are in use. Upgrade your plan or remove a member to invite someone new.`,
+        "SEAT_LIMIT_REACHED",
+        409,
+      )
     }
 
     // Send Supabase invite

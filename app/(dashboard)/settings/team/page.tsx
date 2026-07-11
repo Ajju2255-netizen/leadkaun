@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { UserPlus, Users, X, ShieldCheck, UserCog, Layers, Trash2, Check, Lock } from "lucide-react"
@@ -21,10 +22,19 @@ interface Member {
 
 type Role = "ADMIN" | "MANAGER" | "REP"
 
-async function fetchMembers(): Promise<{ members: Member[] }> {
+interface Seats {
+  used: number
+  limit: number
+  remaining: number
+  isFull: boolean
+  planKey: string
+  planName: string
+}
+
+async function fetchMembers(): Promise<{ members: Member[]; seats?: Seats }> {
   const res = await fetch("/api/team/members")
   if (!res.ok) throw new Error("Failed")
-  // API returns { members } directly via apiSuccess({members}) — accept both shapes
+  // API returns { members, seats } directly via apiSuccess() — accept both shapes
   return res.json().then((r) => r?.members ? r : (r?.data ?? { members: [] }))
 }
 
@@ -60,7 +70,7 @@ export default function TeamPage() {
   const isAdmin = me?.user.role === "ADMIN"
   const myId = me?.user.id
 
-  const { data, isLoading } = useQuery<{ members: Member[] }>({
+  const { data, isLoading } = useQuery<{ members: Member[]; seats?: Seats }>({
     queryKey: ["team-members"],
     queryFn:  fetchMembers,
   })
@@ -84,6 +94,9 @@ export default function TeamPage() {
 
   const members    = data?.members ?? []
   const activeReps = members.filter((m) => m.is_active && m.role === "REP")
+  const seats      = data?.seats
+  // Invalidating `team-members` refreshes seats too, so this never goes stale.
+  const seatsFull  = seats?.isFull ?? false
 
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault()
@@ -191,12 +204,43 @@ export default function TeamPage() {
 
       {/* ── Invite card ──────────────────────────────────────────────────── */}
       <div className="glass-card px-5 py-5">
-        <div className="flex items-center gap-2.5 mb-4">
-          <div className="w-8 h-8 rounded-xl bg-sky-50 flex items-center justify-center">
-            <UserPlus className="w-4 h-4 text-sky-600" />
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-sky-50 flex items-center justify-center">
+              <UserPlus className="w-4 h-4 text-sky-600" />
+            </div>
+            <p className="text-[14px] font-bold text-slate-900">Invite a Team Member</p>
           </div>
-          <p className="text-[14px] font-bold text-slate-900">Invite a Team Member</p>
+          {seats && (
+            <span
+              className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border tabular-nums ${
+                seats.isFull
+                  ? "bg-red-50 text-red-700 border-red-200"
+                  : seats.remaining <= 2
+                    ? "bg-amber-50 text-amber-700 border-amber-200"
+                    : "bg-slate-50 text-slate-600 border-slate-200"
+              }`}
+              title={`${seats.planName} plan · pending invites hold a seat`}
+            >
+              {seats.used} / {seats.limit} seats
+            </span>
+          )}
         </div>
+
+        {seatsFull && (
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50/70 px-3.5 py-2.5">
+            <p className="text-[12.5px] font-medium text-red-800">
+              All {seats?.limit} seats on {seats?.planName} are in use.
+            </p>
+            <p className="text-[11.5px] text-red-700 mt-0.5">
+              <Link href="/settings/billing" className="underline underline-offset-2 font-medium">
+                Upgrade your plan
+              </Link>{" "}
+              or remove a member to invite someone new.
+            </p>
+          </div>
+        )}
+
         <form onSubmit={handleInvite} className="flex gap-2.5 items-end">
           <div className="flex-1">
             <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
@@ -226,13 +270,14 @@ export default function TeamPage() {
           </div>
           <button
             type="submit"
-            disabled={inviteLoading}
+            disabled={inviteLoading || seatsFull}
+            title={seatsFull ? "No seats remaining on your plan" : undefined}
             className="h-[42px] px-5 rounded-xl text-white text-[13px] font-semibold transition-all duration-150
                        bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600
                        shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)]
-                       disabled:opacity-50 active:scale-[0.98] shrink-0"
+                       disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] shrink-0"
           >
-            {inviteLoading ? "Sending…" : "Send Invite"}
+            {inviteLoading ? "Sending…" : seatsFull ? "No seats left" : "Send Invite"}
           </button>
         </form>
       </div>
