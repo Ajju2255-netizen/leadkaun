@@ -226,10 +226,13 @@ export default function BillingPage() {
 
       {!state.configured && (
         <div className="glass-card px-5 py-4 border-amber-200 bg-amber-50/60">
-          <p className="text-[13px] text-amber-900 font-medium">Payments are not configured.</p>
+          <p className="text-[13px] text-amber-900 font-medium">Online upgrades aren&apos;t available yet.</p>
           <p className="text-[12px] text-amber-800 mt-0.5">
-            Set <code className="font-mono">RAZORPAY_KEY_ID</code> and{" "}
-            <code className="font-mono">RAZORPAY_KEY_SECRET</code>, then run the plan sync script.
+            We&apos;re finishing our payment setup. To change your plan in the meantime, email{" "}
+            <a href="mailto:hello@leadkaun.com" className="font-medium underline underline-offset-2">
+              hello@leadkaun.com
+            </a>{" "}
+            and we&apos;ll sort it out for you.
           </p>
         </div>
       )}
@@ -408,9 +411,11 @@ export default function BillingPage() {
                 >
                   {busyPlan === plan.key
                     ? "Opening…"
-                    : sub?.planKey === plan.key
-                      ? <><Check className="w-3.5 h-3.5" /> Resubscribe</>
-                      : "Choose plan"}
+                    : !state.configured
+                      ? "Coming soon"
+                      : sub?.planKey === plan.key
+                        ? <><Check className="w-3.5 h-3.5" /> Resubscribe</>
+                        : "Choose plan"}
                 </button>
               </div>
             )
