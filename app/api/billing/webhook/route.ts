@@ -49,7 +49,7 @@ type RzpWebhook = {
   event: string
   payload: {
     subscription?: { entity: { id: string; status: string; notes?: Record<string, string>; current_start: number | null; current_end: number | null } }
-    payment?: { entity: { id: string; amount: number; status: string; invoice_id?: string | null; error_description?: string | null } }
+    payment?: { entity: { id: string; amount: number; status: string; invoice_id?: string | null; error_description?: string | null; card?: { last4?: string; network?: string } | null } }
     refund?: { entity: { id: string; payment_id: string; amount: number; status: string } }
   }
 }
@@ -240,6 +240,11 @@ export async function POST(req: Request) {
           // Razorpay sends it, so an event without bounds doesn't wipe them.
           ...(subEntity.current_start
             ? { current_period_start: unix(subEntity.current_start), current_period_end: unix(subEntity.current_end) }
+            : {}),
+          // Saved-card display (network + last4 only). Set when a card payment
+          // rides along; left alone otherwise.
+          ...(captured?.card?.last4
+            ? { card_last4: captured.card.last4, card_network: captured.card.network ?? null }
             : {}),
         },
       })

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { toast } from "sonner"
 import { Skeleton } from "@/components/ui/skeleton"
-import { CreditCard, Check, Users, TrendingUp } from "lucide-react"
+import { CreditCard, Check, Users, TrendingUp, Receipt, Download } from "lucide-react"
 import { useRazorpayCheckout } from "@/hooks/useRazorpayCheckout"
 
 type PlanRow = {
@@ -24,7 +24,19 @@ type Sub = {
   provider: string | null
   billingCycle: string | null
   renewsAt: string | null
+  cardLast4: string | null
+  cardNetwork: string | null
 } | null
+
+type HistoryRow = {
+  id: string
+  kind: "invoice" | "payment"
+  amountInr: number
+  status: string
+  number: string | null
+  downloadable: boolean
+  at: string
+}
 type Seats = {
   used: number
   limit: number
@@ -53,6 +65,14 @@ type BillingState = {
 
 const rupees = (paise: number) => `₹${(paise / 100).toLocaleString("en-IN")}`
 
+const HISTORY_STATUS: Record<string, string> = {
+  succeeded: "text-emerald-600",
+  paid: "text-emerald-600",
+  failed: "text-red-600",
+  refunded: "text-amber-600",
+  void: "text-slate-400",
+}
+
 const STATUS_COPY: Record<string, { label: string; cls: string }> = {
   trialing: { label: "Trial",     cls: "bg-sky-50 text-sky-700 border-sky-200" },
   active:   { label: "Active",    cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
@@ -62,16 +82,21 @@ const STATUS_COPY: Record<string, { label: string; cls: string }> = {
 
 export default function BillingPage() {
   const [state, setState] = useState<BillingState | null>(null)
+  const [history, setHistory] = useState<HistoryRow[]>([])
   const [busyPlan, setBusyPlan] = useState<string | null>(null)
   const openCheckout = useRazorpayCheckout()
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/billing/subscription", { credentials: "include" })
-    if (!res.ok) {
+    const [subRes, histRes] = await Promise.all([
+      fetch("/api/billing/subscription", { credentials: "include" }),
+      fetch("/api/billing/history", { credentials: "include" }),
+    ])
+    if (!subRes.ok) {
       toast.error("Could not load billing details")
       return
     }
-    setState(await res.json())
+    setState(await subRes.json())
+    if (histRes.ok) setHistory((await histRes.json()).history ?? [])
   }, [])
 
   useEffect(() => { void load() }, [load])
@@ -241,7 +266,14 @@ export default function BillingPage() {
         )}
         {sub?.status === "past_due" && (
           <p className="text-[13px] text-amber-700">
-            The last renewal did not go through. Update your payment method with your bank, or resubscribe below.
+            The last renewal did not go through. Update your payment method below, or resubscribe.
+          </p>
+        )}
+
+        {isPaid && sub?.cardLast4 && (
+          <p className="text-[13px] text-slate-600 flex items-center gap-1.5">
+            <CreditCard className="w-3.5 h-3.5 text-slate-400" strokeWidth={2} />
+            {sub.cardNetwork ? `${sub.cardNetwork} ` : ""}•••• {sub.cardLast4}
           </p>
         )}
 
@@ -383,6 +415,43 @@ export default function BillingPage() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* ── Billing history ──────────────────────────────────────────────── */}
+      {history.length > 0 && (
+        <div className="glass-card px-5 py-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <Receipt className="w-3.5 h-3.5 text-slate-400" strokeWidth={2.2} />
+            <p className="text-[12px] font-semibold text-slate-500">Billing history</p>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {history.map((h) => (
+              <div key={h.id} className="flex items-center justify-between gap-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="text-[13px] font-medium text-ink">
+                    {rupees(h.amountInr)}
+                    {h.number && <span className="text-slate-400 font-normal"> · {h.number}</span>}
+                  </p>
+                  <p className="text-[11.5px] text-slate-500">
+                    {new Date(h.at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                    {" · "}
+                    <span className={HISTORY_STATUS[h.status] ?? "text-slate-500"}>{h.status}</span>
+                  </p>
+                </div>
+                {h.kind === "invoice" && h.downloadable && (
+                  <a
+                    href={`/api/billing/invoice/${h.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0 inline-flex items-center gap-1 text-[12px] font-medium text-sky-600 hover:text-sky-700"
+                  >
+                    <Download className="w-3.5 h-3.5" strokeWidth={2.2} /> Invoice
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

@@ -896,6 +896,12 @@ model Subscription {
   // into provider_subscription_id.
   pending_provider_subscription_id String?
 
+  // Saved-card display for the billing portal. Captured from the charged
+  // webhook's card payment. No PAN/CVV — only the network + last4 Razorpay
+  // returns, which are safe to store and show ("Visa •••• 4242").
+  card_last4   String?
+  card_network String?
+
   // Billing cycle + the current paid period, so the app can show a renewal date.
   // Period bounds are set from the provider webhook (subscription.charged).
   // Seat/lead LIMITS are NOT stored here — they live on Plan (active_lead_limit,

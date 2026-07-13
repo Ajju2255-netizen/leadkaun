@@ -51,6 +51,8 @@ export async function GET() {
         provider: sub.provider,
         billingCycle: sub.billing_cycle,
         renewsAt: sub.current_period_end,
+        cardLast4: sub.card_last4,
+        cardNetwork: sub.card_network,
       },
       seats,
       leadUsage,
