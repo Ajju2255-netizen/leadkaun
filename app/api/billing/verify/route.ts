@@ -55,7 +55,11 @@ export async function POST(req: Request) {
       where: { account_id: session.account.id },
       include: { plan: true },
     })
-    if (!sub || sub.provider_subscription_id !== data.razorpay_subscription_id) {
+    // The id may be the account's active subscription OR a pending replacement
+    // from an "update payment method" re-authorisation.
+    const isPending = sub?.pending_provider_subscription_id === data.razorpay_subscription_id
+    const owns = sub && (sub.provider_subscription_id === data.razorpay_subscription_id || isPending)
+    if (!sub || !owns) {
       console.warn(
         "[billing] verify for a subscription this account does not own:",
         session.account.id,
@@ -68,19 +72,23 @@ export async function POST(req: Request) {
     const remote = await rzp.fetchSubscription(data.razorpay_subscription_id)
     const status = rzp.mapStatus(remote.status)
 
-    await prisma.subscription.update({
-      where: { account_id: session.account.id },
-      data: {
-        status,
-        mrr_inr: status === "active" ? sub.plan.price_inr : sub.mrr_inr,
-        canceled_at: status === "canceled" ? new Date() : null,
-      },
-    })
+    // For a payment-method update, the swap (cancel old + adopt new id) is done
+    // by the webhook only — the source of truth. Here we just confirm to the UI.
+    if (!isPending) {
+      await prisma.subscription.update({
+        where: { account_id: session.account.id },
+        data: {
+          status,
+          mrr_inr: status === "active" ? sub.plan.price_inr : sub.mrr_inr,
+          canceled_at: status === "canceled" ? new Date() : null,
+        },
+      })
+    }
 
     // Payment/Invoice rows are written by the webhook only — it carries the
     // authoritative amount and invoice id. Writing them here too would risk a
     // duplicate that the unique index would then reject on the webhook side.
-    return apiSuccess({ status })
+    return apiSuccess({ status, paymentMethodUpdate: isPending })
   } catch (err) {
     const authResponse = handleAuthError(err)
     if (authResponse) return authResponse

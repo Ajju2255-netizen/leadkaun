@@ -859,11 +859,18 @@ model Plan {
 
   // Seat limit for the account. A "seat" is any user row that is not
   // deactivated — see lib/billing/seats.ts. Enforced on invite.
-  // trial 30 (matches Growth, per the pricing FAQ) | starter 10 | growth 30 | scale 50
-  max_seats Int @default(10)
+  // free 1 | starter 10 | growth 30 | scale 75 | enterprise effectively ∞
+  max_seats Int @default(1)
+
+  // Max ACTIVE leads an account may hold (open leads — not won/lost/junk).
+  // Null = unlimited. Soft paywall: at the cap, existing leads stay fully usable
+  // and only NEW leads are blocked. Closing/losing a deal frees a slot.
+  // See lib/billing/lead-usage.ts. free 100 | starter 5,000 | growth 25,000 |
+  // scale/enterprise null (unlimited)
+  active_lead_limit Int?
 
   // Razorpay Plan entity id (plan_xxx). Populated by scripts/razorpay-sync-plans.ts.
-  // Null for `trial` (no charge) and until the sync script has been run.
+  // Null for `trial`/`enterprise` (not sold online) and until the sync has run.
   provider_plan_id String?
 
   subscriptions Subscription[]
@@ -881,7 +888,27 @@ model Subscription {
   started_at               DateTime  @default(now())
   canceled_at              DateTime?
   provider                 String? // razorpay | stripe (null for manually-set plans)
-  provider_subscription_id String?
+  provider_subscription_id String? // the provider's subscription id (sub_xxx)
+
+  // "Update payment method" re-authorises on a NEW Razorpay subscription (no
+  // card-swap API exists). This holds that pending replacement's id until it
+  // activates; the webhook then cancels the old sub at cycle end and swaps this
+  // into provider_subscription_id.
+  pending_provider_subscription_id String?
+
+  // Saved-card display for the billing portal. Captured from the charged
+  // webhook's card payment. No PAN/CVV — only the network + last4 Razorpay
+  // returns, which are safe to store and show ("Visa •••• 4242").
+  card_last4   String?
+  card_network String?
+
+  // Billing cycle + the current paid period, so the app can show a renewal date.
+  // Period bounds are set from the provider webhook (subscription.charged).
+  // Seat/lead LIMITS are NOT stored here — they live on Plan (active_lead_limit,
+  // max_seats) so a plan change updates every subscriber at once, no backfill.
+  billing_cycle        String? // monthly | annual
+  current_period_start DateTime?
+  current_period_end   DateTime?
 
   plan Plan @relation(fields: [plan_id], references: [id])
 

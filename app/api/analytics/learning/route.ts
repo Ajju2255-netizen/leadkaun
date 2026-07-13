@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { requireWorkspace, handleAuthError } from "@/lib/auth/middleware"
+import { requireEntitlement, handleFeatureLock } from "@/lib/billing/entitlements"
 import { apiSuccess, apiError } from "@/lib/api/response"
 import { inferIndustry } from "@/lib/import/enrich-lead"
 import { hourIST } from "@/lib/time/ist"
@@ -35,6 +36,7 @@ const POSITIVE_SIGNALS: SignalType[] = [
 export async function GET() {
   try {
     const session = await requireWorkspace("ADMIN", "MANAGER")
+    await requireEntitlement(session.account.id, "ai_learning")
     const accountId = session.account.id
     const workspaceId = session.workspace.id
 
@@ -110,7 +112,7 @@ export async function GET() {
       insights,
     })
   } catch (e) {
-    return handleAuthError(e) ?? apiError("Internal server error", "SERVER_ERROR", 500)
+    return handleAuthError(e) ?? handleFeatureLock(e) ?? apiError("Internal server error", "SERVER_ERROR", 500)
   }
 }
 

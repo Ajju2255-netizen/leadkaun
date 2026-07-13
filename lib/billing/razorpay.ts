@@ -158,6 +158,13 @@ export function fetchSubscription(subscriptionId: string) {
   return call<RzpSubscription>(`/subscriptions/${subscriptionId}`)
 }
 
+export type RzpInvoice = { id: string; short_url: string | null; invoice_number: string | null; status: string }
+
+/** Fetch an invoice — `short_url` is Razorpay's hosted/downloadable invoice. */
+export function fetchInvoice(invoiceId: string) {
+  return call<RzpInvoice>(`/invoices/${invoiceId}`)
+}
+
 /** Cancel at the end of the paid period so the customer keeps what they bought. */
 export function cancelSubscription(subscriptionId: string, atCycleEnd = true) {
   return call<RzpSubscription>(`/subscriptions/${subscriptionId}/cancel`, {

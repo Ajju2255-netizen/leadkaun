@@ -75,6 +75,20 @@ export function useRazorpayCheckout() {
       description: `${args.planName} — monthly`,
       prefill: { email: args.email, name: args.accountName },
       theme: { color: "#0ea5e9" },
+      // Card-only for launch. Hiding UPI keeps our own UPI handle off the
+      // checkout screen (a founder-branding concern) and matches how Anthropic /
+      // OpenAI collect payment. UPI Autopay / net-banking e-mandate can be
+      // re-enabled here once business registration + branding are ready.
+      // (International cards also require enabling International on the Razorpay
+      // account; this only controls which method blocks Checkout offers.)
+      method: {
+        card: true,
+        upi: false,
+        netbanking: false,
+        wallet: false,
+        emi: false,
+        paylater: false,
+      },
       handler: (response: CheckoutSuccess) => {
         void args.onSuccess(response)
       },

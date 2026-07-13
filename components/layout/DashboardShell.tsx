@@ -27,6 +27,7 @@ import { useQuery } from "@tanstack/react-query"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { LeadkaunMark } from "@/components/shared/LeadkaunMark"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { LeadLimitBanner } from "@/components/billing/LeadLimitBanner"
 import type { AuthSession } from "@/lib/auth/session"
 import type { UserRole } from "@prisma/client"
 
@@ -420,7 +421,10 @@ export function DashboardShell({
 
         {/* ── Main content ─────────────────────────────────────────────────── */}
         <main className="flex-1 flex flex-col min-w-0 md:glass-1 md:gloss-edge md:rounded-2xl overflow-hidden pt-14 md:pt-0">
-          <div className="flex-1 p-4 sm:p-6 md:p-8 overflow-auto">{children}</div>
+          <div className="flex-1 p-4 sm:p-6 md:p-8 overflow-auto">
+            <LeadLimitBanner />
+            {children}
+          </div>
         </main>
 
       </div>

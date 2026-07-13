@@ -3,6 +3,7 @@ import { requireWorkspace, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
 import { processImportRows, MAX_BATCH_ROWS } from "@/lib/import/process-rows"
 import { rateLimited, LIMITS } from "@/lib/rate-limit"
+import { leadsRemaining } from "@/lib/billing/lead-usage"
 
 // One batch is small (the client sends ~10 rows), so this stays well under the
 // function ceiling even on a slow DB.
@@ -53,8 +54,16 @@ export async function POST(req: Request) {
     if (!source) return apiError("Lead source not found", "NOT_FOUND", 404)
     if (!stage)  return apiError("Pipeline stage not found", "NOT_FOUND", 404)
 
+    // Enforce the monthly lead cap as rows stream in. Cap this batch to what's
+    // left so inserts never exceed the plan limit; tell the client to stop when
+    // the ceiling is hit. (Recomputed per batch — a count query on an indexed
+    // column — so it stays a hard cap without cross-request locking.)
+    const remaining = await leadsRemaining(session.account.id)
+    const capped = remaining < rows.length ? rows.slice(0, Math.max(0, remaining)) : rows
+    const limitReached = capped.length < rows.length
+
     const result = await processImportRows({
-      rows,
+      rows: capped,
       startRowIndex,
       accountId: session.account.id,
       workspaceId: session.workspace.id,
@@ -77,7 +86,9 @@ export async function POST(req: Request) {
       },
     })
 
-    return apiSuccess(result)
+    // `limitReached` signals the client to stop sending batches and prompt an
+    // upgrade; leads beyond the cap in this batch (and later ones) are skipped.
+    return apiSuccess({ ...result, limitReached })
   } catch (err) {
     const authResponse = handleAuthError(err)
     if (authResponse) return authResponse

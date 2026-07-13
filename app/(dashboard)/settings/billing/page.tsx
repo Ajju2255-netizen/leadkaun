@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { toast } from "sonner"
 import { Skeleton } from "@/components/ui/skeleton"
-import { CreditCard, Check, Users } from "lucide-react"
+import { CreditCard, Check, Users, TrendingUp, Receipt, Download } from "lucide-react"
 import { useRazorpayCheckout } from "@/hooks/useRazorpayCheckout"
 
 type PlanRow = {
@@ -11,6 +11,7 @@ type PlanRow = {
   name: string
   priceInr: number
   maxSeats: number
+  leadLimit: number | null
   sellable: boolean
   tooSmall: boolean
 }
@@ -21,7 +22,21 @@ type Sub = {
   mrrInr: number
   trialEndsAt: string | null
   provider: string | null
+  billingCycle: string | null
+  renewsAt: string | null
+  cardLast4: string | null
+  cardNetwork: string | null
 } | null
+
+type HistoryRow = {
+  id: string
+  kind: "invoice" | "payment"
+  amountInr: number
+  status: string
+  number: string | null
+  downloadable: boolean
+  at: string
+}
 type Seats = {
   used: number
   limit: number
@@ -30,10 +45,33 @@ type Seats = {
   planKey: string
   planName: string
 }
+type LeadUsage = {
+  used: number
+  limit: number | null
+  remaining: number | null
+  pct: number
+  isOver: boolean
+  nearLimit: boolean
+  planName: string
+}
 
-type BillingState = { configured: boolean; subscription: Sub; seats: Seats; plans: PlanRow[] }
+type BillingState = {
+  configured: boolean
+  subscription: Sub
+  seats: Seats
+  leadUsage: LeadUsage
+  plans: PlanRow[]
+}
 
 const rupees = (paise: number) => `₹${(paise / 100).toLocaleString("en-IN")}`
+
+const HISTORY_STATUS: Record<string, string> = {
+  succeeded: "text-emerald-600",
+  paid: "text-emerald-600",
+  failed: "text-red-600",
+  refunded: "text-amber-600",
+  void: "text-slate-400",
+}
 
 const STATUS_COPY: Record<string, { label: string; cls: string }> = {
   trialing: { label: "Trial",     cls: "bg-sky-50 text-sky-700 border-sky-200" },
@@ -44,16 +82,21 @@ const STATUS_COPY: Record<string, { label: string; cls: string }> = {
 
 export default function BillingPage() {
   const [state, setState] = useState<BillingState | null>(null)
+  const [history, setHistory] = useState<HistoryRow[]>([])
   const [busyPlan, setBusyPlan] = useState<string | null>(null)
   const openCheckout = useRazorpayCheckout()
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/billing/subscription", { credentials: "include" })
-    if (!res.ok) {
+    const [subRes, histRes] = await Promise.all([
+      fetch("/api/billing/subscription", { credentials: "include" }),
+      fetch("/api/billing/history", { credentials: "include" }),
+    ])
+    if (!subRes.ok) {
       toast.error("Could not load billing details")
       return
     }
-    setState(await res.json())
+    setState(await subRes.json())
+    if (histRes.ok) setHistory((await histRes.json()).history ?? [])
   }, [])
 
   useEffect(() => { void load() }, [load])
@@ -105,6 +148,42 @@ export default function BillingPage() {
     }
   }
 
+  async function handleUpdatePaymentMethod() {
+    if (busyPlan) return
+    setBusyPlan("__paymethod__")
+    try {
+      const res = await fetch("/api/billing/payment-method", { method: "POST", credentials: "include" })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data?.error ?? "Could not start the update")
+        return
+      }
+      await openCheckout({
+        keyId: data.keyId,
+        subscriptionId: data.subscriptionId,
+        planName: data.planName,
+        accountName: data.accountName,
+        email: data.email,
+        onSuccess: async (payload) => {
+          await fetch("/api/billing/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify(payload),
+          })
+          // The webhook does the swap (cancel old at cycle end, adopt new card).
+          toast.success("New card saved. Finalising the change — this can take a moment.")
+          await load()
+        },
+        onDismiss: () => toast.info("Update cancelled. Your current card is unchanged."),
+      })
+    } catch {
+      toast.error("Could not start the update")
+    } finally {
+      setBusyPlan(null)
+    }
+  }
+
   async function handleCancel() {
     if (!confirm("Cancel your subscription at the end of the current billing period?")) return
     const res = await fetch("/api/billing/subscription", { method: "DELETE", credentials: "include" })
@@ -126,9 +205,12 @@ export default function BillingPage() {
 
   const sub = state.subscription
   const seats = state.seats
+  const leads = state.leadUsage
   const status = sub ? STATUS_COPY[sub.status] ?? STATUS_COPY.trialing : null
   const isPaid = sub?.status === "active" || sub?.status === "past_due"
   const seatsPct = seats.limit > 0 ? Math.min(100, Math.round((seats.used / seats.limit) * 100)) : 0
+  const leadsUnlimited = leads.limit == null
+  const leadsPct = leads.pct
 
   return (
     <div className="space-y-5 max-w-xl">
@@ -169,6 +251,12 @@ export default function BillingPage() {
         {isPaid && sub && (
           <p className="text-[13px] text-slate-600">
             {rupees(sub.mrrInr)} per month.
+            {sub.renewsAt && (
+              <>
+                {" "}Renews{" "}
+                {new Date(sub.renewsAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}.
+              </>
+            )}
           </p>
         )}
         {sub?.status === "trialing" && sub.trialEndsAt && (
@@ -178,17 +266,35 @@ export default function BillingPage() {
         )}
         {sub?.status === "past_due" && (
           <p className="text-[13px] text-amber-700">
-            The last renewal did not go through. Update your payment method with your bank, or resubscribe below.
+            The last renewal did not go through. Update your payment method below, or resubscribe.
+          </p>
+        )}
+
+        {isPaid && sub?.cardLast4 && (
+          <p className="text-[13px] text-slate-600 flex items-center gap-1.5">
+            <CreditCard className="w-3.5 h-3.5 text-slate-400" strokeWidth={2} />
+            {sub.cardNetwork ? `${sub.cardNetwork} ` : ""}•••• {sub.cardLast4}
           </p>
         )}
 
         {isPaid && sub?.provider === "razorpay" && (
-          <button
-            onClick={handleCancel}
-            className="text-[12px] font-medium text-slate-500 hover:text-red-600 transition-colors"
-          >
-            Cancel subscription
-          </button>
+          <div className="flex items-center gap-4 pt-0.5">
+            <button
+              onClick={handleUpdatePaymentMethod}
+              disabled={busyPlan !== null}
+              className="text-[12px] font-medium text-sky-600 hover:text-sky-700 disabled:opacity-50 transition-colors"
+            >
+              {busyPlan === "__paymethod__" ? "Opening…" : "Update payment method"}
+            </button>
+            <span className="text-slate-300">·</span>
+            <button
+              onClick={handleCancel}
+              disabled={busyPlan !== null}
+              className="text-[12px] font-medium text-slate-500 hover:text-red-600 disabled:opacity-50 transition-colors"
+            >
+              Cancel subscription
+            </button>
+          </div>
         )}
       </div>
 
@@ -227,6 +333,49 @@ export default function BillingPage() {
         </p>
       </div>
 
+      {/* ── Lead usage (this month) ──────────────────────────────────────── */}
+      <div className="glass-card px-5 py-5 space-y-3">
+        <div className="flex items-baseline justify-between">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="w-3.5 h-3.5 text-slate-400" strokeWidth={2.2} />
+            <p className="text-[12px] font-semibold text-slate-500">Active leads</p>
+          </div>
+          <p className="text-[13px] font-semibold text-ink tabular-nums">
+            {leads.used.toLocaleString("en-IN")}{" "}
+            <span className="font-medium text-slate-400">
+              {leadsUnlimited ? "· unlimited" : `of ${leads.limit!.toLocaleString("en-IN")}`}
+            </span>
+          </p>
+        </div>
+
+        {!leadsUnlimited && (
+          <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-[width] duration-500 ${
+                leads.isOver ? "bg-red-500" : leadsPct >= 80 ? "bg-amber-500" : "bg-sky-500"
+              }`}
+              style={{ width: `${leadsPct}%` }}
+            />
+          </div>
+        )}
+
+        <p className="text-[12px] text-slate-500">
+          {leadsUnlimited ? (
+            <>Unlimited active leads on {leads.planName}.</>
+          ) : leads.isOver ? (
+            <span className="text-red-600 font-medium">
+              You&apos;ve hit your {leads.planName} limit. Close or remove some leads, or upgrade, to add
+              new ones. Existing leads stay fully usable.
+            </span>
+          ) : (
+            <>
+              {leads.remaining!.toLocaleString("en-IN")} more active lead{leads.remaining === 1 ? "" : "s"} on{" "}
+              {leads.planName}. Won, lost or removed leads free up space.
+            </>
+          )}
+        </p>
+      </div>
+
       {/* ── Plan picker ──────────────────────────────────────────────────── */}
       {!isPaid && (
         <div className="space-y-2.5">
@@ -238,7 +387,8 @@ export default function BillingPage() {
                 <div className="min-w-0">
                   <p className="text-[14px] font-bold text-ink">{plan.name}</p>
                   <p className="text-[13px] text-slate-500 mt-0.5">
-                    {rupees(plan.priceInr)} / month · up to {plan.maxSeats} reps
+                    {rupees(plan.priceInr)} / month · {plan.maxSeats} users ·{" "}
+                    {plan.leadLimit == null ? "unlimited leads" : `${plan.leadLimit.toLocaleString("en-IN")} leads/mo`}
                   </p>
                   {plan.tooSmall && (
                     <p className="text-[11px] text-red-600 mt-1">
@@ -265,6 +415,43 @@ export default function BillingPage() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* ── Billing history ──────────────────────────────────────────────── */}
+      {history.length > 0 && (
+        <div className="glass-card px-5 py-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <Receipt className="w-3.5 h-3.5 text-slate-400" strokeWidth={2.2} />
+            <p className="text-[12px] font-semibold text-slate-500">Billing history</p>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {history.map((h) => (
+              <div key={h.id} className="flex items-center justify-between gap-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="text-[13px] font-medium text-ink">
+                    {rupees(h.amountInr)}
+                    {h.number && <span className="text-slate-400 font-normal"> · {h.number}</span>}
+                  </p>
+                  <p className="text-[11.5px] text-slate-500">
+                    {new Date(h.at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                    {" · "}
+                    <span className={HISTORY_STATUS[h.status] ?? "text-slate-500"}>{h.status}</span>
+                  </p>
+                </div>
+                {h.kind === "invoice" && h.downloadable && (
+                  <a
+                    href={`/api/billing/invoice/${h.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0 inline-flex items-center gap-1 text-[12px] font-medium text-sky-600 hover:text-sky-700"
+                  >
+                    <Download className="w-3.5 h-3.5" strokeWidth={2.2} /> Invoice
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

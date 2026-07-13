@@ -49,9 +49,13 @@ type RzpWebhook = {
   event: string
   payload: {
     subscription?: { entity: { id: string; status: string; notes?: Record<string, string>; current_start: number | null; current_end: number | null } }
-    payment?: { entity: { id: string; amount: number; status: string; invoice_id?: string | null; error_description?: string | null } }
+    payment?: { entity: { id: string; amount: number; status: string; invoice_id?: string | null; error_description?: string | null; card?: { last4?: string; network?: string } | null } }
+    refund?: { entity: { id: string; payment_id: string; amount: number; status: string } }
   }
 }
+
+/** Refund events are payments-domain (no subscription entity) — handled apart. */
+const REFUND_EVENTS = new Set(["refund.created", "refund.processed"])
 
 const unix = (s: number | null | undefined) => (s ? new Date(s * 1000) : null)
 
@@ -81,6 +85,34 @@ export async function POST(req: Request) {
     return new Response("ok", { status: 200 })
   }
 
+  // Refunds carry a refund entity (a payment_id), not a subscription — handle
+  // them before the subscription-entity requirement below. Idempotent via the
+  // same webhook_events claim; marks the matching payment refunded.
+  if (REFUND_EVENTS.has(body.event)) {
+    const refund = body.payload.refund?.entity
+    if (!refund?.payment_id) return Response.json({ ok: true, ignored: `${body.event} (no payment)` })
+    try {
+      await prisma.$transaction(async (tx) => {
+        await tx.webhookEvent.create({
+          data: { provider: "razorpay", event_id: eventId, event_type: body.event },
+        })
+        // (provider, provider_ref) is unique → at most one row; updateMany just
+        // avoids throwing when the payment isn't one we recorded.
+        await tx.payment.updateMany({
+          where: { provider: "razorpay", provider_ref: refund.payment_id },
+          data: { status: "refunded" },
+        })
+      })
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+        return Response.json({ ok: true, duplicate: eventId })
+      }
+      console.error("[billing/webhook] refund processing failed for", eventId, err)
+      return new Response("Processing failed", { status: 500 })
+    }
+    return Response.json({ ok: true, event: body.event, paymentRef: refund.payment_id })
+  }
+
   if (!RELEVANT.has(body.event)) {
     return Response.json({ ok: true, ignored: body.event })
   }
@@ -95,10 +127,16 @@ export async function POST(req: Request) {
     return Response.json({ ok: true, ignored: `${body.event} (no subscription)` })
   }
 
-  // Map provider → account. `notes.account_id` is what we stamped at creation;
-  // fall back to our own record in case an older subscription lacks notes.
+  // Map provider → account. Match the active id OR a pending replacement id
+  // (from an "update payment method" re-authorisation). `notes.account_id` is
+  // the fallback in case an older subscription lacks a stored id.
   const local = await prisma.subscription.findFirst({
-    where: { provider_subscription_id: subEntity.id },
+    where: {
+      OR: [
+        { provider_subscription_id: subEntity.id },
+        { pending_provider_subscription_id: subEntity.id },
+      ],
+    },
     include: { plan: true },
   })
   const accountId = local?.account_id ?? subEntity.notes?.account_id
@@ -110,6 +148,60 @@ export async function POST(req: Request) {
   }
 
   const status = rzp.mapStatus(subEntity.status)
+
+  // ── Payment-method update: the pending replacement just went live ──────────
+  // Cancel the old subscription at cycle end and swap the new id into place.
+  // Cancel is best-effort: the new card is authorised and active, so ignoring it
+  // would be worse than a flagged edge case; a cancel failure is logged for
+  // manual cleanup rather than blocking the swap. (Live-verify this path.)
+  if (local.pending_provider_subscription_id === subEntity.id && status === "active") {
+    const oldSubId = local.provider_subscription_id
+    if (oldSubId && oldSubId !== subEntity.id) {
+      try {
+        await rzp.cancelSubscription(oldSubId, true)
+      } catch (e) {
+        console.error("[billing/webhook] payment-method swap: old sub cancel failed —", oldSubId, e)
+        await recordAccountEvent({
+          accountId,
+          type: "PLAN_CHANGED",
+          summary: `Payment method updated, but the previous subscription (${oldSubId}) may need manual cancellation`,
+          detail: { provider: "razorpay", oldSubscriptionId: oldSubId, newSubscriptionId: subEntity.id },
+        })
+      }
+    }
+    try {
+      await prisma.$transaction(async (tx) => {
+        await tx.webhookEvent.create({
+          data: { provider: "razorpay", event_id: eventId, event_type: body.event },
+        })
+        await tx.subscription.update({
+          where: { account_id: accountId },
+          data: {
+            provider_subscription_id: subEntity.id,
+            pending_provider_subscription_id: null,
+            status: "active",
+            mrr_inr: local.plan.price_inr,
+            ...(subEntity.current_start
+              ? { current_period_start: unix(subEntity.current_start), current_period_end: unix(subEntity.current_end) }
+              : {}),
+          },
+        })
+      })
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+        return Response.json({ ok: true, duplicate: eventId })
+      }
+      console.error("[billing/webhook] payment-method swap failed for", eventId, err)
+      return new Response("Processing failed", { status: 500 })
+    }
+    await recordAccountEvent({
+      accountId,
+      type: "PLAN_CHANGED",
+      summary: `Payment method updated on ${local.plan.name}`,
+      detail: { provider: "razorpay", newSubscriptionId: subEntity.id },
+    })
+    return Response.json({ ok: true, event: body.event, paymentMethodUpdated: true })
+  }
   // A payment entity rides along with `subscription.charged` and also with
   // `subscription.completed` (the final cycle's charge). Key off the entity
   // rather than the event name so both are recorded, and let the unique index
@@ -144,6 +236,16 @@ export async function POST(req: Request) {
           // while Razorpay is still retrying the customer's card.
           ...(status === "active" ? { mrr_inr: local.plan.price_inr } : {}),
           canceled_at: status === "canceled" ? new Date() : null,
+          // Track the current paid period (for the renewal date). Only set when
+          // Razorpay sends it, so an event without bounds doesn't wipe them.
+          ...(subEntity.current_start
+            ? { current_period_start: unix(subEntity.current_start), current_period_end: unix(subEntity.current_end) }
+            : {}),
+          // Saved-card display (network + last4 only). Set when a card payment
+          // rides along; left alone otherwise.
+          ...(captured?.card?.last4
+            ? { card_last4: captured.card.last4, card_network: captured.card.network ?? null }
+            : {}),
         },
       })
 

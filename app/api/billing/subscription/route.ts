@@ -5,6 +5,8 @@ import { apiSuccess, apiError, parseBody } from "@/lib/api/response"
 import { rateLimited, LIMITS } from "@/lib/rate-limit"
 import { recordAccountEvent } from "@/lib/events/account-events"
 import { getSeatUsage, seatsExceedPlan } from "@/lib/billing/seats"
+import { getLeadUsage } from "@/lib/billing/lead-usage"
+import { getAccountEntitlements } from "@/lib/billing/entitlements"
 import * as rzp from "@/lib/billing/razorpay"
 
 // Checkout is an ADMIN-only action — a REP must not be able to put the account
@@ -21,17 +23,21 @@ export async function GET() {
   try {
     const session = await requireAuth()
 
-    const [sub, plans, seats] = await Promise.all([
+    const [sub, plans, seats, leadUsage, entitlements] = await Promise.all([
       prisma.subscription.findUnique({
         where: { account_id: session.account.id },
         include: { plan: { select: { key: true, name: true } } },
       }),
       prisma.plan.findMany({
-        where: { is_active: true, key: { not: "trial" } },
+        // Free (`trial`) and Enterprise are not self-serve, so they're excluded
+        // from the sellable plan picker.
+        where: { is_active: true, key: { notIn: ["trial", "enterprise"] } },
         orderBy: { price_inr: "asc" },
-        select: { key: true, name: true, price_inr: true, provider_plan_id: true, max_seats: true },
+        select: { key: true, name: true, price_inr: true, provider_plan_id: true, max_seats: true, active_lead_limit: true },
       }),
       getSeatUsage(session.account.id),
+      getLeadUsage(session.account.id),
+      getAccountEntitlements(session.account.id),
     ])
 
     return apiSuccess({
@@ -43,8 +49,14 @@ export async function GET() {
         mrrInr: sub.mrr_inr,
         trialEndsAt: sub.trial_ends_at,
         provider: sub.provider,
+        billingCycle: sub.billing_cycle,
+        renewsAt: sub.current_period_end,
+        cardLast4: sub.card_last4,
+        cardNetwork: sub.card_network,
       },
       seats,
+      leadUsage,
+      entitlements,
       // `sellable` is false until scripts/razorpay-sync-plans.ts has run — the
       // UI disables the button rather than failing at checkout.
       // `tooSmall` marks a plan the current team would not fit on.
@@ -53,6 +65,7 @@ export async function GET() {
         name: p.name,
         priceInr: p.price_inr,
         maxSeats: p.max_seats,
+        leadLimit: p.active_lead_limit,
         sellable: Boolean(p.provider_plan_id),
         tooSmall: seats.used > p.max_seats,
       })),
@@ -150,11 +163,15 @@ export async function POST(req: Request) {
         mrr_inr: 0,
         provider: "razorpay",
         provider_subscription_id: subscription.id,
+        // Only monthly Razorpay plans exist today; annual plans will pass this
+        // through from the request when they're added.
+        billing_cycle: "monthly",
       },
       update: {
         plan_id: plan.id,
         provider: "razorpay",
         provider_subscription_id: subscription.id,
+        billing_cycle: "monthly",
       },
     })
 
