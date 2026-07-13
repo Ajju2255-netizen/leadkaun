@@ -28,6 +28,7 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { LeadkaunMark } from "@/components/shared/LeadkaunMark"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { LeadLimitBanner } from "@/components/billing/LeadLimitBanner"
+import { PlanUsageCard } from "@/components/billing/PlanUsageCard"
 import type { AuthSession } from "@/lib/auth/session"
 import type { UserRole } from "@prisma/client"
 
@@ -312,6 +313,8 @@ export function DashboardShell({
             </div>
           ))}
         </nav>
+
+        <PlanUsageCard isAdmin={user.role === "ADMIN"} onNavigate={onItemClick} />
 
         <div className="px-3 py-3" style={{ borderTop: "1px solid var(--hairline)" }}>
           <div className="flex items-center gap-2.5">
