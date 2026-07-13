@@ -49,6 +49,8 @@ export async function GET() {
         mrrInr: sub.mrr_inr,
         trialEndsAt: sub.trial_ends_at,
         provider: sub.provider,
+        billingCycle: sub.billing_cycle,
+        renewsAt: sub.current_period_end,
       },
       seats,
       leadUsage,
@@ -159,11 +161,15 @@ export async function POST(req: Request) {
         mrr_inr: 0,
         provider: "razorpay",
         provider_subscription_id: subscription.id,
+        // Only monthly Razorpay plans exist today; annual plans will pass this
+        // through from the request when they're added.
+        billing_cycle: "monthly",
       },
       update: {
         plan_id: plan.id,
         provider: "razorpay",
         provider_subscription_id: subscription.id,
+        billing_cycle: "monthly",
       },
     })
 

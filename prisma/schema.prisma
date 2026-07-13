@@ -888,7 +888,15 @@ model Subscription {
   started_at               DateTime  @default(now())
   canceled_at              DateTime?
   provider                 String? // razorpay | stripe (null for manually-set plans)
-  provider_subscription_id String?
+  provider_subscription_id String? // the provider's subscription id (sub_xxx)
+
+  // Billing cycle + the current paid period, so the app can show a renewal date.
+  // Period bounds are set from the provider webhook (subscription.charged).
+  // Seat/lead LIMITS are NOT stored here — they live on Plan (active_lead_limit,
+  // max_seats) so a plan change updates every subscriber at once, no backfill.
+  billing_cycle        String? // monthly | annual
+  current_period_start DateTime?
+  current_period_end   DateTime?
 
   plan Plan @relation(fields: [plan_id], references: [id])
 

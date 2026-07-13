@@ -22,6 +22,8 @@ type Sub = {
   mrrInr: number
   trialEndsAt: string | null
   provider: string | null
+  billingCycle: string | null
+  renewsAt: string | null
 } | null
 type Seats = {
   used: number
@@ -188,6 +190,12 @@ export default function BillingPage() {
         {isPaid && sub && (
           <p className="text-[13px] text-slate-600">
             {rupees(sub.mrrInr)} per month.
+            {sub.renewsAt && (
+              <>
+                {" "}Renews{" "}
+                {new Date(sub.renewsAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}.
+              </>
+            )}
           </p>
         )}
         {sub?.status === "trialing" && sub.trialEndsAt && (
