@@ -890,6 +890,12 @@ model Subscription {
   provider                 String? // razorpay | stripe (null for manually-set plans)
   provider_subscription_id String? // the provider's subscription id (sub_xxx)
 
+  // "Update payment method" re-authorises on a NEW Razorpay subscription (no
+  // card-swap API exists). This holds that pending replacement's id until it
+  // activates; the webhook then cancels the old sub at cycle end and swaps this
+  // into provider_subscription_id.
+  pending_provider_subscription_id String?
+
   // Billing cycle + the current paid period, so the app can show a renewal date.
   // Period bounds are set from the provider webhook (subscription.charged).
   // Seat/lead LIMITS are NOT stored here — they live on Plan (active_lead_limit,

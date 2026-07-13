@@ -123,6 +123,42 @@ export default function BillingPage() {
     }
   }
 
+  async function handleUpdatePaymentMethod() {
+    if (busyPlan) return
+    setBusyPlan("__paymethod__")
+    try {
+      const res = await fetch("/api/billing/payment-method", { method: "POST", credentials: "include" })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data?.error ?? "Could not start the update")
+        return
+      }
+      await openCheckout({
+        keyId: data.keyId,
+        subscriptionId: data.subscriptionId,
+        planName: data.planName,
+        accountName: data.accountName,
+        email: data.email,
+        onSuccess: async (payload) => {
+          await fetch("/api/billing/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify(payload),
+          })
+          // The webhook does the swap (cancel old at cycle end, adopt new card).
+          toast.success("New card saved. Finalising the change — this can take a moment.")
+          await load()
+        },
+        onDismiss: () => toast.info("Update cancelled. Your current card is unchanged."),
+      })
+    } catch {
+      toast.error("Could not start the update")
+    } finally {
+      setBusyPlan(null)
+    }
+  }
+
   async function handleCancel() {
     if (!confirm("Cancel your subscription at the end of the current billing period?")) return
     const res = await fetch("/api/billing/subscription", { method: "DELETE", credentials: "include" })
@@ -210,12 +246,23 @@ export default function BillingPage() {
         )}
 
         {isPaid && sub?.provider === "razorpay" && (
-          <button
-            onClick={handleCancel}
-            className="text-[12px] font-medium text-slate-500 hover:text-red-600 transition-colors"
-          >
-            Cancel subscription
-          </button>
+          <div className="flex items-center gap-4 pt-0.5">
+            <button
+              onClick={handleUpdatePaymentMethod}
+              disabled={busyPlan !== null}
+              className="text-[12px] font-medium text-sky-600 hover:text-sky-700 disabled:opacity-50 transition-colors"
+            >
+              {busyPlan === "__paymethod__" ? "Opening…" : "Update payment method"}
+            </button>
+            <span className="text-slate-300">·</span>
+            <button
+              onClick={handleCancel}
+              disabled={busyPlan !== null}
+              className="text-[12px] font-medium text-slate-500 hover:text-red-600 disabled:opacity-50 transition-colors"
+            >
+              Cancel subscription
+            </button>
+          </div>
         )}
       </div>
 
