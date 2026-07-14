@@ -6,6 +6,10 @@ import type { EmailOtpType } from "@supabase/supabase-js"
 import { verifyImpersonation, IMPERSONATION_COOKIE } from "@/lib/auth/impersonation"
 import { recordAccountEvent } from "@/lib/events/account-events"
 
+// Reads the session cookie, so this route is always dynamic — opt out of
+// static prerender (silences Next's DYNAMIC_SERVER_USAGE build log).
+export const dynamic = "force-dynamic"
+
 /**
  * Supabase email-link confirmation handler (SSR / PKCE-safe).
  *

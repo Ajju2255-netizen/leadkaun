@@ -6,6 +6,10 @@ import { recordAccountEvent } from "@/lib/events/account-events"
 import { FEATURE_KEYS, type FeatureKey } from "@/lib/feature-flags"
 import { z } from "zod"
 
+// Reads the session cookie, so this route is always dynamic — opt out of
+// static prerender (silences Next's DYNAMIC_SERVER_USAGE build log).
+export const dynamic = "force-dynamic"
+
 const Body = z.object({ accountId: z.string().min(1), key: z.string().min(1), enabled: z.boolean() })
 
 // POST /api/admin/platform/feature-flags — toggle a per-account feature flag.

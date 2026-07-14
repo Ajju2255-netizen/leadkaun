@@ -8,6 +8,10 @@ import { processSignalAndUpdateScores } from "@/lib/scoring/orchestrator"
 import { getNextAction } from "@/lib/scoring/next-action"
 import { getLeadUsage } from "@/lib/billing/lead-usage"
 
+// Reads the session cookie, so this route is always dynamic — opt out of
+// static prerender (silences Next's DYNAMIC_SERVER_USAGE build log).
+export const dynamic = "force-dynamic"
+
 const PAGE_SIZE = 100
 
 // ─────────────────────────────────────────────

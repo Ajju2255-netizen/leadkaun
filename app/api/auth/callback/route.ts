@@ -3,6 +3,10 @@ import { prisma } from "@/lib/prisma"
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server" // eslint-disable-line @typescript-eslint/no-unused-vars
 
+// Reads the session cookie, so this route is always dynamic — opt out of
+// static prerender (silences Next's DYNAMIC_SERVER_USAGE build log).
+export const dynamic = "force-dynamic"
+
 /**
  * Supabase OAuth callback handler.
  * Exchanges the auth code for a session and redirects to the app.

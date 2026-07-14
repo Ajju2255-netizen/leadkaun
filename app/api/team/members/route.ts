@@ -4,6 +4,10 @@ import { handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
 import { getSeatUsage } from "@/lib/billing/seats"
 
+// Reads the session cookie, so this route is always dynamic — opt out of
+// static prerender (silences Next's DYNAMIC_SERVER_USAGE build log).
+export const dynamic = "force-dynamic"
+
 /**
  * GET /api/team/members
  * Returns all users in the account (active + invited), plus current seat usage.

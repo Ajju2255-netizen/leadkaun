@@ -6,6 +6,10 @@ import { provisionWorkspaceDefaults, slugify } from "@/lib/workspace/provision"
 import { rateLimited, LIMITS } from "@/lib/rate-limit"
 import { requireEntitlement, handleFeatureLock } from "@/lib/billing/entitlements"
 
+// Reads the session cookie, so this route is always dynamic — opt out of
+// static prerender (silences Next's DYNAMIC_SERVER_USAGE build log).
+export const dynamic = "force-dynamic"
+
 /**
  * GET  /api/workspaces — workspaces the caller can access (ADMIN: all in the
  *                        account; others: the ones they're a member of), with

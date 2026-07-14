@@ -5,6 +5,10 @@ import { requireEntitlement, handleFeatureLock } from "@/lib/billing/entitlement
 import { apiSuccess, apiError } from "@/lib/api/response"
 import { startOfIstDay } from "@/lib/time/ist"
 
+// Reads the session cookie, so this route is always dynamic — opt out of
+// static prerender (silences Next's DYNAMIC_SERVER_USAGE build log).
+export const dynamic = "force-dynamic"
+
 /**
  * GET /api/analytics/missed
  *

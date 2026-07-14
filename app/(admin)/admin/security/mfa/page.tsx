@@ -55,6 +55,8 @@ export default function AdminMfa() {
         {mode === "enroll" && (
           <>
             <p className="text-[13px] text-slate-400 mb-3">Scan this with your authenticator app, then enter the 6-digit code.</p>
+            {/* Base64 QR data URI from Supabase MFA — next/image adds no value here. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             {qr && <img src={qr} alt="TOTP QR" className="w-44 h-44 bg-white rounded-lg p-2 mx-auto mb-3" />}
           </>
         )}

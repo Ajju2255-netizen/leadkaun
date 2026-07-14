@@ -9,6 +9,10 @@ import { getLeadUsage } from "@/lib/billing/lead-usage"
 import { getAccountEntitlements } from "@/lib/billing/entitlements"
 import * as rzp from "@/lib/billing/razorpay"
 
+// Reads the session cookie, so this route is always dynamic — opt out of
+// static prerender (silences Next's DYNAMIC_SERVER_USAGE build log).
+export const dynamic = "force-dynamic"
+
 // Checkout is an ADMIN-only action — a REP must not be able to put the account
 // on a paid plan. Reads are allowed for anyone so the UI can show current state.
 const CreateSchema = z.object({

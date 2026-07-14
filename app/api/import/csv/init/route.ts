@@ -5,6 +5,10 @@ import { rateLimited, LIMITS } from "@/lib/rate-limit"
 import { MAX_IMPORT_ROWS } from "@/lib/import/process-rows"
 import { getLeadUsage } from "@/lib/billing/lead-usage"
 
+// Reads the session cookie, so this route is always dynamic — opt out of
+// static prerender (silences Next's DYNAMIC_SERVER_USAGE build log).
+export const dynamic = "force-dynamic"
+
 /**
  * POST /api/import/csv/init
  *

@@ -7,6 +7,10 @@ import { getNextAction, buildActionReason } from "@/lib/scoring/next-action"
 import { recordScoreEvent, diffEnrichment } from "@/lib/scoring/score-events"
 import { recomputeFitQualityGrade } from "@/lib/scoring/recompute"
 
+// Reads the session cookie, so this route is always dynamic — opt out of
+// static prerender (silences Next's DYNAMIC_SERVER_USAGE build log).
+export const dynamic = "force-dynamic"
+
 type Params = { params: { id: string } }
 
 // ─────────────────────────────────────────────

@@ -11,6 +11,10 @@ import {
 import { RECOMMENDATION_TOP_N } from "@/lib/analytics/recommendation-rank"
 import type { SignalType } from "@prisma/client"
 
+// Reads the session cookie, so this route is always dynamic — opt out of
+// static prerender (silences Next's DYNAMIC_SERVER_USAGE build log).
+export const dynamic = "force-dynamic"
+
 /**
  * GET /api/analytics/learning
  * The Learning Engine — account-level patterns Leadkaun has learned, each

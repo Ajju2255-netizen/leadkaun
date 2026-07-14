@@ -10,6 +10,10 @@ import {
 } from "@/lib/scoring/channel-hint"
 import type { SignalType } from "@prisma/client"
 
+// Reads the session cookie, so this route is always dynamic — opt out of
+// static prerender (silences Next's DYNAMIC_SERVER_USAGE build log).
+export const dynamic = "force-dynamic"
+
 const OUTREACH_SIGNAL_TYPES: SignalType[] = [
   "CALL_ANSWERED_INTERESTED",
   "CALL_ANSWERED_NOT_INTERESTED",

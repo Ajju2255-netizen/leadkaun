@@ -3,6 +3,10 @@ import { requireWorkspace, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
 import { startOfIstDay, IST_OFFSET_MS } from "@/lib/time/ist"
 
+// Reads the session cookie, so this route is always dynamic — opt out of
+// static prerender (silences Next's DYNAMIC_SERVER_USAGE build log).
+export const dynamic = "force-dynamic"
+
 /**
  * GET /api/analytics/intelligence
  * Loss intelligence, pattern detection, prediction, source performance.

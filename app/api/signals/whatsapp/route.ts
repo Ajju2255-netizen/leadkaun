@@ -14,6 +14,10 @@ import { dispatchScoreAlerts } from "@/lib/realtime/score-alerts"
 import { sendSqlAlertEmail } from "@/lib/email/lead-alerts"
 import type { SignalType, WaStage } from "@prisma/client"
 
+// Reads the session cookie, so this route is always dynamic — opt out of
+// static prerender (silences Next's DYNAMIC_SERVER_USAGE build log).
+export const dynamic = "force-dynamic"
+
 const WA_SIGNAL_TYPES = [
   "WA_REPLIED_1H",
   "WA_REPLIED_4H",

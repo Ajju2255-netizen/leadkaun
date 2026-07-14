@@ -5,6 +5,10 @@ import { startOfIstMonth } from "@/lib/time/ist"
 import { isWithinSla, complianceBand } from "@/lib/activity/sla"
 import type { LeadGrade } from "@prisma/client"
 
+// Reads the session cookie, so this route is always dynamic — opt out of
+// static prerender (silences Next's DYNAMIC_SERVER_USAGE build log).
+export const dynamic = "force-dynamic"
+
 /**
  * GET /api/activity/compliance
  *
