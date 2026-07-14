@@ -15,9 +15,14 @@ export const dynamic = "force-dynamic"
 
 // Checkout is an ADMIN-only action — a REP must not be able to put the account
 // on a paid plan. Reads are allowed for anyone so the UI can show current state.
+// Any plan key — validated against the DB below (must exist, be active, be
+// sellable, and not the non-purchasable trial/enterprise tiers). Hard-coding the
+// keys here meant adding any new plan silently broke checkout.
 const CreateSchema = z.object({
-  planKey: z.enum(["starter", "growth", "scale"]),
+  planKey: z.string().min(1).max(40),
 })
+
+const NON_PURCHASABLE = new Set(["trial", "enterprise"])
 
 /**
  * GET /api/billing/subscription
@@ -96,6 +101,10 @@ export async function POST(req: Request) {
 
     const { data, error } = await parseBody(req, CreateSchema)
     if (error) return error
+
+    if (NON_PURCHASABLE.has(data.planKey)) {
+      return apiError("That plan isn't available for online checkout", "BAD_PLAN", 422)
+    }
 
     const plan = await prisma.plan.findUnique({ where: { key: data.planKey } })
     if (!plan || !plan.is_active) return apiError("Unknown plan", "BAD_PLAN", 422)
