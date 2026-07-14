@@ -5,6 +5,10 @@ import { processImportRows, MAX_BATCH_ROWS } from "@/lib/import/process-rows"
 import { rateLimited, LIMITS } from "@/lib/rate-limit"
 import { leadsRemaining } from "@/lib/billing/lead-usage"
 
+// Reads the session cookie, so this route is always dynamic — opt out of
+// static prerender (silences Next's DYNAMIC_SERVER_USAGE build log).
+export const dynamic = "force-dynamic"
+
 // One batch is small (the client sends ~10 rows), so this stays well under the
 // function ceiling even on a slow DB.
 export const maxDuration = 120

@@ -8,6 +8,10 @@ import { rateLimited, LIMITS } from "@/lib/rate-limit"
 import { createSupabaseAdminClient } from "@/lib/supabase/admin"
 import { getSeatUsage } from "@/lib/billing/seats"
 
+// Reads the session cookie, so this route is always dynamic — opt out of
+// static prerender (silences Next's DYNAMIC_SERVER_USAGE build log).
+export const dynamic = "force-dynamic"
+
 const InviteSchema = z.object({
   email: z.string().email(),
   role:  z.enum(["REP", "MANAGER"]),

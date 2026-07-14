@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server"
 import { getServerSession } from "@/lib/auth/session"
 
+// Reads the session cookie, so this route is always dynamic — opt out of
+// static prerender (silences Next's DYNAMIC_SERVER_USAGE build log).
+export const dynamic = "force-dynamic"
+
 /**
  * GET /api/auth/user
  * Returns the current authenticated user + account for client components.

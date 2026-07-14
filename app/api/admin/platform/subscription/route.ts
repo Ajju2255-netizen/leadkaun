@@ -5,6 +5,10 @@ import { apiSuccess, apiError, parseBody } from "@/lib/api/response"
 import { recordAccountEvent } from "@/lib/events/account-events"
 import { z } from "zod"
 
+// Reads the session cookie, so this route is always dynamic — opt out of
+// static prerender (silences Next's DYNAMIC_SERVER_USAGE build log).
+export const dynamic = "force-dynamic"
+
 const Body = z.object({
   accountId: z.string().min(1),
   planKey:   z.string().min(1),

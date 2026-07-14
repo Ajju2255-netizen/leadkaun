@@ -4,6 +4,10 @@ import { handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
 import { rateLimited, LIMITS } from "@/lib/rate-limit"
 
+// Reads the session cookie, so this route is always dynamic — opt out of
+// static prerender (silences Next's DYNAMIC_SERVER_USAGE build log).
+export const dynamic = "force-dynamic"
+
 /**
  * POST /api/follow-ups/[id]/skip
  *

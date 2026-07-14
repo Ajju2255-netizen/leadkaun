@@ -9,6 +9,10 @@ import { generateImportSignals } from "@/lib/import/generate-signals"
 import { processSignalAndUpdateScores } from "@/lib/scoring/orchestrator"
 import Papa from "papaparse"
 
+// Reads the session cookie, so this route is always dynamic — opt out of
+// static prerender (silences Next's DYNAMIC_SERVER_USAGE build log).
+export const dynamic = "force-dynamic"
+
 // Vercel Pro max function duration — allows processing large CSVs inline
 export const maxDuration = 300
 

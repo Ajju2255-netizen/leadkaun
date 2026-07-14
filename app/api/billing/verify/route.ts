@@ -5,6 +5,10 @@ import { apiSuccess, apiError, parseBody } from "@/lib/api/response"
 import { rateLimited, LIMITS } from "@/lib/rate-limit"
 import * as rzp from "@/lib/billing/razorpay"
 
+// Reads the session cookie, so this route is always dynamic — opt out of
+// static prerender (silences Next's DYNAMIC_SERVER_USAGE build log).
+export const dynamic = "force-dynamic"
+
 const VerifySchema = z.object({
   razorpay_payment_id: z.string().min(1),
   razorpay_subscription_id: z.string().min(1),

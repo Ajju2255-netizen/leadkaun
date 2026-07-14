@@ -7,6 +7,10 @@ import { assignGrade } from "@/lib/scoring/grade"
 import { scoreNotesIntent, getNotesGradeOverride } from "@/lib/scoring/notes-intent"
 import { mapCityToState, inferIndustry } from "@/lib/import/enrich-lead"
 
+// Reads the session cookie, so this route is always dynamic — opt out of
+// static prerender (silences Next's DYNAMIC_SERVER_USAGE build log).
+export const dynamic = "force-dynamic"
+
 /**
  * GET /api/admin/score-debug?leadId=xxx
  *
