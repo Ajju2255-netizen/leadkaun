@@ -52,9 +52,9 @@ export async function GET() {
         amountInr: i.amount_inr,
         status: i.status,
         number: i.number,
-        // Downloadable if we stored a pdf, or it's a real Razorpay invoice we
-        // can fetch the hosted URL for on demand.
-        downloadable: Boolean(i.pdf_url) || Boolean(i.provider_ref),
+        // Every invoice row is downloadable — we render the Leadkaun PDF from
+        // our own records, no dependency on a stored pdf_url or Razorpay.
+        downloadable: true,
         at: i.created_at,
       })),
       ...payments

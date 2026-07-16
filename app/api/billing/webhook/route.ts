@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { recordAccountEvent } from "@/lib/events/account-events"
 import * as rzp from "@/lib/billing/razorpay"
+import { INVOICE_ISSUER } from "@/lib/billing/invoice-issuer"
 
 // node:crypto + raw body — must not run on the edge.
 export const runtime = "nodejs"
@@ -269,10 +270,15 @@ export async function POST(req: Request) {
         })
 
         if (captured.invoice_id) {
+          // Consecutive serial for our own invoice PDF (LK-00001, …). Assigned
+          // once at creation inside this tx; a retried event no-ops on `update`.
+          const seq = (await tx.invoice.count()) + 1
+          const number = `${INVOICE_ISSUER.numberPrefix}-${String(seq).padStart(5, "0")}`
           await tx.invoice.upsert({
             where: { provider_provider_ref: { provider: "razorpay", provider_ref: captured.invoice_id } },
             create: {
               account_id: accountId,
+              number,
               amount_inr: captured.amount,
               status: "paid",
               period_start: unix(subEntity.current_start),
