@@ -270,10 +270,12 @@ export async function POST(req: Request) {
         })
 
         if (captured.invoice_id) {
-          // Consecutive serial for our own invoice PDF (LK-00001, …). Assigned
-          // once at creation inside this tx; a retried event no-ops on `update`.
-          const seq = (await tx.invoice.count()) + 1
-          const number = `${INVOICE_ISSUER.numberPrefix}-${String(seq).padStart(5, "0")}`
+          // Consecutive serial for our own invoice PDF (LK-00001, …). Drawn from
+          // a DB sequence so concurrent charges can't collide (COUNT(*)+1 could).
+          // A retried event no-ops on `update`, so it may skip a value — gaps are
+          // fine, duplicates (guarded by the unique index) are not.
+          const [{ nextval }] = await tx.$queryRaw<{ nextval: bigint }[]>`SELECT nextval('invoice_serial_seq')`
+          const number = `${INVOICE_ISSUER.numberPrefix}-${String(nextval).padStart(5, "0")}`
           await tx.invoice.upsert({
             where: { provider_provider_ref: { provider: "razorpay", provider_ref: captured.invoice_id } },
             create: {

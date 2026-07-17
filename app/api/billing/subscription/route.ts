@@ -128,6 +128,22 @@ export async function POST(req: Request) {
         409,
       )
     }
+    // A past_due/trialing row may still point at a live Razorpay subscription.
+    // The upsert below overwrites provider_subscription_id, which would orphan
+    // that Razorpay sub — it keeps charging, unrecorded and uncancellable by us.
+    // Cancel it first; abort if we can't, rather than risk a double charge.
+    if (
+      existing?.provider === "razorpay" &&
+      existing.provider_subscription_id &&
+      existing.status !== "canceled"
+    ) {
+      try {
+        await rzp.cancelSubscription(existing.provider_subscription_id, false)
+      } catch (e) {
+        console.error("[billing] failed to cancel prior subscription before switch:", e)
+        return apiError("Couldn't switch plans right now. Please try again.", "SWITCH_FAILED", 502)
+      }
+    }
 
     // Refuse to sell a plan the team does not fit on. Taking the money and then
     // leaving them permanently over-limit is the worst of both outcomes.
