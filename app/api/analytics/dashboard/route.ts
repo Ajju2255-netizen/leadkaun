@@ -12,6 +12,10 @@ export const dynamic = "force-dynamic"
  *
  * Returns KPIs, grade distribution, rep stats, and source truth cards.
  * Admin/Manager only. Used by useDashboard hook (60s polling).
+ *
+ * Rep stats, stage breakdown and source truth are computed with grouped
+ * aggregates (groupBy) rather than loading every lead row into memory — the
+ * old version pulled the full lead table ~3× on every 60s poll.
  */
 export async function GET(_req: Request) {
   try {
@@ -29,6 +33,12 @@ export async function GET(_req: Request) {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
     const staleThreshold = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)
 
+    // Shared "active lead" predicate: not junk, not won, not lost.
+    const activeLeadWhere = {
+      account_id: accountId, workspace_id: workspaceId,
+      is_junk: false, won_at: null, lost_at: null,
+    }
+
     const [
       totalLeads,
       newLast7d,
@@ -39,23 +49,30 @@ export async function GET(_req: Request) {
       wonThisMonth,
       pipelineValue,
       gradeDistribution,
-      repStats,
       aLeads,
       bLeads,
       actedTodaySignals,
       missedLeads,
-      stageBreakdown,
       stuckContacted,
       dueTodayFollowups,
       overdueFollowupLeads,
-      sources,
       yesterdayMissed,
       atRiskSoon,
+      // Rep stats (aggregated): names + per-rep active-lead and missed aggregates.
+      repList,
+      leadAggByRep,
+      missedAggByRep,
+      // Pipeline stage breakdown (aggregated).
+      stageList,
+      leadsByStage,
+      // Source truth (aggregated).
+      sourceList,
+      srcTotals,
+      srcSql,
+      srcWon,
     ] = await Promise.all([
       // Total active leads
-      prisma.lead.count({
-        where: { account_id: accountId, workspace_id: workspaceId, is_junk: false, won_at: null, lost_at: null },
-      }),
+      prisma.lead.count({ where: activeLeadWhere }),
       // New in last 7 days
       prisma.lead.count({
         where: { account_id: accountId, workspace_id: workspaceId, is_junk: false, created_at: { gte: sevenDaysAgo } },
@@ -66,20 +83,13 @@ export async function GET(_req: Request) {
       }),
       // Stale (no contact in 14+ days)
       prisma.lead.count({
-        where: {
-          account_id:       accountId,
-          is_junk:          false,
-          won_at:           null,
-          lost_at:          null,
-          first_contact_at: { lt: staleThreshold },
-        },
+        where: { ...activeLeadWhere, first_contact_at: { lt: staleThreshold } },
       }),
       // Callbacks due today
       prisma.followUpAction.count({
         where: {
           account_id: accountId, workspace_id: workspaceId,
-          action_type: "CALL",
-          status: "PENDING",
+          action_type: "CALL", status: "PENDING",
           due_date: { gte: today, lt: tomorrow },
         },
       }),
@@ -93,36 +103,22 @@ export async function GET(_req: Request) {
         _sum: { won_value: true },
       }),
       // Pipeline value
-      prisma.lead.aggregate({
-        where: { account_id: accountId, workspace_id: workspaceId, is_junk: false, won_at: null, lost_at: null },
-        _sum: { expected_value: true },
-      }),
+      prisma.lead.aggregate({ where: activeLeadWhere, _sum: { expected_value: true } }),
       // Grade distribution
       prisma.lead.groupBy({
-        by:    ["grade"],
-        where: { account_id: accountId, workspace_id: workspaceId, is_junk: false, won_at: null, lost_at: null },
+        by: ["grade"],
+        where: activeLeadWhere,
         _count: { grade: true },
         orderBy: { grade: "asc" },
       }),
-      // Rep stats
-      prisma.user.findMany({
-        where:  { account_id: accountId, role: "REP", is_active: true },
-        select: {
-          id: true, first_name: true, last_name: true,
-          assigned_leads: {
-            where:  { is_junk: false, won_at: null, lost_at: null },
-            select: { grade: true, expected_value: true, speed_to_lead_hours: true, is_missed: true },
-          },
-        },
-      }),
       // A leads in queue (not missed/won/lost/junk)
       prisma.lead.aggregate({
-        where: { account_id: accountId, workspace_id: workspaceId, grade: "A", is_missed: false, won_at: null, lost_at: null, is_junk: false },
+        where: { ...activeLeadWhere, grade: "A", is_missed: false },
         _count: { id: true }, _sum: { expected_value: true },
       }),
       // B leads in queue
       prisma.lead.aggregate({
-        where: { account_id: accountId, workspace_id: workspaceId, grade: "B", is_missed: false, won_at: null, lost_at: null, is_junk: false },
+        where: { ...activeLeadWhere, grade: "B", is_missed: false },
         _count: { id: true }, _sum: { expected_value: true },
       }),
       // A/B leads with a signal logged today (distinct lead)
@@ -136,22 +132,10 @@ export async function GET(_req: Request) {
         where: { account_id: accountId, workspace_id: workspaceId, is_missed: true, won_at: null, lost_at: null },
         _count: { id: true }, _sum: { expected_value: true },
       }),
-      // Pipeline stages (non-terminal) with lead counts+values
-      prisma.pipelineStage.findMany({
-        where: { account_id: accountId, workspace_id: workspaceId, is_terminal: false },
-        select: {
-          name: true, key: true, display_order: true,
-          leads: {
-            where: { is_junk: false, won_at: null, lost_at: null },
-            select: { expected_value: true },
-          },
-        },
-        orderBy: { display_order: "asc" },
-      }),
       // Leads stuck in "contacted" stage > 48h
       prisma.lead.count({
         where: {
-          account_id: accountId, workspace_id: workspaceId, is_junk: false, won_at: null, lost_at: null,
+          ...activeLeadWhere,
           stage: { key: "contacted" },
           stage_entered_at: { lt: new Date(Date.now() - 48 * 3_600_000) },
         },
@@ -166,17 +150,6 @@ export async function GET(_req: Request) {
         where: { account_id: accountId, workspace_id: workspaceId, status: "OVERDUE" },
         select: { lead_id: true, lead: { select: { expected_value: true } } },
         distinct: ["lead_id"],
-      }),
-      // Sources
-      prisma.leadSource.findMany({
-        where: { account_id: accountId, workspace_id: workspaceId },
-        select: {
-          id: true, name: true,
-          leads: {
-            where:  { account_id: accountId, workspace_id: workspaceId },
-            select: { is_sql: true, won_at: true, intent_score: true, is_junk: true },
-          },
-        },
       }),
       // Yesterday missed leads (approximate via updated_at when is_missed was set)
       prisma.lead.aggregate({
@@ -193,6 +166,58 @@ export async function GET(_req: Request) {
         distinct: ["lead_id"],
         select: { lead_id: true, lead: { select: { expected_value: true } } },
       }),
+      // Rep names (all active reps, incl. those with 0 leads)
+      prisma.user.findMany({
+        where: { account_id: accountId, role: "REP", is_active: true },
+        select: { id: true, first_name: true, last_name: true },
+      }),
+      // Active leads per rep → assigned count + avg speed-to-lead
+      prisma.lead.groupBy({
+        by: ["assigned_rep_id"],
+        where: { ...activeLeadWhere, assigned_rep_id: { not: null } },
+        _count: true, _avg: { speed_to_lead_hours: true },
+      }),
+      // Missed active leads per rep → missed count + missed value
+      prisma.lead.groupBy({
+        by: ["assigned_rep_id"],
+        where: { ...activeLeadWhere, is_missed: true, assigned_rep_id: { not: null } },
+        _count: true, _sum: { expected_value: true },
+      }),
+      // Non-terminal pipeline stages
+      prisma.pipelineStage.findMany({
+        where: { account_id: accountId, workspace_id: workspaceId, is_terminal: false },
+        select: { id: true, name: true, key: true, display_order: true },
+        orderBy: { display_order: "asc" },
+      }),
+      // Active leads per stage → count + value
+      prisma.lead.groupBy({
+        by: ["stage_id"],
+        where: activeLeadWhere,
+        _count: true, _sum: { expected_value: true },
+      }),
+      // Source names
+      prisma.leadSource.findMany({
+        where: { account_id: accountId, workspace_id: workspaceId },
+        select: { id: true, name: true },
+      }),
+      // Non-junk totals + avg intent per source
+      prisma.lead.groupBy({
+        by: ["source_id"],
+        where: { account_id: accountId, workspace_id: workspaceId, is_junk: false },
+        _count: true, _avg: { intent_score: true },
+      }),
+      // Non-junk SQL per source
+      prisma.lead.groupBy({
+        by: ["source_id"],
+        where: { account_id: accountId, workspace_id: workspaceId, is_junk: false, is_sql: true },
+        _count: true,
+      }),
+      // Non-junk won per source
+      prisma.lead.groupBy({
+        by: ["source_id"],
+        where: { account_id: accountId, workspace_id: workspaceId, is_junk: false, won_at: { not: null } },
+        _count: true,
+      }),
     ])
 
     // Compute grade distribution with percentages
@@ -203,43 +228,42 @@ export async function GET(_req: Request) {
       pct:   Math.round((g._count.grade / total) * 100),
     }))
 
-    // Compute rep stats
-    const repStatsComputed = repStats.map((rep) => {
-      const leads   = rep.assigned_leads
-      const speeds  = leads.map((l) => l.speed_to_lead_hours).filter((s): s is number => s != null)
-      const avgSpeed = speeds.length > 0 ? speeds.reduce((a, b) => a + b, 0) / speeds.length : null
-      const missedLeadsForRep = leads.filter((l) => l.is_missed)
-      const missedValue = missedLeadsForRep.reduce((s, l) => s + (l.expected_value ?? 0), 0)
-
+    // Compute rep stats from grouped aggregates
+    const leadByRep   = new Map(leadAggByRep.map((r) => [r.assigned_rep_id, r]))
+    const missedByRep = new Map(missedAggByRep.map((r) => [r.assigned_rep_id, r]))
+    const repStatsComputed = repList.map((rep) => {
+      const a = leadByRep.get(rep.id)
+      const m = missedByRep.get(rep.id)
       return {
         id:            rep.id,
         first_name:    rep.first_name,
         last_name:     rep.last_name,
-        assigned:      leads.length,
-        speed_to_lead: avgSpeed,
-        missed_count:  missedLeadsForRep.length,
-        missed_value:  missedValue,
+        assigned:      a?._count ?? 0,
+        speed_to_lead: a?._avg.speed_to_lead_hours ?? null,
+        missed_count:  m?._count ?? 0,
+        missed_value:  m?._sum.expected_value ?? 0,
       }
     })
 
-    // Compute source truth
-    const sourceTruth = sources.map((src) => {
-      const nonJunk = src.leads.filter((l) => !l.is_junk)
-      const sqlCount = nonJunk.filter((l) => l.is_sql).length
-      const wonCount = nonJunk.filter((l) => l.won_at != null).length
-      const avgIntent = nonJunk.length > 0
-        ? Math.round(nonJunk.reduce((s, l) => s + l.intent_score, 0) / nonJunk.length)
-        : 0
-      return {
-        id:              src.id,
-        name:            src.name,
-        total_leads:     nonJunk.length,
-        sql_count:       sqlCount,
-        won_count:       wonCount,
-        avg_intent:      avgIntent,
-        conversion_rate: nonJunk.length > 0 ? Math.round((wonCount / nonJunk.length) * 100) : 0,
-      }
-    }).filter((s) => s.total_leads > 0)
+    // Compute source truth from grouped aggregates
+    const sqlBySource  = new Map(srcSql.map((s) => [s.source_id, s._count]))
+    const wonBySource  = new Map(srcWon.map((s) => [s.source_id, s._count]))
+    const sourceName   = new Map(sourceList.map((s) => [s.id, s.name]))
+    const sourceTruth = srcTotals
+      .filter((t) => t.source_id != null && t._count > 0 && sourceName.has(t.source_id))
+      .map((t) => {
+        const totalLeadsSrc = t._count
+        const wonCount = wonBySource.get(t.source_id) ?? 0
+        return {
+          id:              t.source_id!,
+          name:            sourceName.get(t.source_id)!,
+          total_leads:     totalLeadsSrc,
+          sql_count:       sqlBySource.get(t.source_id) ?? 0,
+          won_count:       wonCount,
+          avg_intent:      Math.round(t._avg.intent_score ?? 0),
+          conversion_rate: totalLeadsSrc > 0 ? Math.round((wonCount / totalLeadsSrc) * 100) : 0,
+        }
+      })
 
     // At risk soon
     const atRiskSoonValue = atRiskSoon.reduce((s, a) => s + (a.lead?.expected_value ?? 0), 0)
@@ -256,12 +280,16 @@ export async function GET(_req: Request) {
     const actedValue   = actedTodaySignals.reduce((s, a) => s + (a.lead?.expected_value ?? 0), 0)
 
     // Pipeline stages
-    const stageData = stageBreakdown.map((s) => ({
-      name:  s.name,
-      key:   s.key,
-      count: s.leads.length,
-      value: s.leads.reduce((sum, l) => sum + (l.expected_value ?? 0), 0),
-    }))
+    const stageAggById = new Map(leadsByStage.map((s) => [s.stage_id, s]))
+    const stageData = stageList.map((s) => {
+      const agg = stageAggById.get(s.id)
+      return {
+        name:  s.name,
+        key:   s.key,
+        count: agg?._count ?? 0,
+        value: agg?._sum.expected_value ?? 0,
+      }
+    })
 
     // Follow-up values
     const dueTodayValue   = dueTodayFollowups.reduce((s, a) => s + (a.lead?.expected_value ?? 0), 0)

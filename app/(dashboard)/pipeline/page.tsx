@@ -88,15 +88,34 @@ function stuckThreshold(stageKey: string): number {
 // ── Fetch ─────────────────────────────────────────────────────────────────────
 
 async function fetchPipeline(): Promise<PipelineData> {
-  const [stagesRes, leadsRes] = await Promise.all([
+  const [stagesRes, firstRes] = await Promise.all([
     fetch("/api/pipeline/stages", { credentials: "include" }),
     fetch("/api/leads?page=1", { credentials: "include" }),
   ])
   const stages = stagesRes.ok ? await stagesRes.json() : { stages: [] }
-  const leads  = leadsRes.ok  ? await leadsRes.json()  : { leads:  [] }
+  const first  = firstRes.ok  ? await firstRes.json()  : { leads: [], pages: 1 }
+  let leads = first.leads ?? []
+
+  // The board must show every active lead, not just the first page (was capped
+  // at 100 → columns and Won/Lost totals were silently wrong). Pull the
+  // remaining pages in parallel, capped so a very large account can't fire
+  // hundreds of requests (a board that big is unusable anyway).
+  const totalPages = Math.min(first.pages ?? 1, 30)
+  if (totalPages > 1) {
+    const rest = await Promise.all(
+      Array.from({ length: totalPages - 1 }, (_, i) =>
+        fetch(`/api/leads?page=${i + 2}`, { credentials: "include" })
+          .then((r) => (r.ok ? r.json() : { leads: [] }))
+          .then((j) => j.leads ?? [])
+          .catch(() => []),
+      ),
+    )
+    leads = leads.concat(...rest)
+  }
+
   return {
     stages: (stages.stages ?? []).sort((a: Stage, b: Stage) => a.order - b.order),
-    leads:  leads.leads ?? [],
+    leads,
   }
 }
 
