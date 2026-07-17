@@ -48,7 +48,15 @@ export async function getPlatformSession(): Promise<PlatformSession | null> {
   }
 
   const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  // getUser hits the auth server and can throw on a stale/invalid token — must
+  // not 500 the admin layout. Treat any failure as "not a platform admin".
+  let user: Awaited<ReturnType<typeof supabase.auth.getUser>>["data"]["user"] = null
+  try {
+    const { data } = await supabase.auth.getUser()
+    user = data.user
+  } catch {
+    return null
+  }
   if (!user?.email) return null
 
   if (!allowlist().includes(user.email.toLowerCase())) return null
@@ -61,7 +69,15 @@ export async function getPlatformSession(): Promise<PlatformSession | null> {
     return { authId: user.id, email: admin.email, role: admin.role, mfaEnrolled: true, mfaElevated: true }
   }
 
-  const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+  let aal: Awaited<ReturnType<typeof supabase.auth.mfa.getAuthenticatorAssuranceLevel>>["data"] = null
+  try {
+    const res = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+    aal = res.data
+  } catch {
+    // Can't resolve MFA state → fail closed (unenrolled/unelevated), which routes
+    // the admin to enrolment/challenge rather than crashing the layout.
+    return { authId: user.id, email: admin.email, role: admin.role, mfaEnrolled: false, mfaElevated: false }
+  }
   return {
     authId: user.id,
     email: admin.email,

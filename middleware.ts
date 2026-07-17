@@ -72,7 +72,14 @@ export async function middleware(req: NextRequest) {
           },
         }
       )
-      await supabase.auth.getSession()
+      // A stale or revoked refresh token makes getSession throw (AuthApiError:
+      // Invalid Refresh Token). That must never 500 the request — admin pages
+      // self-gate, so swallow it and let the response through as signed-out.
+      try {
+        await supabase.auth.getSession()
+      } catch {
+        // treated as signed out
+      }
     }
     return response
   }
@@ -115,10 +122,18 @@ export async function middleware(req: NextRequest) {
     }
   )
 
-  // Refresh session (keeps cookie alive, must run on every request)
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  // Refresh session (keeps cookie alive, must run on every request). A stale or
+  // revoked refresh token makes getSession throw (AuthApiError: Invalid Refresh
+  // Token) — that must not 500 the page. Treat any failure as "no session"; the
+  // redirect below sends them to /login, where a fresh sign-in overwrites the
+  // bad cookies.
+  let session: Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"] = null
+  try {
+    const { data } = await supabase.auth.getSession()
+    session = data.session
+  } catch {
+    session = null
+  }
 
   // Unauthenticated user hitting a protected route → redirect to login
   if (!session && isDashboardPath(pathname)) {

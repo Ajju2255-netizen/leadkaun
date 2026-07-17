@@ -140,9 +140,16 @@ export async function getServerSession(): Promise<AuthSession | null> {
     }
   } else {
     const supabase = createServerClient()
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
+    // A stale/revoked refresh token makes getSession throw (AuthApiError:
+    // Invalid Refresh Token). Treat any failure as unauthenticated rather than
+    // 500ing the layout/API — the caller redirects to /login.
+    let session: Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"] = null
+    try {
+      const { data } = await supabase.auth.getSession()
+      session = data.session
+    } catch {
+      return null
+    }
 
     if (!session?.user) return null
 

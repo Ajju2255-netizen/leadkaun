@@ -41,6 +41,7 @@ export async function GET(req: Request) {
     const actions = await prisma.followUpAction.findMany({
       where: {
         account_id:      session.account.id,
+        workspace_id:    session.workspace.id,
         assigned_rep_id: repFilterId,
         status:          { in: ["PENDING", "OVERDUE"] },
         due_date:        { lt: tomorrow },
