@@ -407,7 +407,7 @@ export default function IcpPage() {
       // Background regrade
       fetch("/api/admin/regrade", { method: "POST", credentials: "include" }).catch(() => {})
 
-      toast.success(`Saved — ${json.data.updated} leads are being regraded`)
+      toast.success(`Saved — ${json.queued ?? 0} leads are being regraded`)
       qc.invalidateQueries({ queryKey: ["icp-settings"] })
       qc.invalidateQueries({ queryKey: ["leads"] })
     } catch (err: unknown) {

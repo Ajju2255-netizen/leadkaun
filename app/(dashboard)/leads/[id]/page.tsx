@@ -131,7 +131,7 @@ export default function LeadRecordPage() {
     queryFn:  () => fetchLead(leadId),
   })
 
-  const { data: teamData } = useQuery<{ data: { id: string; first_name: string; last_name: string | null }[] }>({
+  const { data: teamData } = useQuery<{ members: { id: string; first_name: string; last_name: string | null }[] }>({
     queryKey: ["team-members"],
     queryFn:  async () => {
       const res = await fetch("/api/team/members", { credentials: "include" })
@@ -141,7 +141,7 @@ export default function LeadRecordPage() {
     enabled: isManager,
     staleTime: 5 * 60_000,
   })
-  const teamMembers = teamData?.data ?? []
+  const teamMembers = teamData?.members ?? []
 
   async function handleReassign() {
     if (!reassignRepId || reassigning) return

@@ -698,18 +698,29 @@ export default function LeadsPage() {
     if (!repId) return
     setBulkAssigning(true)
     const ids = Array.from(checkedIds)
-    await Promise.all(ids.map(id =>
-      fetch(`/api/leads/${id}/assign`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ rep_id: repId }),
-      })
-    ))
-    setBulkAssigning(false)
-    setCheckedIds(new Set())
-    queryClient.invalidateQueries({ queryKey: ["leads"] })
-    toast.success(`Assigned ${ids.length} lead${ids.length !== 1 ? "s" : ""}`)
+    try {
+      const results = await Promise.all(ids.map(id =>
+        fetch(`/api/leads/${id}/assign`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ rep_id: repId }),
+        }).then(r => r.ok).catch(() => false)
+      ))
+      const ok = results.filter(Boolean).length
+      const failed = ids.length - ok
+      setCheckedIds(new Set())
+      queryClient.invalidateQueries({ queryKey: ["leads"] })
+      if (ok === 0) {
+        toast.error("Could not assign leads. Please try again.")
+      } else if (failed > 0) {
+        toast.success(`Assigned ${ok} lead${ok !== 1 ? "s" : ""} · ${failed} failed`)
+      } else {
+        toast.success(`Assigned ${ok} lead${ok !== 1 ? "s" : ""}`)
+      }
+    } finally {
+      setBulkAssigning(false)
+    }
   }
 
   function handleBulkExport() {

@@ -8,20 +8,20 @@ import { ThemedSelect } from "@/components/shared/ThemedSelect"
 import { ModalPortal } from "@/components/shared/ModalPortal"
 import { enqueueOfflineAction } from "@/lib/offline/queue"
 
+// Values MUST match the WA_SIGNAL_TYPES enum in app/api/signals/whatsapp.
 const WA_OUTCOMES = [
-  { value: "WA_REPLIED_1H",         label: "Replied within 1 hour" },
-  { value: "WA_REPLIED_SAME_DAY",   label: "Replied same day" },
-  { value: "WA_REPLIED_NEXT_DAY",   label: "Replied next day" },
-  { value: "WA_NO_REPLY_24H",       label: "No reply in 24h" },
-  { value: "WA_NO_REPLY_48H",       label: "No reply in 48h" },
-  { value: "WA_BLOCKED",            label: "Blocked" },
+  { value: "WA_REPLIED_1H",   label: "Replied within 1 hour" },
+  { value: "WA_REPLIED_4H",   label: "Replied within 4 hours" },
+  { value: "WA_REPLIED_24H",  label: "Replied within 24 hours" },
+  { value: "WA_NO_REPLY",     label: "No reply" },
 ]
 
 const WA_TAGS = [
-  { value: "WA_TAG_NEGOTIATING",    label: "Negotiating price" },
-  { value: "WA_TAG_SITE_VISIT",     label: "Requested site visit" },
-  { value: "WA_TAG_COMPARING",      label: "Comparing options" },
-  { value: "WA_TAG_NOT_INTERESTED", label: "Not interested" },
+  { value: "WA_TAG_ASKED_PRICING",    label: "Asked for pricing" },
+  { value: "WA_TAG_NEGOTIATING",      label: "Negotiating price" },
+  { value: "WA_TAG_COMPARING",        label: "Comparing options" },
+  { value: "WA_TAG_DECISION_PENDING", label: "Decision pending" },
+  { value: "WA_TAG_NOT_SERIOUS",      label: "Not interested" },
 ]
 
 interface Props {
@@ -41,17 +41,17 @@ export function LogWhatsAppModal({ open, onClose, leadId, leadName }: Props) {
   async function handleSave() {
     if (!outcome) { toast.error("Select a conversation outcome"); return }
 
-    const body = {
-      lead_id:          leadId,
-      outcome,
-      conversation_tag: tag || undefined,
-      notes:            notes.trim() || undefined,
-    }
+    // The endpoint takes one `signal_type` per call. Log the reply-timing
+    // outcome as the primary signal; an optional intent tag is a second signal.
+    const note = notes.trim() || undefined
+    const primaryBody = { lead_id: leadId, signal_type: outcome, note }
+    const tagBody = tag ? { lead_id: leadId, signal_type: tag } : null
 
     setSaving(true)
     try {
       if (!navigator.onLine) {
-        enqueueOfflineAction({ url: "/api/signals/whatsapp", method: "POST", body })
+        enqueueOfflineAction({ url: "/api/signals/whatsapp", method: "POST", body: primaryBody })
+        if (tagBody) enqueueOfflineAction({ url: "/api/signals/whatsapp", method: "POST", body: tagBody })
         toast.info("Offline — WhatsApp log saved locally and will sync when connected")
         handleClose()
         return
@@ -60,13 +60,22 @@ export function LogWhatsAppModal({ open, onClose, leadId, leadName }: Props) {
       const res = await fetch("/api/signals/whatsapp", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify(body),
+        body:    JSON.stringify(primaryBody),
       })
 
       if (!res.ok) {
-        const err = await res.json()
+        const err = await res.json().catch(() => ({}))
         toast.error(err.error ?? "Failed to log WhatsApp")
         return
+      }
+
+      // Best-effort second signal for the intent tag (never blocks success).
+      if (tagBody) {
+        await fetch("/api/signals/whatsapp", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify(tagBody),
+        }).catch(() => {})
       }
 
       toast.success("WhatsApp interaction logged")

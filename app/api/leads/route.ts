@@ -32,7 +32,8 @@ export async function GET(req: Request) {
     const importJobId = searchParams.get("batch") ?? undefined
     const dateFrom    = searchParams.get("date_from") ?? undefined
     const dateTo      = searchParams.get("date_to")   ?? undefined
-    const page        = Math.max(1, parseInt(searchParams.get("page") ?? "1"))
+    const pageParsed  = parseInt(searchParams.get("page") ?? "1", 10)
+    const page        = Number.isFinite(pageParsed) ? Math.max(1, pageParsed) : 1
     const isJunk      = searchParams.get("junk") === "true"
 
     // REP can only see their own leads
@@ -173,6 +174,7 @@ export async function POST(req: Request) {
       const newLead = await tx.lead.create({
         data: {
           account_id:      session.account.id,
+          workspace_id:    session.workspace.id,
           first_name:      data.first_name,
           last_name:       data.last_name,
           phone,

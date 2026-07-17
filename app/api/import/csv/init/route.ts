@@ -69,6 +69,7 @@ export async function POST(req: Request) {
     const job = await prisma.importJobStatus.create({
       data: {
         account_id:   session.account.id,
+        workspace_id: session.workspace.id,
         user_id:      session.user.id,
         status:       "PROCESSING",
         total_rows:   totalRows,

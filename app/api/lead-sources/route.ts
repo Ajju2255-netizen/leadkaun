@@ -92,6 +92,7 @@ export async function POST(req: Request) {
     const source = await prisma.leadSource.create({
       data: {
         account_id:       session.account.id,
+        workspace_id:     session.workspace.id,
         name:             data.name,
         key:              finalKey,
         intent_baseline:  data.intent_baseline,

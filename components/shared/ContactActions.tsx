@@ -21,20 +21,21 @@ import { cn } from "@/lib/utils"
 
 type Tone = "good" | "warm" | "cold" | "neutral"
 
+// Values MUST match the server enums in app/api/signals/call|whatsapp (SignalType).
 const CALL_OUTCOMES: { value: string; label: string; tone: Tone }[] = [
   { value: "CALL_ANSWERED_INTERESTED",     label: "Interested",     tone: "good"    },
   { value: "CALL_ANSWERED_CALLBACK",       label: "Callback",       tone: "warm"    },
-  { value: "CALL_NO_ANSWER",               label: "No answer",      tone: "neutral" },
+  { value: "CALL_NOT_ANSWERED",            label: "No answer",      tone: "neutral" },
   { value: "CALL_BUSY",                    label: "Busy",           tone: "neutral" },
   { value: "CALL_ANSWERED_NOT_INTERESTED", label: "Not interested", tone: "cold"    },
 ]
 
 const WA_OUTCOMES: { value: string; label: string; tone: Tone }[] = [
-  { value: "WA_REPLIED_1H",       label: "Replied <1h", tone: "good"    },
-  { value: "WA_REPLIED_SAME_DAY", label: "Replied today", tone: "warm"  },
-  { value: "WA_NO_REPLY_24H",     label: "No reply 24h", tone: "neutral" },
-  { value: "WA_NO_REPLY_48H",     label: "No reply 48h", tone: "neutral" },
-  { value: "WA_BLOCKED",          label: "Blocked",      tone: "cold"    },
+  { value: "WA_REPLIED_1H",      label: "Replied <1h",   tone: "good"    },
+  { value: "WA_REPLIED_4H",      label: "Replied <4h",   tone: "warm"    },
+  { value: "WA_REPLIED_24H",     label: "Replied today", tone: "warm"    },
+  { value: "WA_NO_REPLY",        label: "No reply",      tone: "neutral" },
+  { value: "WA_TAG_NOT_SERIOUS", label: "Not serious",   tone: "cold"    },
 ]
 
 const TONE: Record<Tone, string> = {
@@ -88,7 +89,8 @@ export function ContactActions({
 
   async function logOutcome(channel: "call" | "wa", outcome: string) {
     const url  = channel === "call" ? "/api/signals/call" : "/api/signals/whatsapp"
-    const body = { lead_id: leadId, outcome }
+    // Server expects `signal_type` (SignalType enum), not `outcome`.
+    const body = { lead_id: leadId, signal_type: outcome }
     setSaving(outcome)
     try {
       if (typeof navigator !== "undefined" && !navigator.onLine) {

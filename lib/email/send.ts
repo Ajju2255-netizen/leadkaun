@@ -1,4 +1,5 @@
 import { Resend } from "resend"
+import { render } from "@react-email/components"
 import * as React from "react"
 import { prisma } from "@/lib/prisma"
 
@@ -54,11 +55,15 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult
 
   try {
     const resend = new Resend(apiKey)
+    // Render the React email to HTML ourselves and send `html`. resend v6 no
+    // longer bundles @react-email/render, so passing `react:` throws
+    // "t is not a function" in the minified production bundle.
+    const html = await render(opts.react)
     const { data, error } = await resend.emails.send({
       from:     FROM_ADDRESS,
       to:       opts.to,
       subject:  opts.subject,
-      react:    opts.react,
+      html,
       replyTo: opts.replyTo,
     })
 
