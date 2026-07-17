@@ -952,6 +952,7 @@ model Invoice {
 
   @@index([account_id, created_at])
   @@unique([provider, provider_ref]) // same retry-idempotency reason as Payment
+  @@unique([number]) // consecutive serial (invoice_serial_seq); no duplicates
   @@map("invoices")
 }
 
