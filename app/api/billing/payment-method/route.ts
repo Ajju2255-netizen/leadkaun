@@ -59,11 +59,21 @@ export async function POST() {
       await prisma.account.update({ where: { id: account.id }, data: { razorpay_customer_id: customerId } })
     }
 
+    // Defer the replacement's first charge to when the current paid period ends,
+    // so the customer isn't billed twice for the overlap (they've already paid
+    // the old subscription through current_period_end). Fall back to an immediate
+    // first charge only if we don't know the period end (or it's basically now).
+    const periodEnd = sub.current_period_end
+    const startAt = periodEnd && periodEnd.getTime() > Date.now() + 5 * 60_000
+      ? Math.floor(periodEnd.getTime() / 1000)
+      : undefined
+
     // New subscription on the same plan — this is the re-authorisation.
     const replacement = await rzp.createSubscription({
       planId: sub.plan.provider_plan_id,
       customerId,
       accountId: account.id,
+      startAt,
     })
 
     // Track it as pending. The OLD subscription keeps billing until the new one

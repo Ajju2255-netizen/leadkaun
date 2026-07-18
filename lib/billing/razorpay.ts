@@ -139,6 +139,13 @@ export function createSubscription(input: {
   customerId: string
   accountId: string
   totalCount?: number
+  /**
+   * Unix seconds. When set, Razorpay defers the FIRST charge to this time — the
+   * customer authorises the mandate now but isn't billed until then. Used by the
+   * "update payment method" re-auth so the new card isn't charged for the period
+   * the old subscription has already been paid for (no overlap double-charge).
+   */
+  startAt?: number
 }) {
   return call<RzpSubscription>("/subscriptions", {
     method: "POST",
@@ -147,6 +154,7 @@ export function createSubscription(input: {
       customer_id: input.customerId,
       total_count: input.totalCount ?? 120,
       customer_notify: 1,
+      ...(input.startAt ? { start_at: input.startAt } : {}),
       // Echoed back on every webhook — this is how we map a Razorpay
       // subscription to one of our accounts without trusting the client.
       notes: { account_id: input.accountId },
