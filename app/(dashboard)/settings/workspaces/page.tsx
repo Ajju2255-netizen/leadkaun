@@ -150,7 +150,11 @@ function MembersModal({ workspace, onClose, onChanged }: { workspace: Workspace;
   const qc = useQueryClient()
   const { data, isLoading } = useQuery<{ members: Member[]; available: Member[] }>({
     queryKey: ["workspace-members", workspace.id],
-    queryFn: () => fetch(`/api/workspaces/${workspace.id}/members`, { credentials: "include" }).then((r) => r.json()),
+    queryFn: async () => {
+      const r = await fetch(`/api/workspaces/${workspace.id}/members`, { credentials: "include" })
+      if (!r.ok) throw new Error("Failed to load members")
+      return r.json()
+    },
   })
   const [addId, setAddId] = useState("")
   const refresh = () => { qc.invalidateQueries({ queryKey: ["workspace-members", workspace.id] }); onChanged() }

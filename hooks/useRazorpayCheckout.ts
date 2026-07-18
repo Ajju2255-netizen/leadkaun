@@ -46,13 +46,31 @@ function loadScript(): Promise<RazorpayCtor> {
     const existing = document.querySelector<HTMLScriptElement>(`script[src="${SRC}"]`)
     const script = existing ?? document.createElement("script")
 
-    const onLoad = () => {
-      if (window.Razorpay) resolve(window.Razorpay)
-      else reject(new Error("Razorpay Checkout loaded but exposed no global"))
+    let timeout: ReturnType<typeof setTimeout>
+    const cleanup = () => {
+      clearTimeout(timeout)
+      script.removeEventListener("load", onLoad)
+      script.removeEventListener("error", onError)
     }
+    function onLoad() {
+      cleanup()
+      if (window.Razorpay) resolve(window.Razorpay)
+      else { script.remove(); reject(new Error("Razorpay Checkout loaded but exposed no global")) }
+    }
+    function onError() {
+      cleanup()
+      // Remove the failed tag so a retry starts fresh — otherwise a later call
+      // finds this dead tag, attaches a load listener that never fires, and the
+      // checkout button stays stuck on "Opening…" forever.
+      script.remove()
+      reject(new Error("Failed to load Razorpay Checkout"))
+    }
+    // Backstop: never leave the caller hanging (which would keep the billing
+    // button disabled) if a stale/blocked tag emits neither load nor error.
+    timeout = setTimeout(() => { cleanup(); script.remove(); reject(new Error("Razorpay Checkout timed out")) }, 15000)
 
-    script.addEventListener("load", onLoad, { once: true })
-    script.addEventListener("error", () => reject(new Error("Failed to load Razorpay Checkout")), { once: true })
+    script.addEventListener("load", onLoad)
+    script.addEventListener("error", onError)
 
     if (!existing) {
       script.src = SRC

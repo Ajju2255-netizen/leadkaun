@@ -249,20 +249,29 @@ export default function NotificationsPage() {
   const groupedRead   = filtered.filter((i) =>  i.is_read)
 
   async function markDismiss(id: string, reason: string) {
-    await fetch(`/api/notifications/${id}/dismiss`, {
-      method: "POST", credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reason }),
-    })
-    queryClient.invalidateQueries({ queryKey: ["notifications"] })
-    queryClient.invalidateQueries({ queryKey: ["notif-count"] })
-    toast.success("Alert dismissed")
+    try {
+      const res = await fetch(`/api/notifications/${id}/dismiss`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      })
+      if (!res.ok) { toast.error("Couldn't dismiss the alert"); return }
+      queryClient.invalidateQueries({ queryKey: ["notifications"] })
+      queryClient.invalidateQueries({ queryKey: ["notif-count"] })
+      toast.success("Alert dismissed")
+    } catch {
+      toast.error("Couldn't dismiss the alert")
+    }
   }
 
   async function markRead(id: string, url: string | null) {
-    await fetch(`/api/notifications/${id}/read`, { method: "POST", credentials: "include" })
-    queryClient.invalidateQueries({ queryKey: ["notifications"] })
-    queryClient.invalidateQueries({ queryKey: ["notif-count"] })
+    // Marking read is best-effort — still navigate on failure; the read state
+    // reconciles on next load. Wrapped so a network error isn't unhandled.
+    try {
+      await fetch(`/api/notifications/${id}/read`, { method: "POST", credentials: "include" })
+      queryClient.invalidateQueries({ queryKey: ["notifications"] })
+      queryClient.invalidateQueries({ queryKey: ["notif-count"] })
+    } catch { /* non-fatal */ }
     if (url) router.push(url)
   }
 

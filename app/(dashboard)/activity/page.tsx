@@ -80,7 +80,11 @@ export default function ActivityPage() {
   // Team members for the rep filter (managers only)
   const { data: teamData } = useQuery<{ members: Member[] }>({
     queryKey: ["team-members"],
-    queryFn: () => fetch("/api/team/members", { credentials: "include" }).then((r) => r.json()),
+    queryFn: async () => {
+      const r = await fetch("/api/team/members", { credentials: "include" })
+      if (!r.ok) throw new Error("Failed to load team")
+      return r.json()
+    },
     enabled: isManager,
     staleTime: 60_000,
   })
@@ -148,10 +152,12 @@ export default function ActivityPage() {
 function ActivityFeed({ repFilter, page, setPage }: { repFilter: string; page: number; setPage: (n: number) => void }) {
   const { data, isLoading } = useQuery<FeedResp>({
     queryKey: ["activity-feed", repFilter, page],
-    queryFn: () => {
+    queryFn: async () => {
       const p = new URLSearchParams({ page: String(page) })
       if (repFilter && repFilter !== "all") p.set("rep_id", repFilter)
-      return fetch(`/api/activity/feed?${p}`, { credentials: "include" }).then((r) => r.json())
+      const r = await fetch(`/api/activity/feed?${p}`, { credentials: "include" })
+      if (!r.ok) throw new Error("Failed to load activity feed")
+      return r.json()
     },
   })
 
@@ -222,7 +228,11 @@ function StatTile({ label, value, sub }: { label: string; value: React.ReactNode
 function CompliancePanel() {
   const { data, isLoading } = useQuery<ComplianceResp>({
     queryKey: ["activity-compliance"],
-    queryFn: () => fetch("/api/activity/compliance", { credentials: "include" }).then((r) => r.json()),
+    queryFn: async () => {
+      const r = await fetch("/api/activity/compliance", { credentials: "include" })
+      if (!r.ok) throw new Error("Failed to load compliance")
+      return r.json()
+    },
   })
 
   if (isLoading) return <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">{[1,2,3].map((i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}</div>
@@ -288,7 +298,11 @@ function CompliancePanel() {
 function RecoveryPanel() {
   const { data, isLoading } = useQuery<{ total_count: number; total_value: number; recovered_this_week: number; value_7d_pct_change: number | null; by_rep: { rep_id: string; first_name: string; last_name: string | null; missed_count: number; missed_value: number }[] }>({
     queryKey: ["missed-opportunities"],
-    queryFn: () => fetch("/api/analytics/missed", { credentials: "include" }).then((r) => r.json()),
+    queryFn: async () => {
+      const r = await fetch("/api/analytics/missed", { credentials: "include" })
+      if (!r.ok) throw new Error("Failed to load recovery")
+      return r.json()
+    },
   })
   if (isLoading) return <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">{[1,2,3].map((i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}</div>
   if (!data) return null
@@ -330,7 +344,11 @@ function RecoveryPanel() {
 function PerformancePanel() {
   const { data, isLoading } = useQuery<{ reps: RepPerf[] }>({
     queryKey: ["rep-tracking"],
-    queryFn: () => fetch("/api/analytics/rep-tracking", { credentials: "include" }).then((r) => r.json()),
+    queryFn: async () => {
+      const r = await fetch("/api/analytics/rep-tracking", { credentials: "include" })
+      if (!r.ok) throw new Error("Failed to load rep performance")
+      return r.json()
+    },
   })
   if (isLoading) return <div className="glass-2 gloss-edge rounded-2xl p-4 space-y-2">{[1,2,3].map((i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}</div>
   if (!data) return null
