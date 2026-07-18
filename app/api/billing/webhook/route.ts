@@ -37,6 +37,9 @@ export const dynamic = "force-dynamic"
  * See https://razorpay.com/docs/webhooks/payloads/subscriptions/
  */
 const RELEVANT = new Set([
+  // A future-dated "update payment method" re-auth lands here (mandate approved,
+  // first charge deferred to start_at) — this is where we swap the card over.
+  "subscription.authenticated",
   "subscription.activated",
   "subscription.charged",
   "subscription.pending",
@@ -155,7 +158,14 @@ export async function POST(req: Request) {
   // Cancel is best-effort: the new card is authorised and active, so ignoring it
   // would be worse than a flagged edge case; a cancel failure is logged for
   // manual cleanup rather than blocking the swap. (Live-verify this path.)
-  if (local.pending_provider_subscription_id === subEntity.id && status === "active") {
+  // The pending replacement is ready when it's authenticated (future-dated re-auth
+  // — mandate approved, first charge deferred so there's no overlap double-charge)
+  // or already active (immediate re-auth, when we couldn't defer). Either way, swap
+  // it in and retire the old subscription at its cycle end.
+  const pendingReady =
+    local.pending_provider_subscription_id === subEntity.id &&
+    (status === "active" || subEntity.status === "authenticated")
+  if (pendingReady) {
     const oldSubId = local.provider_subscription_id
     if (oldSubId && oldSubId !== subEntity.id) {
       try {
