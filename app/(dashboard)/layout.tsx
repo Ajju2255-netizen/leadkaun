@@ -9,7 +9,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const session = await getServerSession()
 
   if (!session) {
-    redirect("/login")
+    // Route through logout (clears any stale Supabase cookie) rather than
+    // straight to /login — otherwise a valid cookie with an invalid/inactive DB
+    // user loops between the middleware bounce and this redirect. See the
+    // logout route handler.
+    redirect("/api/auth/logout")
   }
 
   return (
