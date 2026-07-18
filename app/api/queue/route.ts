@@ -160,6 +160,9 @@ export async function GET(req: Request) {
     const contactedToday = await prisma.signal.count({
       where: {
         account_id:  session.account.id,
+        // Scope to this workspace via the lead (signals' own workspace_id column
+        // isn't reliably populated), so the count doesn't bleed across workspaces.
+        lead:        { workspace_id: session.workspace.id },
         created_at:  { gte: todayStart },
         signal_type: { in: OUTREACH_SIGNAL_TYPES },
         ...(session.user.role === "REP" ? { user_id: session.user.id } : {}),

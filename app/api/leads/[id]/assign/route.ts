@@ -31,7 +31,16 @@ export async function POST(req: Request, { params }: Params) {
     const [lead, rep] = await Promise.all([
       prisma.lead.findFirst({ where: { id: params.id, account_id: session.account.id, workspace_id: session.workspace.id } }),
       prisma.user.findFirst({
-        where: { id: data.rep_id, account_id: session.account.id, is_active: true },
+        where: {
+          id: data.rep_id, account_id: session.account.id, is_active: true,
+          // Rep must be able to work this workspace — an account ADMIN (all
+          // workspaces) or an explicit member. Otherwise the lead lands with
+          // someone who can't see it.
+          OR: [
+            { role: "ADMIN" },
+            { workspace_members: { some: { workspace_id: session.workspace.id } } },
+          ],
+        },
       }),
     ])
     if (!lead) return NOT_FOUND("Lead")
