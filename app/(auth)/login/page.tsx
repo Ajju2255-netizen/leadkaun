@@ -18,7 +18,10 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 function LoginForm() {
   const router       = useRouter()
   const searchParams = useSearchParams()
-  const redirectTo   = searchParams.get("redirectTo") ?? "/dashboard"
+  // Only honour a same-origin absolute path — never an external URL (an
+  // attacker-supplied ?redirectTo=https://evil.com would be an open redirect).
+  const rawRedirect  = searchParams.get("redirectTo")
+  const redirectTo   = rawRedirect && /^\/[^/\\]/.test(rawRedirect) ? rawRedirect : "/dashboard"
 
   const [email,    setEmail]    = useState("")
   const [password, setPassword] = useState("")
