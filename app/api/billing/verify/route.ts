@@ -76,8 +76,6 @@ export async function POST(req: Request) {
     const remote = await rzp.fetchSubscription(data.razorpay_subscription_id)
     const status = rzp.mapStatus(remote.status)
 
-    // For a payment-method update, the swap (cancel old + adopt new id) is done
-    // by the webhook only — the source of truth. Here we just confirm to the UI.
     if (!isPending) {
       await prisma.subscription.update({
         where: { account_id: session.account.id },
@@ -85,6 +83,33 @@ export async function POST(req: Request) {
           status,
           mrr_inr: status === "active" ? sub.plan.price_inr : sub.mrr_inr,
           canceled_at: status === "canceled" ? new Date() : null,
+        },
+      })
+    } else if (remote.status === "authenticated" || status === "active") {
+      // Payment-method re-auth succeeded: swap the card over now via this browser
+      // success path rather than waiting on the webhook — for a future-dated sub
+      // Razorpay won't fire subscription.activated until the deferred first charge,
+      // and subscription.authenticated may not be enabled on the webhook. Cancel
+      // the old sub at cycle end and adopt the new id. Idempotent with the
+      // webhook's swap — a second run finds pending already cleared.
+      const oldSubId = sub.provider_subscription_id
+      if (oldSubId && oldSubId !== data.razorpay_subscription_id) {
+        try {
+          await rzp.cancelSubscription(oldSubId, true)
+        } catch (e) {
+          console.error("[billing] verify swap: old sub cancel failed —", oldSubId, e)
+        }
+      }
+      await prisma.subscription.update({
+        where: { account_id: session.account.id },
+        data: {
+          provider_subscription_id: data.razorpay_subscription_id,
+          pending_provider_subscription_id: null,
+          status: "active",
+          mrr_inr: sub.plan.price_inr,
+          ...(remote.current_start
+            ? { current_period_start: new Date(remote.current_start * 1000), current_period_end: remote.current_end ? new Date(remote.current_end * 1000) : null }
+            : {}),
         },
       })
     }
