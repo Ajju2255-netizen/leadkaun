@@ -240,15 +240,22 @@ export default function PipelinePage() {
         : prev,
     )
 
-    const res = await fetch(`/api/leads/${leadId}/stage`, {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body:    JSON.stringify({ stage_id: toStage.id, note: isBackward ? `Moved back to "${toStage.name}" on the pipeline board` : null }),
-    })
-    if (res.ok) toast.success(`Moved to ${toStage.name}`)
-    else { const e = await res.json().catch(() => ({})); toast.error(e.error ?? "Couldn't move the deal") }
-    invalidate()
+    try {
+      const res = await fetch(`/api/leads/${leadId}/stage`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body:    JSON.stringify({ stage_id: toStage.id, note: isBackward ? `Moved back to "${toStage.name}" on the pipeline board` : null }),
+      })
+      if (res.ok) toast.success(`Moved to ${toStage.name}`)
+      else { const e = await res.json().catch(() => ({})); toast.error(e.error ?? "Couldn't move the deal") }
+    } catch {
+      toast.error("Couldn't move the deal — check your connection")
+    } finally {
+      // Always reconcile with the server truth, so a failed move reverts the
+      // optimistic card position instead of leaving it in the wrong column.
+      invalidate()
+    }
   }
 
   if (isLoading) return (
@@ -537,15 +544,20 @@ function PipelineLeadCard({
   async function moveForward() {
     if (!nextStage) return
     setMovingForward(true)
-    const res = await fetch(`/api/leads/${lead.id}/stage`, {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body:    JSON.stringify({ stage_id: nextStage.id }),
-    })
-    setMovingForward(false)
-    if (res.ok) { toast.success(`Moved to ${nextStage.name}`); onMoved() }
-    else { const e = await res.json(); toast.error(e.error ?? "Failed to move stage") }
+    try {
+      const res = await fetch(`/api/leads/${lead.id}/stage`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body:    JSON.stringify({ stage_id: nextStage.id }),
+      })
+      if (res.ok) { toast.success(`Moved to ${nextStage.name}`); onMoved() }
+      else { const e = await res.json().catch(() => ({})); toast.error(e.error ?? "Failed to move stage") }
+    } catch {
+      toast.error("Failed to move stage — check your connection")
+    } finally {
+      setMovingForward(false)
+    }
   }
 
   return (

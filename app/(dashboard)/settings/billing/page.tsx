@@ -124,20 +124,26 @@ export default function BillingPage() {
         accountName: data.accountName,
         email: data.email,
         onSuccess: async (payload) => {
-          const verify = await fetch("/api/billing/verify", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify(payload),
-          })
-          if (verify.ok) {
-            toast.success(`You're on ${data.planName}.`)
-          } else {
-            // The webhook is authoritative and still lands — say so rather than
-            // implying the payment failed.
+          try {
+            const verify = await fetch("/api/billing/verify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify(payload),
+            })
+            if (verify.ok) {
+              toast.success(`You're on ${data.planName}.`)
+            } else {
+              // The webhook is authoritative and still lands — say so rather than
+              // implying the payment failed.
+              toast.info("Payment received. Activating your plan — this can take a moment.")
+            }
+          } catch {
+            // Verify is only a UX shortcut; the webhook still activates the plan.
             toast.info("Payment received. Activating your plan — this can take a moment.")
+          } finally {
+            await load()
           }
-          await load()
         },
         onDismiss: () => toast.info("Checkout cancelled. You have not been charged."),
       })
@@ -165,15 +171,20 @@ export default function BillingPage() {
         accountName: data.accountName,
         email: data.email,
         onSuccess: async (payload) => {
-          await fetch("/api/billing/verify", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify(payload),
-          })
-          // The webhook does the swap (cancel old at cycle end, adopt new card).
-          toast.success("New card saved. Finalising the change — this can take a moment.")
-          await load()
+          try {
+            await fetch("/api/billing/verify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify(payload),
+            })
+            // The webhook does the swap (cancel old at cycle end, adopt new card).
+            toast.success("New card saved. Finalising the change — this can take a moment.")
+          } catch {
+            toast.info("Card submitted. Finalising the change — this can take a moment.")
+          } finally {
+            await load()
+          }
         },
         onDismiss: () => toast.info("Update cancelled. Your current card is unchanged."),
       })
