@@ -8,10 +8,10 @@ import { toast } from "sonner"
 import Papa from "papaparse"
 import { mapHeader } from "@/lib/import/column-map"
 import {
-  Download, FileSpreadsheet, FileType2, UserPlus, Lock,
+  Download, FileSpreadsheet, FileType2, UserPlus, X,
   CloudUpload, Cog, ShieldCheck, Users, CheckCircle2,
   AlertCircle, Clock, Star, IndianRupee, ArrowRight,
-  Sparkles, RotateCw,
+  Sparkles, RotateCw, Loader2,
 } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { EmptyState } from "@/components/shared/EmptyState"
@@ -55,12 +55,20 @@ type Stage = "idle" | "uploading" | "parsing" | "scoring" | "deduplicating" | "c
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB — matches the UI promise
 
-// A minimal, copy-paste-able template covering the required (name, phone) and
-// the most useful optional columns. Headers match the import column map.
+// Full template — every column the importer recognises, with example rows that
+// show the accepted formats. Headers match the import column map (aliases like
+// "Mobile No", "Full Name" also work). Only name + phone are required; the rest
+// are optional and drive scoring:
+//   • interest_level → High / Medium / Low  (adds an intent signal)
+//   • last_contact_days → whole number of days since last contact (0 = today)
+//   • budget → 25L, 1.2Cr, or a plain number like 500000
+//   • notes → free text; keywords (demo, callback, site visit, "not interested")
+//             nudge intent up or down
 const SAMPLE_CSV =
-  "name,phone,email,company,city,budget,interest_level,inquiry\n" +
-  "Rohan Sharma,98765 43210,rohan@example.com,Acme Realty,Bangalore,25L,High,Looking for 3BHK in Whitefield\n" +
-  "Priya Nair,+91 99887 76655,priya@example.com,,Mumbai,1.2Cr,Medium,Requested a callback next week\n"
+  "name,phone,email,company,designation,city,state,pincode,budget,interest_level,last_contact_days,notes\n" +
+  "Rohan Sharma,98765 43210,rohan@example.com,Acme Realty,Director,Bangalore,Karnataka,560066,25L,High,1,Wants a 3BHK in Whitefield — asked for a site visit\n" +
+  "Priya Nair,+91 99887 76655,priya@example.com,Nair Exports,Owner,Mumbai,Maharashtra,400001,1.2Cr,Medium,3,Requested a callback next week\n" +
+  "Imran Khan,9812345678,,,Manager,Lucknow,Uttar Pradesh,226001,500000,Low,10,Comparing vendors — no urgency yet\n"
 
 function downloadSampleCsv() {
   const blob = new Blob([SAMPLE_CSV], { type: "text/csv;charset=utf-8;" })
@@ -163,9 +171,13 @@ function PipelineSteps({ current }: { current: Stage }) {
 function ImportFromCard({
   uploading,
   onCsvClick,
+  onSheetsClick,
+  onManualClick,
 }: {
   uploading: boolean
   onCsvClick: () => void
+  onSheetsClick: () => void
+  onManualClick: () => void
 }) {
   return (
     <div className="glass-2 gloss-edge rounded-2xl p-6">
@@ -197,8 +209,15 @@ function ImportFromCard({
           <span className="text-[11px] font-semibold text-emerald-600 shrink-0">Click ↑</span>
         </button>
 
-        {/* Google Sheets — coming soon */}
-        <div className="w-full flex items-center gap-3 p-3 rounded-xl border border-hairline bg-white/40">
+        {/* Google Sheets — paste a shared link */}
+        <button
+          type="button"
+          disabled={uploading}
+          onClick={onSheetsClick}
+          className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 border-dashed transition-all text-left
+            ${uploading ? "border-slate-200 opacity-60 cursor-not-allowed" : "border-sky-200 bg-sky-50/30 hover:border-sky-400 hover:bg-sky-50/60 cursor-pointer"}
+          `}
+        >
           <div
             className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
             style={{
@@ -210,15 +229,20 @@ function ImportFromCard({
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-[13px] font-semibold text-ink leading-tight">Google Sheets</p>
-            <p className="text-[11px] text-ink-muted mt-0.5">Live sync from any sheet</p>
+            <p className="text-[11px] text-ink-muted mt-0.5">Import from a shared sheet link</p>
           </div>
-          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 shrink-0">
-            <Lock className="w-2.5 h-2.5" /> Soon
-          </span>
-        </div>
+          <span className="text-[11px] font-semibold text-sky-600 shrink-0">Paste →</span>
+        </button>
 
-        {/* Manual Entry — coming soon */}
-        <div className="w-full flex items-center gap-3 p-3 rounded-xl border border-hairline bg-white/40">
+        {/* Manual Entry — add one lead by hand */}
+        <button
+          type="button"
+          disabled={uploading}
+          onClick={onManualClick}
+          className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 border-dashed transition-all text-left
+            ${uploading ? "border-slate-200 opacity-60 cursor-not-allowed" : "border-violet-200 bg-violet-50/30 hover:border-violet-400 hover:bg-violet-50/60 cursor-pointer"}
+          `}
+        >
           <div
             className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
             style={{
@@ -232,10 +256,8 @@ function ImportFromCard({
             <p className="text-[13px] font-semibold text-ink leading-tight">Manual Entry</p>
             <p className="text-[11px] text-ink-muted mt-0.5">Add a single lead by hand</p>
           </div>
-          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 shrink-0">
-            <Lock className="w-2.5 h-2.5" /> Soon
-          </span>
-        </div>
+          <span className="text-[11px] font-semibold text-violet-600 shrink-0">Add →</span>
+        </button>
       </div>
 
       {/* New to this? grab the template + see what's recognised */}
@@ -249,7 +271,8 @@ function ImportFromCard({
         </button>
         <p className="text-[11px] text-ink-muted leading-relaxed">
           <span className="font-semibold text-ink-soft">Required:</span> name, phone.{" "}
-          <span className="font-semibold text-ink-soft">Optional:</span> email, company, city, budget, interest level, notes.
+          <span className="font-semibold text-ink-soft">Optional:</span> email, company, designation, city, state, pincode,
+          budget, interest level (High/Medium/Low), last contact days, notes.
           Column names are matched automatically — “Mobile No”, “Full Name”, etc. all work.
         </p>
       </div>
@@ -504,6 +527,26 @@ export default function ImportPage() {
   const fileRef     = useRef<HTMLInputElement>(null)
   const [refreshKey, setRefreshKey] = useState(0)
 
+  // Google Sheets + Manual Entry modals
+  const [sheetsOpen, setSheetsOpen] = useState(false)
+  const [manualOpen, setManualOpen] = useState(false)
+
+  // Invalidate every lead-derived cache so a new import/lead shows up app-wide
+  // without a manual page refresh.
+  const refreshLeadCaches = useCallback(() => {
+    for (const key of [
+      ["queue"], ["leads"], ["leads-stats"], ["leads-sample"],
+      ["missed-opportunities"], ["missed-count"],
+      ["pipeline"], ["pipeline-summary"],
+      ["dashboard"], ["dashboard-pulse"],
+      ["follow-ups"], ["follow-ups-engine"],
+      ["analytics-intelligence"], ["rep-tracking"],
+      ["notifications"], ["notif-count"],
+    ]) {
+      queryClient.invalidateQueries({ queryKey: key })
+    }
+  }, [queryClient])
+
   // Load sources + stages (retryable, so a failed fetch doesn't leave the
   // Source/Stage selects stuck on "Loading…" forever — audit B8 dead-end).
   const [metaError, setMetaError] = useState(false)
@@ -569,21 +612,6 @@ export default function ImportPage() {
     setUploading(true)
     setProgress(0)
     setResult(null)
-
-    // Imported leads must surface everywhere without a manual page refresh.
-    const refreshLeadCaches = () => {
-      for (const key of [
-        ["queue"], ["leads"], ["leads-stats"], ["leads-sample"],
-        ["missed-opportunities"], ["missed-count"],
-        ["pipeline"], ["pipeline-summary"],
-        ["dashboard"], ["dashboard-pulse"],
-        ["follow-ups"], ["follow-ups-engine"],
-        ["analytics-intelligence"], ["rep-tracking"],
-        ["notifications"], ["notif-count"],
-      ]) {
-        queryClient.invalidateQueries({ queryKey: key })
-      }
-    }
 
     try {
       // ── Parse client-side (encoding-aware) so the upload streams in small
@@ -689,6 +717,61 @@ export default function ImportPage() {
     }
   }
 
+  // ── Google Sheets: one-time pull from a shared sheet link ──────────────────
+  async function handleSheetImport(sheetUrl: string) {
+    if (!sourceId || !stageId) {
+      toast.error("Please select a lead source and initial stage first")
+      return
+    }
+    setSheetsOpen(false)
+    setFileName("Google Sheet")
+    setUploading(true)
+    setProgress(20)          // one blocking request — show activity, then jump to 100
+    setResult(null)
+    try {
+      const res = await fetch("/api/import/sheets", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sheet_url:           sheetUrl,
+          source_id:           sourceId,
+          stage_id:            stageId,
+          name:                sessionName.trim() || undefined,
+          source_collected_at: sourceAgeToDate(freshness)?.toISOString() ?? null,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(data.error ?? "Google Sheets import failed.")
+        setProgress(null); setUploading(false); return
+      }
+      setProgress(100)
+      setResult({
+        jobId: data.jobId, aborted: false,
+        inserted: data.inserted ?? 0, duplicates: data.duplicates ?? 0, errors: data.errors ?? 0,
+        high_intent_count: data.high_intent_count ?? 0, total_value: data.total_value ?? 0,
+        total_rows: data.total_rows ?? null,
+        errorDetail: data.errorDetail ?? null,
+      })
+      if ((data.inserted ?? 0) > 0) {
+        toast.success(`Imported ${data.inserted} lead${data.inserted === 1 ? "" : "s"} from Google Sheets`)
+      } else {
+        toast.info(`Import complete — 0 new leads (${data.duplicates ?? 0} duplicate${data.duplicates === 1 ? "" : "s"})`)
+      }
+      if (data.truncated) {
+        toast.info(`That sheet had ${data.sheet_total_rows?.toLocaleString("en-IN")} rows — imported the first ${data.total_rows?.toLocaleString("en-IN")}. Split the rest or export to CSV.`)
+      }
+      refreshLeadCaches()
+      setRefreshKey((k) => k + 1)
+    } catch (err) {
+      console.error("Sheets import failed:", err)
+      toast.error("Unexpected error during Google Sheets import.")
+      setProgress(null)
+    } finally {
+      setUploading(false)
+    }
+  }
+
   if (currentUser && !isManager) {
     return (
       <div className="max-w-2xl mx-auto py-12 text-center space-y-2">
@@ -749,7 +832,12 @@ export default function ImportPage() {
       {/* ── 2-col: Import From | Ingestion in Progress ───────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
-        <ImportFromCard uploading={uploading} onCsvClick={handleCsvClick} />
+        <ImportFromCard
+          uploading={uploading}
+          onCsvClick={handleCsvClick}
+          onSheetsClick={() => setSheetsOpen(true)}
+          onManualClick={() => setManualOpen(true)}
+        />
 
         <div className="lg:col-span-2 glass-2 gloss-edge rounded-2xl p-6">
           <h2 className="text-[16px] font-semibold text-ink mb-5">
@@ -923,6 +1011,25 @@ export default function ImportPage() {
           </div>
         )}
       </div>
+
+      {/* ── Google Sheets modal ──────────────────────────────────────────── */}
+      <SheetsModal
+        open={sheetsOpen}
+        onClose={() => setSheetsOpen(false)}
+        onImport={handleSheetImport}
+        ready={Boolean(sourceId && stageId)}
+      />
+
+      {/* ── Manual entry modal ───────────────────────────────────────────── */}
+      <ManualLeadModal
+        open={manualOpen}
+        onClose={() => setManualOpen(false)}
+        sources={sources}
+        stages={stages}
+        defaultSourceId={sourceId}
+        defaultStageId={stageId}
+        onCreated={() => { refreshLeadCaches(); setRefreshKey((k) => k + 1) }}
+      />
     </div>
   )
 }
@@ -990,5 +1097,293 @@ function RegradeButton() {
         {status === "loading" ? "Regrading…" : status === "done" ? "Done" : "Run regrade"}
       </button>
     </div>
+  )
+}
+
+// ── Shared modal shell ─────────────────────────────────────────────────────────
+
+function ModalShell({
+  title, subtitle, icon, accent, onClose, children,
+}: {
+  title: string; subtitle?: string; icon: React.ReactNode; accent: string
+  onClose: () => void; children: React.ReactNode
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 backdrop-blur-sm p-4 sm:p-6"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className="mt-[5vh] w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-hairline" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start gap-3 p-5 border-b border-hairline">
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: accent, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.85)" }}>
+            {icon}
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-[16px] font-semibold text-ink leading-tight">{title}</h3>
+            {subtitle && <p className="text-[12px] text-ink-muted mt-0.5">{subtitle}</p>}
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close" className="text-ink-muted hover:text-ink shrink-0 -mt-0.5">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="p-5">{children}</div>
+      </div>
+    </div>
+  )
+}
+
+// ── Google Sheets modal ────────────────────────────────────────────────────────
+
+function SheetsModal({
+  open, onClose, onImport, ready,
+}: {
+  open: boolean; onClose: () => void; onImport: (url: string) => void; ready: boolean
+}) {
+  const [url, setUrl] = useState("")
+  if (!open) return null
+  const valid = /docs\.google\.com\/spreadsheets\/d\//.test(url)
+  return (
+    <ModalShell
+      title="Import from Google Sheets"
+      subtitle="Paste a shared sheet link — we pull it once through the same scoring pipeline."
+      icon={<FileSpreadsheet className="w-5 h-5 text-sky-700" strokeWidth={2} />}
+      accent="linear-gradient(180deg, #BAE6FD 0%, #7DD3FC 100%)"
+      onClose={onClose}
+    >
+      <div className="space-y-4">
+        <div className="space-y-1.5">
+          <label className="text-[11px] font-semibold text-ink-soft uppercase tracking-[0.08em] block">Google Sheet link</label>
+          <input
+            type="url"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://docs.google.com/spreadsheets/d/…"
+            autoFocus
+            className="w-full h-10 px-3 rounded-lg border border-hairline-strong bg-white text-[13px] text-ink outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 placeholder:text-ink-faint"
+          />
+        </div>
+
+        <div className="rounded-lg bg-sky-50/60 border border-sky-100 p-3 text-[12px] text-ink-soft leading-relaxed">
+          <p className="font-semibold text-ink mb-1">Before you import</p>
+          <ol className="list-decimal list-inside space-y-0.5">
+            <li>In the sheet: <span className="font-medium text-ink">Share → General access → “Anyone with the link (Viewer)”</span>.</li>
+            <li>First row must be the header (name, phone, email, …).</li>
+            <li>We import the first tab, using the source, stage &amp; list-age selected on this page.</li>
+          </ol>
+        </div>
+
+        {!ready && (
+          <p className="text-[12px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            Pick a lead source and initial stage on the import page first.
+          </p>
+        )}
+
+        <div className="flex items-center justify-end gap-2 pt-1">
+          <button type="button" onClick={onClose} className="h-10 px-4 rounded-lg text-[13px] font-semibold text-ink-soft hover:bg-slate-100 transition-colors">
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={!valid || !ready}
+            onClick={() => onImport(url.trim())}
+            className="h-10 px-4 rounded-lg text-[13px] font-semibold text-white disabled:opacity-50 inline-flex items-center gap-1.5 transition-all active:scale-[0.98]"
+            style={{ background: "linear-gradient(180deg, #38BDF8 0%, #0EA5E9 100%)", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.45), 0 4px 12px rgba(14,165,233,0.30)" }}
+          >
+            <FileSpreadsheet className="w-4 h-4" /> Import sheet
+          </button>
+        </div>
+      </div>
+    </ModalShell>
+  )
+}
+
+// ── Manual entry modal ─────────────────────────────────────────────────────────
+
+/** Parse a budget string like "25L", "1.2Cr", "₹5,00,000" → integer rupees. */
+function parseBudget(raw: string): number | null {
+  const s = raw.trim().toLowerCase().replace(/[₹,\s]/g, "")
+  if (!s) return null
+  const m = s.match(/^([\d.]+)(cr|crore|l|lac|lakh|k)?$/)
+  if (!m) return null
+  const num = parseFloat(m[1])
+  if (isNaN(num)) return null
+  const unit = m[2]
+  let val = num
+  if (unit === "cr" || unit === "crore") val = num * 1_00_00_000
+  else if (unit === "l" || unit === "lac" || unit === "lakh") val = num * 1_00_000
+  else if (unit === "k") val = num * 1_000
+  const int = Math.round(val)
+  return int > 0 ? int : null
+}
+
+function ManualField({
+  label, value, onChange, placeholder, type = "text", required, autoFocus,
+}: {
+  label: string; value: string; onChange: (v: string) => void
+  placeholder?: string; type?: string; required?: boolean; autoFocus?: boolean
+}) {
+  return (
+    <div className="space-y-1.5">
+      <label className="text-[10px] font-semibold text-ink-soft uppercase tracking-[0.08em] block">
+        {label}{required && <span className="text-rose-500"> *</span>}
+      </label>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        autoFocus={autoFocus}
+        className="w-full h-10 px-3 rounded-lg border border-hairline-strong bg-white text-[13px] text-ink outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 placeholder:text-ink-faint"
+      />
+    </div>
+  )
+}
+
+const EMPTY_MANUAL = {
+  first_name: "", last_name: "", phone: "", email: "", company_name: "",
+  designation: "", city: "", state: "", pincode: "", expected_value: "",
+  interest_level: "", last_contact_days: "", inquiry_text: "",
+}
+
+function ManualLeadModal({
+  open, onClose, sources, stages, defaultSourceId, defaultStageId, onCreated,
+}: {
+  open: boolean; onClose: () => void
+  sources: LeadSource[]; stages: PipelineStage[]
+  defaultSourceId: string; defaultStageId: string
+  onCreated: () => void
+}) {
+  const [f, setF] = useState({ ...EMPTY_MANUAL })
+  const [sourceId, setSourceId] = useState(defaultSourceId)
+  const [stageId, setStageId] = useState(defaultStageId)
+  const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (open) { setSourceId(defaultSourceId); setStageId(defaultStageId) }
+  }, [open, defaultSourceId, defaultStageId])
+
+  if (!open) return null
+
+  const set = (k: keyof typeof EMPTY_MANUAL) => (v: string) => setF((prev) => ({ ...prev, [k]: v }))
+  const phoneDigits = f.phone.replace(/\D/g, "").length
+  const canSubmit = f.first_name.trim().length > 0 && phoneDigits >= 10 && Boolean(sourceId) && Boolean(stageId) && !submitting
+
+  async function submit() {
+    if (!canSubmit) return
+    setSubmitting(true)
+
+    const days = f.last_contact_days.trim() === "" ? null : parseInt(f.last_contact_days, 10)
+    const expected = parseBudget(f.expected_value)
+
+    const payload: Record<string, unknown> = {
+      first_name:   f.first_name.trim(),
+      last_name:    f.last_name.trim() || undefined,
+      phone:        f.phone.trim(),
+      email:        f.email.trim() || undefined,
+      company_name: f.company_name.trim() || undefined,
+      designation:  f.designation.trim() || undefined,
+      city:         f.city.trim() || undefined,
+      state:        f.state.trim() || undefined,
+      pincode:      f.pincode.trim() || undefined,
+      source_id:    sourceId,
+      stage_id:     stageId,
+      inquiry_text: f.inquiry_text.trim() || undefined,
+      expected_value:    expected ?? undefined,
+      interest_level:    f.interest_level || undefined,
+      last_contact_days: days !== null && !isNaN(days) && days >= 0 ? days : undefined,
+    }
+
+    try {
+      const res = await fetch("/api/leads", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(data.error ?? "Couldn't add the lead. Check the fields and try again.")
+        setSubmitting(false)
+        return
+      }
+      const grade = typeof data.grade === "string" ? data.grade : undefined
+      toast.success(`Lead added${grade ? ` — graded ${grade}` : ""}`)
+      onCreated()
+      setF({ ...EMPTY_MANUAL })
+      onClose()
+    } catch {
+      toast.error("Unexpected error adding the lead.")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <ModalShell
+      title="Add a lead"
+      subtitle="Scored on the same A–F engine as an import — intent included."
+      icon={<UserPlus className="w-5 h-5 text-violet-700" strokeWidth={2} />}
+      accent="linear-gradient(180deg, #DDD6FE 0%, #C4B5FD 100%)"
+      onClose={onClose}
+    >
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          <ManualField label="First name" value={f.first_name} onChange={set("first_name")} placeholder="Rohan" required autoFocus />
+          <ManualField label="Last name" value={f.last_name} onChange={set("last_name")} placeholder="Sharma" />
+          <ManualField label="Phone" value={f.phone} onChange={set("phone")} placeholder="98765 43210" type="tel" required />
+          <ManualField label="Email" value={f.email} onChange={set("email")} placeholder="rohan@example.com" type="email" />
+          <ManualField label="Company" value={f.company_name} onChange={set("company_name")} placeholder="Acme Realty" />
+          <ManualField label="Designation" value={f.designation} onChange={set("designation")} placeholder="Director" />
+          <ManualField label="City" value={f.city} onChange={set("city")} placeholder="Bangalore" />
+          <ManualField label="State" value={f.state} onChange={set("state")} placeholder="Karnataka" />
+          <ManualField label="Pincode" value={f.pincode} onChange={set("pincode")} placeholder="560066" />
+          <ManualField label="Budget" value={f.expected_value} onChange={set("expected_value")} placeholder="25L · 1.2Cr · 500000" />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-semibold text-ink-soft uppercase tracking-[0.08em] block">Lead source <span className="text-rose-500">*</span></label>
+            <ThemedSelect value={sourceId} onValueChange={setSourceId} options={sources.map((s) => ({ value: s.id, label: s.name }))} placeholder={sources.length ? "Select source" : "Loading…"} disabled={!sources.length} aria-label="Lead source" />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-semibold text-ink-soft uppercase tracking-[0.08em] block">Initial stage <span className="text-rose-500">*</span></label>
+            <ThemedSelect value={stageId} onValueChange={setStageId} options={stages.map((s) => ({ value: s.id, label: s.name }))} placeholder={stages.length ? "Select stage" : "Loading…"} disabled={!stages.length} aria-label="Initial stage" />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-semibold text-ink-soft uppercase tracking-[0.08em] block">Interest level</label>
+            <ThemedSelect value={f.interest_level} onValueChange={set("interest_level")} options={[{ value: "high", label: "High" }, { value: "medium", label: "Medium" }, { value: "low", label: "Low" }]} placeholder="Not set" aria-label="Interest level" />
+          </div>
+          <ManualField label="Days since last contact" value={f.last_contact_days} onChange={set("last_contact_days")} placeholder="e.g. 2" type="number" />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-semibold text-ink-soft uppercase tracking-[0.08em] block">Notes</label>
+          <textarea
+            value={f.inquiry_text}
+            onChange={(e) => set("inquiry_text")(e.target.value)}
+            placeholder="What do they want? Keywords like “demo”, “site visit”, “callback” nudge intent up."
+            rows={2}
+            className="w-full px-3 py-2 rounded-lg border border-hairline-strong bg-white text-[13px] text-ink outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 placeholder:text-ink-faint resize-none"
+          />
+        </div>
+
+        <div className="flex items-center justify-end gap-2 pt-1">
+          <button type="button" onClick={onClose} className="h-10 px-4 rounded-lg text-[13px] font-semibold text-ink-soft hover:bg-slate-100 transition-colors">
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={!canSubmit}
+            onClick={submit}
+            className="h-10 px-4 rounded-lg text-[13px] font-semibold text-white disabled:opacity-50 inline-flex items-center gap-1.5 transition-all active:scale-[0.98]"
+            style={{ background: "linear-gradient(180deg, #A78BFA 0%, #8B5CF6 100%)", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.45), 0 4px 12px rgba(139,92,246,0.30)" }}
+          >
+            {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+            {submitting ? "Adding…" : "Add lead"}
+          </button>
+        </div>
+      </div>
+    </ModalShell>
   )
 }

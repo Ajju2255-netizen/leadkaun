@@ -7,6 +7,7 @@ import { rateLimited, LIMITS } from "@/lib/rate-limit"
 import { processSignalAndUpdateScores } from "@/lib/scoring/orchestrator"
 import { getNextAction } from "@/lib/scoring/next-action"
 import { getLeadUsage } from "@/lib/billing/lead-usage"
+import { generateImportSignals } from "@/lib/import/generate-signals"
 
 // Reads the session cookie, so this route is always dynamic — opt out of
 // static prerender (silences Next's DYNAMIC_SERVER_USAGE build log).
@@ -126,6 +127,11 @@ const CreateLeadSchema = z.object({
   inquiry_text:   z.string().optional().nullable(),
   expected_value: z.number().int().positive().optional().nullable(),
   assigned_rep_id: z.string().optional().nullable(),
+  // Optional intent hints — same inference the importer applies. When present,
+  // they add IMPORT_* signals so a hand-entered lead is graded on its intent,
+  // not just its source baseline + fit.
+  interest_level:    z.enum(["high", "medium", "low"]).optional().nullable(),
+  last_contact_days: z.number().int().min(0).optional().nullable(),
 })
 
 export async function POST(req: Request) {
@@ -206,6 +212,30 @@ export async function POST(req: Request) {
           intent_score_after:   source.intent_baseline,
         },
       })
+
+      // Inferred intent signals (interest level, last-contact recency, notes
+      // keywords) — mirrors the importer so a hand-entered lead is graded on its
+      // intent, not just its source baseline. Written before scoring so the
+      // orchestrator folds them into the canonical grade.
+      const inferred = generateImportSignals({
+        interest_level:    data.interest_level ?? undefined,
+        last_contact_days: data.last_contact_days ?? undefined,
+        notes:             data.inquiry_text ?? undefined,
+      })
+      if (inferred.length > 0) {
+        await tx.signal.createMany({
+          data: inferred.map((s) => ({
+            account_id:           session.account.id,
+            lead_id:              newLead.id,
+            signal_type:          s.signal_type,
+            signal_value:         s.signal_value,
+            raw_value:            { source: "manual_entry" },
+            lead_grade_at_signal: "E" as const,
+            intent_score_before:  source.intent_baseline,
+            intent_score_after:   source.intent_baseline,
+          })),
+        })
+      }
 
       // Run full scoring pipeline
       await processSignalAndUpdateScores(newLead.id, session.account.id, tx)
