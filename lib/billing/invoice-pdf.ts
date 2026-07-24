@@ -143,7 +143,6 @@ export async function renderInvoicePdf(data: InvoiceData): Promise<Uint8Array> {
   text("Payment method: Card · Razorpay", M, 106, 9, font, C.muted)
   if (data.paymentRef) text(`Reference: ${data.paymentRef}`, M, 93, 9, font, C.muted)
   text("This is a computer-generated invoice and is valid without a signature.", M, 74, 9, font, C.muted)
-  if (!isTax) text("Leadkaun is not registered under GST.", M, 61, 8.5, font, C.muted)
   textRight(`${INVOICE_ISSUER.email} · ${INVOICE_ISSUER.website}`, RIGHT, 74, 9, font, C.muted)
 
   return await doc.save()
