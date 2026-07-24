@@ -717,8 +717,8 @@ export default function ImportPage() {
     }
   }
 
-  // ── Google Sheets: one-time pull from a shared sheet link ──────────────────
-  async function handleSheetImport(sheetUrl: string) {
+  // ── Google Sheets: pull now, optionally keep in sync ───────────────────────
+  async function handleSheetImport(sheetUrl: string, keepInSync: boolean) {
     if (!sourceId || !stageId) {
       toast.error("Please select a lead source and initial stage first")
       return
@@ -738,6 +738,7 @@ export default function ImportPage() {
           stage_id:            stageId,
           name:                sessionName.trim() || undefined,
           source_collected_at: sourceAgeToDate(freshness)?.toISOString() ?? null,
+          keep_in_sync:        keepInSync,
         }),
       })
       const data = await res.json().catch(() => ({}))
@@ -760,6 +761,10 @@ export default function ImportPage() {
       }
       if (data.truncated) {
         toast.info(`That sheet had ${data.sheet_total_rows?.toLocaleString("en-IN")} rows — imported the first ${data.total_rows?.toLocaleString("en-IN")}. Split the rest or export to CSV.`)
+      }
+      if (data.connected) {
+        toast.success("Auto-sync is on — new rows will import every few minutes")
+        queryClient.invalidateQueries({ queryKey: ["sheet-sync"] })
       }
       refreshLeadCaches()
       setRefreshKey((k) => k + 1)
@@ -828,6 +833,9 @@ export default function ImportPage() {
           </p>
         </div>
       </div>
+
+      {/* ── Connected Google Sheet (if auto-sync is on) ──────────────────── */}
+      <ConnectedSheetCard />
 
       {/* ── 2-col: Import From | Ingestion in Progress ───────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -1100,6 +1108,74 @@ function RegradeButton() {
   )
 }
 
+// ── Connected Google Sheet (auto-sync status) ──────────────────────────────────
+
+interface SheetSyncStatus {
+  connected: boolean
+  sync?: { id: string; sheet_url: string; last_synced_at: string | null; last_status: string | null; total_synced: number }
+}
+
+function ConnectedSheetCard() {
+  const queryClient = useQueryClient()
+  const [disconnecting, setDisconnecting] = useState(false)
+  const { data } = useQuery<SheetSyncStatus>({
+    queryKey: ["sheet-sync"],
+    queryFn: async () => {
+      const res = await fetch("/api/import/sheets", { credentials: "include" })
+      if (!res.ok) return { connected: false }
+      return res.json()
+    },
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  })
+
+  if (!data?.connected || !data.sync) return null
+  const s = data.sync
+  const ok = (s.last_status ?? "ok") === "ok"
+
+  async function disconnect() {
+    setDisconnecting(true)
+    try {
+      const res = await fetch("/api/import/sheets", { method: "DELETE", credentials: "include" })
+      if (!res.ok) { toast.error("Couldn't disconnect. Try again."); setDisconnecting(false); return }
+      toast.success("Auto-sync disconnected")
+      queryClient.invalidateQueries({ queryKey: ["sheet-sync"] })
+    } catch {
+      toast.error("Couldn't disconnect. Try again."); setDisconnecting(false)
+    }
+  }
+
+  return (
+    <div className="glass-2 gloss-edge rounded-2xl p-5 flex items-center gap-4">
+      <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: "linear-gradient(180deg, #BAE6FD 0%, #7DD3FC 100%)", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.85)" }}>
+        <FileSpreadsheet className="w-5 h-5 text-sky-700" strokeWidth={2} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <p className="text-[14px] font-semibold text-ink">Google Sheet connected</p>
+          <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${ok ? "text-emerald-700 bg-emerald-50 ring-1 ring-emerald-200" : "text-amber-700 bg-amber-50 ring-1 ring-amber-200"}`}>
+            {ok ? <><CheckCircle2 className="w-3 h-3" /> Syncing</> : <><AlertCircle className="w-3 h-3" /> Attention</>}
+          </span>
+        </div>
+        <p className="text-[12px] text-ink-muted mt-0.5 truncate">
+          {s.total_synced.toLocaleString("en-IN")} auto-synced ·{" "}
+          {s.last_synced_at
+            ? `last checked ${new Date(s.last_synced_at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`
+            : "not yet checked"}
+          {!ok && s.last_status ? ` · ${s.last_status}` : ""}
+        </p>
+      </div>
+      <button
+        onClick={disconnect}
+        disabled={disconnecting}
+        className="h-9 px-3.5 rounded-xl text-[12px] font-semibold text-ink-soft border border-hairline bg-white/70 hover:bg-slate-100 transition-colors shrink-0 disabled:opacity-50"
+      >
+        {disconnecting ? "…" : "Disconnect"}
+      </button>
+    </div>
+  )
+}
+
 // ── Shared modal shell ─────────────────────────────────────────────────────────
 
 function ModalShell({
@@ -1139,9 +1215,10 @@ function ModalShell({
 function SheetsModal({
   open, onClose, onImport, ready,
 }: {
-  open: boolean; onClose: () => void; onImport: (url: string) => void; ready: boolean
+  open: boolean; onClose: () => void; onImport: (url: string, keepInSync: boolean) => void; ready: boolean
 }) {
   const [url, setUrl] = useState("")
+  const [keepInSync, setKeepInSync] = useState(false)
   if (!open) return null
   const valid = /docs\.google\.com\/spreadsheets\/d\//.test(url)
   return (
@@ -1180,6 +1257,19 @@ function SheetsModal({
           </p>
         )}
 
+        <label className="flex items-start gap-2.5 cursor-pointer select-none rounded-lg border border-hairline px-3 py-2.5 hover:bg-slate-50/60 transition-colors">
+          <input
+            type="checkbox"
+            checked={keepInSync}
+            onChange={(e) => setKeepInSync(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-hairline-strong text-sky-500 focus:ring-sky-300"
+          />
+          <span className="min-w-0">
+            <span className="block text-[13px] font-semibold text-ink">Keep this sheet in sync</span>
+            <span className="block text-[11px] text-ink-muted mt-0.5">We re-check every few minutes and auto-import new rows. Duplicates are skipped. You can disconnect anytime.</span>
+          </span>
+        </label>
+
         <div className="flex items-center justify-end gap-2 pt-1">
           <button type="button" onClick={onClose} className="h-10 px-4 rounded-lg text-[13px] font-semibold text-ink-soft hover:bg-slate-100 transition-colors">
             Cancel
@@ -1187,11 +1277,11 @@ function SheetsModal({
           <button
             type="button"
             disabled={!valid || !ready}
-            onClick={() => onImport(url.trim())}
+            onClick={() => onImport(url.trim(), keepInSync)}
             className="h-10 px-4 rounded-lg text-[13px] font-semibold text-white disabled:opacity-50 inline-flex items-center gap-1.5 transition-all active:scale-[0.98]"
             style={{ background: "linear-gradient(180deg, #38BDF8 0%, #0EA5E9 100%)", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.45), 0 4px 12px rgba(14,165,233,0.30)" }}
           >
-            <FileSpreadsheet className="w-4 h-4" /> Import sheet
+            <FileSpreadsheet className="w-4 h-4" /> {keepInSync ? "Import & sync" : "Import sheet"}
           </button>
         </div>
       </div>

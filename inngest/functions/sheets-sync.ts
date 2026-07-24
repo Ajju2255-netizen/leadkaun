@@ -1,131 +1,114 @@
 import { inngest } from "@/inngest/client"
 import { recordJobRun } from "@/lib/events/job-run"
 import { prisma } from "@/lib/prisma"
+import { fetchSheetRows } from "@/lib/import/fetch-sheet"
+import { runSheetImport } from "@/lib/import/run-sheet-import"
 
 /**
- * Google Sheets sync job.
- * Cron: every 5 minutes — cron expression: star-slash-5 star star star star
+ * Google Sheets auto-sync — no OAuth.
+ * Cron: every 5 minutes.
  *
- * Per account with Google Sheets configured:
- * 1. Fetch rows from the connected sheet since last_row_index
- * 2. Trigger import/csv.uploaded equivalent for new rows
- * 3. Update last_row_index on success
+ * For each active SheetSync connection (a sheet shared "Anyone with the link"):
+ *   1. Re-fetch the sheet via its CSV export.
+ *   2. If the row count grew since the last pull, re-run the import — dedup by
+ *      phone means only genuinely new leads are inserted (idempotent).
+ *   3. Record status + the new row count so an unchanged sheet is a no-op.
  *
- * NOTE: Google Sheets integration config (sheets_url, refresh_token,
- * column_mapping, last_row_index) is stored in `google_sheets_configs`
- * table, created in Phase 7 (Task 7.3). This function is a no-op until
- * Phase 7 connects the first account.
- *
- * TAD ref: Section 6.6
+ * The connection is created from the import page ("Keep in sync"), which also
+ * runs the first import and seeds last_row_count. This job only picks up rows
+ * added afterwards.
  */
 
-// Minimal type for sheets config rows — full model added in Phase 7
-type SheetsConfig = {
-  id:               string
-  account_id:       string
-  sheet_id:         string
-  column_mapping:   Record<string, string>
-  last_row_index:   number
-  source_id:        string
-  stage_id:         string
-  user_id:          string
-}
+const MAX_CONFIGS_PER_RUN = 50
 
 export const sheetsSyncFn = inngest.createFunction(
   { id: "sheets-sync", name: "Google Sheets Sync", triggers: [{ cron: "*/5 * * * *" }] },
   async ({ step, logger }) => {
     await step.run("record-job-run", () => recordJobRun("sheets-sync"))
-    // ── Load all active sheets configs ────────────────────────────────────────
-    // Phase 7 adds the google_sheets_configs table. Until then this returns [].
-    const configs = await step.run("load-sheets-configs", async () => {
+
+    const configs = await step.run("load-sheet-syncs", async () => {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return await (prisma as any).googleSheetsConfig.findMany({
+        return await prisma.sheetSync.findMany({
           where: { is_active: true },
-          select: {
-            id:             true,
-            account_id:     true,
-            sheet_id:       true,
-            column_mapping: true,
-            last_row_index: true,
-            source_id:      true,
-            stage_id:       true,
-            user_id:        true,
-          },
+          orderBy: { last_synced_at: "asc" },   // stalest first
+          take: MAX_CONFIGS_PER_RUN,
         })
       } catch {
-        // Model not yet migrated — safe to return empty array
-        logger.info("google_sheets_configs table not found — skipping sync")
+        logger.info("sheet_syncs table not found — skipping (run the sheet_sync migration)")
         return []
       }
     })
 
     if (configs.length === 0) {
-      logger.info("Sheets sync: no active configurations")
-      return { synced: 0, new_rows: 0 }
+      logger.info("Sheets sync: no active connections")
+      return { checked: 0, synced: 0, inserted: 0 }
     }
 
-    logger.info(`Sheets sync: checking ${configs.length} connected sheets`)
-
-    let totalNewRows = 0
     let synced = 0
+    let totalInserted = 0
 
-    for (const config of configs as SheetsConfig[]) {
-      const result = await step.run(`sync-sheet-${config.id}`, async () => {
-        // Fetch new rows from Google Sheets API
-        const rows = await fetchSheetRows(
-          config.sheet_id,
-          config.last_row_index,
-          config.column_mapping,
-        )
+    for (const config of configs) {
+      const outcome = await step.run(`sync-${config.id}`, async () => {
+        const fetched = await fetchSheetRows(config.sheet_url)
+        if (!fetched.ok) {
+          await prisma.sheetSync.update({
+            where: { id: config.id },
+            data: { last_synced_at: new Date(), last_status: (fetched.error ?? "fetch failed").slice(0, 200) },
+          })
+          return { inserted: 0, changed: false }
+        }
 
-        if (rows.length === 0) return { new_rows: 0, updated: false }
+        const count = fetched.rows.length
 
-        // Fire import event for each batch of new rows (reuse CSV import pipeline)
-        await inngest.send({
-          name: "import/sheets.rows",
-          data: {
-            config_id:   config.id,
-            account_id:  config.account_id,
-            user_id:     config.user_id,
-            source_id:   config.source_id,
-            stage_id:    config.stage_id,
-            rows,
-            new_last_row_index: config.last_row_index + rows.length,
-          },
+        // No new rows since last pull → cheap no-op.
+        if (count <= config.last_row_count) {
+          await prisma.sheetSync.update({
+            where: { id: config.id },
+            data: { last_synced_at: new Date(), last_status: "ok", last_row_count: count },
+          })
+          return { inserted: 0, changed: false }
+        }
+
+        // Source + stage must still exist in the workspace.
+        const [source, stage] = await Promise.all([
+          prisma.leadSource.findFirst({ where: { id: config.source_id, account_id: config.account_id, workspace_id: config.workspace_id } }),
+          prisma.pipelineStage.findFirst({ where: { id: config.stage_id, account_id: config.account_id, workspace_id: config.workspace_id } }),
+        ])
+        if (!source || !stage) {
+          await prisma.sheetSync.update({
+            where: { id: config.id },
+            data: { last_synced_at: new Date(), last_status: "Source or stage was deleted — reconnect the sheet" },
+          })
+          return { inserted: 0, changed: false }
+        }
+
+        const result = await runSheetImport({
+          accountId: config.account_id, workspaceId: config.workspace_id, userId: config.user_id,
+          sourceId: config.source_id, stageId: config.stage_id,
+          source: { key: source.key, intent_baseline: source.intent_baseline },
+          rows: fetched.rows,
+          name: `Sheet sync · ${new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}`,
+          fileName: "Google Sheet (auto-sync)",
+          eventSource: "google_sheets_sync",
         })
 
-        return { new_rows: rows.length, updated: true }
+        await prisma.sheetSync.update({
+          where: { id: config.id },
+          data: {
+            last_synced_at: new Date(),
+            last_status:    result.limitReached ? "Lead limit reached — some rows skipped" : "ok",
+            last_row_count: count,
+            total_synced:   { increment: result.inserted },
+          },
+        })
+        return { inserted: result.inserted, changed: true }
       })
 
-      totalNewRows += result.new_rows
-      if (result.updated) synced++
+      if (outcome.changed) synced++
+      totalInserted += outcome.inserted
     }
 
-    logger.info(`Sheets sync complete: ${synced} sheets updated, ${totalNewRows} new rows queued`)
-    return { synced, new_rows: totalNewRows }
+    logger.info(`Sheets sync: ${configs.length} checked, ${synced} pulled, ${totalInserted} new leads`)
+    return { checked: configs.length, synced, inserted: totalInserted }
   },
 )
-
-/**
- * Fetch rows from Google Sheets API starting after `lastRowIndex`.
- * Returns parsed rows using the column mapping.
- *
- * Full implementation in Phase 7 (lib/import/sheets-poller.ts).
- * This stub exists so the Inngest function registers correctly.
- */
-async function fetchSheetRows(
-  sheetId:       string,
-  lastRowIndex:  number,
-  columnMapping: Record<string, string>,
-): Promise<Record<string, string>[]> {
-  // Phase 7 replaces this with real Google Sheets API calls using
-  // lib/import/sheets-poller.ts (OAuth2 token refresh + Sheets v4 API)
-  const _sheetId       = sheetId
-  const _lastRowIndex  = lastRowIndex
-  const _columnMapping = columnMapping
-  void _sheetId
-  void _lastRowIndex
-  void _columnMapping
-  return []
-}

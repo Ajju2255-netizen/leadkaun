@@ -668,6 +668,35 @@ model ImportJobStatus {
   @@map("import_job_status")
 }
 
+// A persistent Google Sheets connection for auto-sync. No OAuth — the sheet is
+// shared "Anyone with the link (Viewer)" and pulled via its CSV export. The
+// cron (inngest/functions/sheets-sync.ts) re-pulls each active row every few
+// minutes; dedup by phone makes re-imports idempotent, so only genuinely new
+// leads are inserted. `last_row_count` gates work so an unchanged sheet is a
+// no-op.
+model SheetSync {
+  id             String    @id @default(cuid())
+  account_id     String
+  workspace_id   String
+  sheet_url      String
+  sheet_id       String
+  gid            String    @default("0")
+  source_id      String
+  stage_id       String
+  user_id        String
+  is_active      Boolean   @default(true)
+  last_row_count Int       @default(0)
+  last_synced_at DateTime?
+  last_status    String? // "ok" or a short error message
+  total_synced   Int       @default(0) // cumulative leads inserted via sync
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+
+  @@index([is_active])
+  @@index([account_id, workspace_id])
+  @@map("sheet_syncs")
+}
+
 model CustomField {
   id            String    @id @default(cuid())
   account_id    String
