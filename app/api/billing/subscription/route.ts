@@ -15,14 +15,18 @@ export const dynamic = "force-dynamic"
 
 // Checkout is an ADMIN-only action — a REP must not be able to put the account
 // on a paid plan. Reads are allowed for anyone so the UI can show current state.
-// Any plan key — validated against the DB below (must exist, be active, be
-// sellable, and not the non-purchasable trial/enterprise tiers). Hard-coding the
-// keys here meant adding any new plan silently broke checkout.
 const CreateSchema = z.object({
   planKey: z.string().min(1).max(40),
 })
 
-const NON_PURCHASABLE = new Set(["trial", "enterprise"])
+// The only self-serve, publicly listed tiers — an ALLOWLIST on purpose.
+// Free (`trial`) and Enterprise are sold off-platform, and — critically — a
+// stray or manually-inserted plan row (e.g. a "Test Pack") must NEVER leak into
+// the customer plan picker or checkout just because it happens to be `is_active`.
+// A blocklist can't guarantee that; an allowlist can. Adding a genuine new
+// self-serve tier is a deliberate one-line change here.
+const SELF_SERVE_PLAN_KEYS = ["starter", "growth", "scale"] as const
+type SelfServePlanKey = (typeof SELF_SERVE_PLAN_KEYS)[number]
 
 /**
  * GET /api/billing/subscription
@@ -38,9 +42,10 @@ export async function GET() {
         include: { plan: { select: { key: true, name: true } } },
       }),
       prisma.plan.findMany({
-        // Free (`trial`) and Enterprise are not self-serve, so they're excluded
-        // from the sellable plan picker.
-        where: { is_active: true, key: { notIn: ["trial", "enterprise"] } },
+        // Only the real self-serve tiers are ever listed. Allowlisting (rather
+        // than excluding trial/enterprise) means no stray/junk plan row can
+        // surface in the picker.
+        where: { is_active: true, key: { in: [...SELF_SERVE_PLAN_KEYS] } },
         orderBy: { price_inr: "asc" },
         select: { key: true, name: true, price_inr: true, provider_plan_id: true, max_seats: true, active_lead_limit: true },
       }),
@@ -102,7 +107,7 @@ export async function POST(req: Request) {
     const { data, error } = await parseBody(req, CreateSchema)
     if (error) return error
 
-    if (NON_PURCHASABLE.has(data.planKey)) {
+    if (!SELF_SERVE_PLAN_KEYS.includes(data.planKey as SelfServePlanKey)) {
       return apiError("That plan isn't available for online checkout", "BAD_PLAN", 422)
     }
 
