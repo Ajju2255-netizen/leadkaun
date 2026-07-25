@@ -26,12 +26,18 @@ export default function RegisterPage() {
   const [error,   setError]   = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  // Pre-fill the email when the marketing site hands off with ?email=… so the
-  // visitor who started signing up in the hero doesn't retype it.
+  // Pre-fill from the marketing hero signup handoff (?email=&firstName=&lastName=
+  // &org=) so the visitor only sets a password here.
   useEffect(() => {
     try {
-      const email = new URLSearchParams(window.location.search).get("email")
-      if (email) setForm((prev) => ({ ...prev, email }))
+      const p = new URLSearchParams(window.location.search)
+      setForm((prev) => ({
+        ...prev,
+        email:     p.get("email")     ?? prev.email,
+        firstName: p.get("firstName") ?? prev.firstName,
+        lastName:  p.get("lastName")  ?? prev.lastName,
+        orgName:   p.get("org")       ?? prev.orgName,
+      }))
     } catch {
       /* ignore */
     }
