@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { LeadkaunMark } from "@/components/shared/LeadkaunMark"
@@ -25,6 +25,17 @@ export default function RegisterPage() {
   })
   const [error,   setError]   = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+
+  // Pre-fill the email when the marketing site hands off with ?email=… so the
+  // visitor who started signing up in the hero doesn't retype it.
+  useEffect(() => {
+    try {
+      const email = new URLSearchParams(window.location.search).get("email")
+      if (email) setForm((prev) => ({ ...prev, email }))
+    } catch {
+      /* ignore */
+    }
+  }, [])
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
