@@ -14,6 +14,7 @@ import { GradeBadge } from "@/components/shared/GradeBadge"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { ScoreBar } from "@/components/shared/ScoreBar"
 import { ScoreExplanation } from "@/components/shared/ScoreExplanation"
+import { RecommendationExplanation } from "@/components/shared/RecommendationExplanation"
 import { ConfidenceCard } from "@/components/shared/ConfidenceCard"
 import { FreshnessBadge } from "@/components/shared/FreshnessBadge"
 import { ScoreTimeline } from "@/components/shared/ScoreTimeline"
@@ -446,6 +447,11 @@ export default function LeadRecordPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* ── Why did Leadkaun recommend this? (explanation + telemetry) ── */}
+        {action && (
+          <RecommendationExplanation lead={lead} action={action} leadId={leadId} />
         )}
 
         {/* ── Scores ───────────────────────────────────────────────────── */}

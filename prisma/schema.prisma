@@ -60,6 +60,31 @@ enum ScoreEventKind {
   LOST
 }
 
+// The recommendation-interaction funnel. Every step a rep takes with a
+// recommendation ("Call now", …) is one event. This is the raw dataset behind
+// Recommendation Acceptance Rate (RAR = ACCEPTED / SHOWN) and, later, RSR.
+// EXPANDED is first-class on purpose: "opens the why but doesn't follow" vs
+// "follows without opening" is the clearest read on how much reps trust us.
+enum RecommendationEventType {
+  SHOWN      // the recommendation was rendered to a rep (RAR denominator)
+  EXPANDED   // the rep opened "Why did Leadkaun recommend this?"
+  ACCEPTED   // the rep chose to follow it
+  IGNORED    // the rep chose to skip it (see skip_reason)
+  DISMISSED  // the rep removed it from view
+  EXECUTED   // the rep actually acted (call/WhatsApp logged) — wired later
+  OUTCOME    // won/lost recorded against a followed recommendation — wired later
+}
+
+// Structured skip reasons — buttons only, no free text. This becomes the first
+// research dataset: it tells us exactly where recommendations fail.
+enum RecommendationSkipReason {
+  ALREADY_DOING_IT
+  WRONG_RECOMMENDATION
+  NEED_MORE_INFO
+  NOT_RELEVANT
+  OTHER
+}
+
 enum WaStage {
   INQUIRY
   DISCUSSION
@@ -425,6 +450,7 @@ model Lead {
   stage_history     StageHistory[]
   notifications     Notification[]
   score_events      LeadScoreEvent[]
+  recommendation_events RecommendationEvent[]
 
   @@unique([account_id, phone])
   @@index([account_id])
@@ -540,6 +566,35 @@ model LeadScoreEvent {
 
   @@index([lead_id, occurred_at])
   @@map("lead_score_events")
+}
+
+// Recommendation-interaction telemetry. Deliberately its own table (NOT
+// lead_score_events) so high-frequency SHOWN/EXPANDED noise never pollutes the
+// user-facing "Score Evolution" timeline, and RAR/RSR stay clean aggregate
+// queries. Each row is frozen at event time so the dataset survives re-scoring.
+model RecommendationEvent {
+  id           String  @id @default(cuid())
+  account_id   String
+  workspace_id String?
+  lead_id      String
+  user_id      String? // the rep who interacted (null for system-emitted)
+
+  event RecommendationEventType
+
+  // Frozen snapshot of the recommendation at the moment of the event.
+  action_label    String?                   // e.g. "Call now"
+  grade_at_event  String?                   // lead grade when shown (A–F)
+  confidence_band String?                   // high | moderate | low | very_low
+  skip_reason     RecommendationSkipReason? // only set on IGNORED
+  detail          Json?                     // optional structured context
+
+  created_at DateTime @default(now())
+
+  lead Lead @relation(fields: [lead_id], references: [id], onDelete: Cascade)
+
+  @@index([account_id, event, created_at])
+  @@index([lead_id, created_at])
+  @@map("recommendation_events")
 }
 
 model FollowUpAction {
