@@ -4,6 +4,7 @@ import { requireWorkspace, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError, parseBody, NOT_FOUND } from "@/lib/api/response"
 import { rateLimited, LIMITS } from "@/lib/rate-limit"
 import { recordScoreEvent } from "@/lib/scoring/score-events"
+import { recordRecommendationEvent } from "@/lib/analytics/record-recommendation-event"
 
 // Reads the session cookie, so this route is always dynamic — opt out of
 // static prerender (silences Next's DYNAMIC_SERVER_USAGE build log).
@@ -98,6 +99,17 @@ export async function POST(req: Request, { params }: Params) {
         summary: `Lost — ${data.loss_reason.replace(/_/g, " ").toLowerCase()}`,
         detail: { loss_reason: data.loss_reason },
       })
+    })
+
+    // Funnel telemetry (best-effort, post-commit): the outcome of a recommendation.
+    await recordRecommendationEvent({
+      account_id:     session.account.id,
+      workspace_id:   session.workspace.id,
+      lead_id:        lead.id,
+      user_id:        session.user.id,
+      event:          "OUTCOME",
+      grade_at_event: lead.grade,
+      detail:         { result: "lost", loss_reason: data.loss_reason },
     })
 
     return apiSuccess({ lost: true, loss_reason: data.loss_reason })

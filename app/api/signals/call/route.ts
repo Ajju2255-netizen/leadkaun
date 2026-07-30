@@ -6,6 +6,7 @@ import { rateLimited, LIMITS } from "@/lib/rate-limit"
 import { processSignalAndUpdateScores } from "@/lib/scoring/orchestrator"
 import { computeFirstActionRank } from "@/lib/analytics/recommendation-rank"
 import { recordScoreEvent } from "@/lib/scoring/score-events"
+import { recordRecommendationEvent } from "@/lib/analytics/record-recommendation-event"
 import { signalLabel } from "@/lib/activity/signal-labels"
 import { SIGNAL_WEIGHTS } from "@/lib/scoring/signal-weights"
 import { applyAutoStage } from "@/lib/pipeline/auto-stage"
@@ -179,6 +180,19 @@ export async function POST(req: Request) {
         detail: { signal_type: signalType },
       })
       return scoring
+    })
+
+    // Funnel telemetry (best-effort, post-commit): the rep acted on the
+    // recommendation. grade_at_event is the pre-recompute grade — the one the
+    // recommendation was shown at.
+    await recordRecommendationEvent({
+      account_id:     session.account.id,
+      workspace_id:   session.workspace.id,
+      lead_id:        lead.id,
+      user_id:        session.user.id,
+      event:          "EXECUTED",
+      grade_at_event: lead.grade,
+      detail:         { via: "call", signal_type: signalType },
     })
 
     // After commit: push realtime toast to the assigned rep on SQL crossing /
