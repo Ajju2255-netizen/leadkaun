@@ -71,10 +71,14 @@ export function IntakeReport({
       ? `Analysis completed in ${analysisSeconds < 0.1 ? "under 0.1" : analysisSeconds.toFixed(1)} seconds`
       : "Analysis completed in under a second"
 
-  // Closing line with exactly the four philosophy words emphasised.
-  const [beforeBold, afterBold] = report.closingLine.includes(BOLD_PHRASE)
-    ? report.closingLine.split(BOLD_PHRASE)
-    : [report.closingLine, null]
+  // Closing — split into two sentences (the pause gives the first weight), and
+  // emphasise the four philosophy words in the first.
+  const closingParts = report.closingLine.split(/(?<=day one\.)\s+/)
+  const closingLead = closingParts[0] ?? report.closingLine
+  const closingRest = closingParts.slice(1).join(" ")
+  const [leadBefore, leadAfter] = closingLead.includes(BOLD_PHRASE)
+    ? closingLead.split(BOLD_PHRASE)
+    : [closingLead, null]
 
   return (
     <div
@@ -86,15 +90,16 @@ export function IntakeReport({
       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">Import Intelligence Report</p>
       <h1 className="mt-3 font-serif text-[30px] leading-[1.08] font-semibold text-ink tracking-[-0.01em]">We analysed your leads.</h1>
       <p className="mt-3 text-[15px] leading-relaxed text-ink-soft max-w-[54ch]">
-        Before importing your leads, Leadkaun analysed them to understand your business and identify the
-        best opportunities from day one.
+        Before importing your leads, Leadkaun analysed your data to understand how your business sells and
+        identify the best opportunities from day one.
       </p>
 
       <div className="my-8 h-px bg-hairline" />
 
       {/* Here's what we understood */}
       <section>
-        <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-ink-muted mb-4">Here&apos;s what we understood</p>
+        <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-ink-muted mb-1">Here&apos;s what we understood</p>
+        <p className="text-[12px] text-ink-faint mb-4">Based on the information available in your file.</p>
         <ul className="space-y-3">
           {conclusions.map((c, i) => (
             <li key={i} className="flex items-start gap-3 text-[15px] leading-snug text-ink">
@@ -119,7 +124,7 @@ export function IntakeReport({
       <section className="mt-11 pt-10 border-t border-hairline">
         <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-ink-muted mb-3">Data readiness</p>
         <p className="text-[15px] font-medium text-ink mb-1">
-          {report.readiness.label === "High" ? "Ready to import today." : report.readiness.message}
+          {report.readiness.label === "High" ? "Ready to start prioritising leads." : report.readiness.message}
         </p>
         <ul>
           {report.dataReadiness.map((d) => {
@@ -243,11 +248,14 @@ export function IntakeReport({
         )}
       </section>
 
-      {/* Closing — four philosophy words emphasised */}
-      <p className="mt-8 font-serif text-[17px] leading-[1.5] text-ink">
-        {beforeBold}
-        {afterBold !== null && <><strong className="font-semibold">{BOLD_PHRASE}</strong>{afterBold}</>}
-      </p>
+      {/* Closing — two paragraphs; four philosophy words emphasised */}
+      <div className="mt-8 font-serif text-[17px] leading-[1.5] text-ink space-y-3">
+        <p>
+          {leadBefore}
+          {leadAfter !== null && <><strong className="font-semibold">{BOLD_PHRASE}</strong>{leadAfter}</>}
+        </p>
+        {closingRest && <p className="text-ink-soft">{closingRest}</p>}
+      </div>
 
       {/* How did we determine this? */}
       <details className="mt-6 border-t border-hairline pt-4 group">
