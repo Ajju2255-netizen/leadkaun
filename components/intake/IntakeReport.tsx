@@ -114,8 +114,9 @@ export function IntakeReport({
         </p>
       </div>
 
+      {/* ── Assess ── (stronger separation than between inner sections) */}
       {/* Data readiness — adjective first, then the number */}
-      <section className="mt-9">
+      <section className="mt-11 pt-10 border-t border-hairline">
         <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-ink-muted mb-3">Data readiness</p>
         <p className="text-[15px] font-medium text-ink mb-1">
           {report.readiness.label === "High" ? "Ready to import today." : report.readiness.message}
@@ -170,8 +171,9 @@ export function IntakeReport({
         </section>
       )}
 
+      {/* ── Decide ── (stronger separation than between inner sections) */}
       {/* What happens after import */}
-      <section className="mt-9">
+      <section className="mt-11 pt-10 border-t border-hairline">
         <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-ink-muted mb-3">What happens after import</p>
         <ul className="space-y-2.5">
           {report.whatHappensNext.map((w, i) => (

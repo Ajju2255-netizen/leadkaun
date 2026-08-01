@@ -26,7 +26,7 @@ export const CLOSING_LINE =
  * Plain-language methods, no AI mystique. Every claim in the report traces here.
  */
 export const HOW_WE_DETERMINED: string[] = [
-  "Industry — inferred from patterns in your company names. No external lookup.",
+  "Industry — inferred from company names, business terms, and other patterns found in your data. No external lookup was used.",
   "Country and currency — inferred from phone number formats and the values present in your data.",
   "Contact quality — phone numbers and email addresses were validated using standard format checks.",
   "Duplicates — estimated by matching standardised phone numbers within your file.",
