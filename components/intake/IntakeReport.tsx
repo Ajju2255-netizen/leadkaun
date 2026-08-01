@@ -60,16 +60,16 @@ export function IntakeReport({
   if (report.contactQuality.primary !== "none") {
     conclusions.push(
       report.contactQuality.primary === "phone"
-        ? "Phone numbers appear to be the primary way to contact your leads."
-        : "Email appears to be the primary way to contact your leads.",
+        ? "Phone numbers appear to be the primary way to contact these leads."
+        : "Email appears to be the primary way to contact these leads.",
     )
   }
   if (report.currency.known) conclusions.push(report.currency.claim)
 
   const timing =
     analysisSeconds && analysisSeconds > 0
-      ? `Analysed in ${analysisSeconds < 0.1 ? "under 0.1" : analysisSeconds.toFixed(1)} seconds`
-      : "Analysed in under a second"
+      ? `Analysis completed in ${analysisSeconds < 0.1 ? "under 0.1" : analysisSeconds.toFixed(1)} seconds`
+      : "Analysis completed in under a second"
 
   // Closing line with exactly the four philosophy words emphasised.
   const [beforeBold, afterBold] = report.closingLine.includes(BOLD_PHRASE)
@@ -83,8 +83,6 @@ export function IntakeReport({
         px-6 py-9 sm:px-11 sm:py-11 transition-all duration-500 ease-out motion-reduce:transition-none
         ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1.5"}`}
     >
-      <p className="text-[11px] tabular-nums text-ink-faint mb-4">{timing}</p>
-
       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">Import Intelligence Report</p>
       <h1 className="mt-3 font-serif text-[30px] leading-[1.08] font-semibold text-ink tracking-[-0.01em]">We analysed your leads.</h1>
       <p className="mt-3 text-[15px] leading-relaxed text-ink-soft max-w-[54ch]">
@@ -145,7 +143,7 @@ export function IntakeReport({
         </ul>
         {report.missingFields.length > 0 && (
           <div className="mt-5">
-            <p className="text-[13px] text-ink-soft mb-2">Adding these later will improve recommendations:</p>
+            <p className="text-[13px] text-ink-soft mb-2">Adding these fields later will improve prioritisation:</p>
             <ul className="space-y-1.5">
               {report.missingFields.map((m) => (
                 <li key={m} className="flex items-center gap-2.5 text-[13.5px] text-ink">
@@ -263,6 +261,9 @@ export function IntakeReport({
           ))}
         </ul>
       </details>
+
+      {/* Deterministic, not opaque AI — quiet, at the bottom. */}
+      <p className="mt-6 text-right text-[11px] tabular-nums text-ink-faint">{timing}</p>
     </div>
   )
 }

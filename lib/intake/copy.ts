@@ -6,11 +6,11 @@
  * from a diagnosis into a promise. Observable actions, no AI buzzwords.
  */
 export const WHAT_HAPPENS_NEXT: string[] = [
-  "Every phone number is standardised to one format",
+  "Every phone number is standardised into one format",
   "Duplicate leads are identified",
   "Each lead receives an initial profile",
-  "Lead priorities are calculated",
-  "Your team gets recommendations on who to contact first",
+  "Initial priorities are calculated",
+  "Your team receives recommendations on who to contact first",
   "Leadkaun begins learning how your business sells",
 ]
 
