@@ -8,6 +8,8 @@ import { processSignalAndUpdateScores } from "@/lib/scoring/orchestrator"
 import { getNextAction } from "@/lib/scoring/next-action"
 import { getLeadUsage } from "@/lib/billing/lead-usage"
 import { generateImportSignals } from "@/lib/import/generate-signals"
+import { normalisePhone } from "@/lib/import/phone-normalise"
+import { findDuplicateLead } from "@/lib/leads/find-duplicate-lead"
 
 // Reads the session cookie, so this route is always dynamic — opt out of
 // static prerender (silences Next's DYNAMIC_SERVER_USAGE build log).
@@ -156,13 +158,15 @@ export async function POST(req: Request) {
     const { data, error } = await parseBody(req, CreateLeadSchema)
     if (error) return error
 
-    // Normalise phone — ensure +91 prefix
+    // Normalise phone with the ONE canonical normaliser (same as every import
+    // path), so a hand-entered number and the same number in a CSV dedupe alike.
     const phone = normalisePhone(data.phone)
+    if (!phone) {
+      return apiError("Could not read a valid phone number", "INVALID_PHONE", 422)
+    }
 
-    // Check for duplicate phone within the workspace
-    const existing = await prisma.lead.findFirst({
-      where: { workspace_id: session.workspace.id, phone },
-    })
+    // Duplicate check — account-scoped (matches the DB unique constraint)
+    const existing = await findDuplicateLead({ accountId: session.account.id, phone })
     if (existing) {
       return apiError(`A lead with phone ${phone} already exists`, "DUPLICATE_PHONE", 409)
     }
@@ -247,15 +251,4 @@ export async function POST(req: Request) {
   } catch (e) {
     return handleAuthError(e) ?? apiError("Internal server error", "SERVER_ERROR", 500)
   }
-}
-
-// ─────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────
-
-function normalisePhone(raw: string): string {
-  const digits = raw.replace(/\D/g, "")
-  if (digits.startsWith("91") && digits.length === 12) return `+${digits}`
-  if (digits.length === 10) return `+91${digits}`
-  return `+${digits}`
 }

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { validateRow } from "@/lib/import/validate-row"
+import { findDuplicateLead } from "@/lib/leads/find-duplicate-lead"
 import { generateImportSignals } from "@/lib/import/generate-signals"
 import { processSignalAndUpdateScores } from "@/lib/scoring/orchestrator"
 import { recordScoreEvent } from "@/lib/scoring/score-events"
@@ -68,11 +69,9 @@ export async function processImportRows(opts: ProcessRowsOpts): Promise<ProcessR
     }
     const vr = validation.data
 
-    // ── Duplicate check (by workspace + canonical phone) ──────────────────
+    // ── Duplicate check (account-scoped, matches the DB unique constraint) ─
     try {
-      const exists = await prisma.lead.findFirst({
-        where: { workspace_id: workspaceId, phone: vr.phone },
-      })
+      const exists = await findDuplicateLead({ accountId, phone: vr.phone })
       if (exists) { duplicates++; continue }
     } catch (dupErr) {
       errors++
