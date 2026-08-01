@@ -5,7 +5,7 @@ import { rateLimited, LIMITS } from "@/lib/rate-limit"
 import { analyseIntake } from "@/lib/intake/analyse"
 import { columnSignatureHash } from "@/lib/intake/session"
 import { INTAKE_ENGINE_VERSION, MAPPING_VERSION, ANALYSIS_VERSION } from "@/lib/intake/version"
-import { IntakeSource, type Prisma } from "@prisma/client"
+import { IntakeSource, IntakeState, type Prisma } from "@prisma/client"
 
 // Reads the session cookie → always dynamic.
 export const dynamic = "force-dynamic"
@@ -81,6 +81,13 @@ export async function POST(req: Request) {
           ...(uploadStartedAt ? { upload_started_at: uploadStartedAt } : {}),
           analysis_finished_at:     new Date(),
           analysis_duration_ms:     analysisMs,
+          state:                    IntakeState.REPORT_READY,
+          events: {
+            create: [
+              { state: IntakeState.CREATED, note: source, ...(uploadStartedAt ? { at: uploadStartedAt } : {}) },
+              { state: IntakeState.REPORT_READY },
+            ],
+          },
         },
         select: { id: true },
       })

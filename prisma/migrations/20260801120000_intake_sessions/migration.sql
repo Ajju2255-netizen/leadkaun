@@ -1,12 +1,13 @@
 -- Intake sessions: the lifecycle memory of every dataset entering Leadkaun.
 -- Stores a structural hash + metadata + the frozen report + internal scores +
--- the Time-to-Trust timeline. NEVER stores raw customer rows.
+-- the Time-to-Trust timeline + a state machine. NEVER stores raw customer rows.
+-- Plus an immutable, append-only per-session event timeline.
 
 -- CreateEnum
 CREATE TYPE "IntakeSource" AS ENUM ('CSV', 'GOOGLE_SHEETS', 'MANUAL', 'API');
 
 -- CreateEnum
-CREATE TYPE "IntakeOutcome" AS ENUM ('ANALYSING', 'APPROVED', 'ABANDONED', 'CANCELLED', 'FAILED', 'COMPLETED');
+CREATE TYPE "IntakeState" AS ENUM ('CREATED', 'ANALYSING', 'REPORT_READY', 'VIEWED', 'APPROVED', 'IMPORTING', 'COMPLETED', 'ABANDONED', 'CANCELLED', 'FAILED');
 
 -- CreateEnum
 CREATE TYPE "IntakeAbandonReason" AS ENUM ('TOO_MANY_DUPLICATES', 'NEED_TO_CLEAN_CSV', 'WRONG_MAPPING', 'OTHER');
@@ -40,7 +41,7 @@ CREATE TABLE "intake_sessions" (
     "import_started_at" TIMESTAMP(3),
     "import_completed_at" TIMESTAMP(3),
     "analysis_duration_ms" INTEGER,
-    "outcome" "IntakeOutcome" NOT NULL DEFAULT 'ANALYSING',
+    "state" "IntakeState" NOT NULL DEFAULT 'CREATED',
     "abandon_reason" "IntakeAbandonReason",
     "import_job_id" TEXT,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -49,11 +50,28 @@ CREATE TABLE "intake_sessions" (
     CONSTRAINT "intake_sessions_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "intake_session_events" (
+    "id" TEXT NOT NULL,
+    "session_id" TEXT NOT NULL,
+    "state" "IntakeState" NOT NULL,
+    "note" TEXT,
+    "at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "intake_session_events_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE INDEX "intake_sessions_account_id_created_at_idx" ON "intake_sessions"("account_id", "created_at");
 
 -- CreateIndex
-CREATE INDEX "intake_sessions_workspace_id_outcome_idx" ON "intake_sessions"("workspace_id", "outcome");
+CREATE INDEX "intake_sessions_workspace_id_state_idx" ON "intake_sessions"("workspace_id", "state");
 
 -- CreateIndex
 CREATE INDEX "intake_sessions_account_id_sample_hash_idx" ON "intake_sessions"("account_id", "sample_hash");
+
+-- CreateIndex
+CREATE INDEX "intake_session_events_session_id_at_idx" ON "intake_session_events"("session_id", "at");
+
+-- AddForeignKey
+ALTER TABLE "intake_session_events" ADD CONSTRAINT "intake_session_events_session_id_fkey" FOREIGN KEY ("session_id") REFERENCES "intake_sessions"("id") ON DELETE CASCADE ON UPDATE CASCADE;

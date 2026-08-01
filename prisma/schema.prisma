@@ -95,14 +95,21 @@ enum IntakeSource {
   API
 }
 
-// The lifecycle state of an intake session.
-enum IntakeOutcome {
-  ANALYSING   // report produced, awaiting the customer's decision
-  APPROVED    // customer clicked "Start Prioritising Leads"
-  ABANDONED   // left without deciding
-  CANCELLED   // explicitly cancelled (may carry a reason)
-  FAILED      // analysis or import failed
-  COMPLETED   // import finished
+// The intake STATE MACHINE. A session is always in exactly one state; the UI
+// simply renders the current state (which makes retries, resumes, future
+// connectors, and debugging clean). Progress states flow top-down; the last
+// three are terminal.
+enum IntakeState {
+  CREATED       // session opened, upload received
+  ANALYSING     // Intake Engine running (async-ready; today it's synchronous)
+  REPORT_READY  // Import Intelligence Report produced, awaiting the customer
+  VIEWED        // customer opened the report
+  APPROVED      // customer clicked "Start Prioritising Leads"
+  IMPORTING     // leads are being imported
+  COMPLETED     // import finished
+  ABANDONED     // left without deciding
+  CANCELLED     // explicitly cancelled (may carry a reason)
+  FAILED        // analysis or import failed
 }
 
 // Lightly-asked reason when a customer explicitly cancels. Product research.
@@ -671,20 +678,39 @@ model IntakeSession {
   import_completed_at  DateTime?
   analysis_duration_ms Int?
 
-  // ── Outcome ──
-  outcome        IntakeOutcome        @default(ANALYSING)
+  // ── State + outcome ──
+  state          IntakeState          @default(CREATED)
   abandon_reason IntakeAbandonReason?
 
   /** Set once approved and an import job is created. Not a hard relation. */
   import_job_id String?
 
+  /** Immutable, append-only lifecycle timeline (for support / debugging / research). */
+  events IntakeSessionEvent[]
+
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
   @@index([account_id, created_at])
-  @@index([workspace_id, outcome])
+  @@index([workspace_id, state])
   @@index([account_id, sample_hash])
   @@map("intake_sessions")
+}
+
+// One immutable entry in a session's timeline. INSERT-only — never updated,
+// never deleted (except by cascade). Six months from now, this is how support
+// reconstructs exactly what happened, and how research spots patterns.
+model IntakeSessionEvent {
+  id         String        @id @default(cuid())
+  session_id String
+  state      IntakeState   // the state entered at this moment
+  note       String?       // optional context (e.g. cancel reason, error)
+  at         DateTime      @default(now())
+
+  session IntakeSession @relation(fields: [session_id], references: [id], onDelete: Cascade)
+
+  @@index([session_id, at])
+  @@map("intake_session_events")
 }
 
 model FollowUpAction {
