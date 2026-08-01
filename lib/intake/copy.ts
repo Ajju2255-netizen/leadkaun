@@ -6,12 +6,12 @@
  * from a diagnosis into a promise. Observable actions, no AI buzzwords.
  */
 export const WHAT_HAPPENS_NEXT: string[] = [
-  "Standardise every phone number to one format",
-  "Detect and flag duplicates",
-  "Build a profile for each lead",
-  "Calculate an initial priority for every lead",
-  "Recommend who to call first",
-  "Keep learning from your team's outcomes",
+  "Every phone number is standardised into one format",
+  "Duplicate leads are identified",
+  "Each lead receives an initial profile",
+  "Initial priorities are calculated",
+  "Your team receives recommendations on who to contact first",
+  "Leadkaun begins learning how your business sells",
 ]
 
 /**
@@ -27,8 +27,8 @@ export const CLOSING_LINE =
  */
 export const HOW_WE_DETERMINED: string[] = [
   "Industry — inferred from patterns in your company names. No external lookup.",
-  "Country & currency — detected from the shape of your phone numbers.",
-  "Contact quality — every phone and email checked against a validity standard.",
+  "Country and currency — inferred from phone number formats and the values present in your data.",
+  "Contact quality — phone numbers and email addresses were validated using standard format checks.",
   "Duplicates — estimated by matching standardised phone numbers within your file.",
 ]
 
