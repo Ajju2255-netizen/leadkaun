@@ -5,6 +5,7 @@ import { apiSuccess, apiError } from "@/lib/api/response"
 import { rateLimited, LIMITS } from "@/lib/rate-limit"
 import { mapHeader } from "@/lib/import/column-map"
 import { validateRow } from "@/lib/import/validate-row"
+import { findDuplicateLead } from "@/lib/leads/find-duplicate-lead"
 import { generateImportSignals } from "@/lib/import/generate-signals"
 import { processSignalAndUpdateScores } from "@/lib/scoring/orchestrator"
 import Papa from "papaparse"
@@ -163,11 +164,9 @@ export async function POST(req: Request) {
 
         const vr = validation.data
 
-        // ── Duplicate check ───────────────────────────────────────────────
+        // ── Duplicate check (account-scoped, matches the DB unique constraint) ─
         try {
-          const exists = await prisma.lead.findFirst({
-            where: { workspace_id: session.workspace.id, phone: vr.phone },
-          })
+          const exists = await findDuplicateLead({ accountId: session.account.id, phone: vr.phone })
           if (exists) {
             duplicates++
             continue
