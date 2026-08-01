@@ -85,6 +85,41 @@ enum RecommendationSkipReason {
   OTHER
 }
 
+// Where an intake session originated. Everything becomes one intake session —
+// today CSV / Sheets / manual; tomorrow HubSpot, Zoho, Salesforce, WhatsApp,
+// IndiaMART, TradeIndia. New sources are additive.
+enum IntakeSource {
+  CSV
+  GOOGLE_SHEETS
+  MANUAL
+  API
+}
+
+// The intake STATE MACHINE. A session is always in exactly one state; the UI
+// simply renders the current state (which makes retries, resumes, future
+// connectors, and debugging clean). Progress states flow top-down; the last
+// three are terminal.
+enum IntakeState {
+  CREATED       // session opened, upload received
+  ANALYSING     // Intake Engine running (async-ready; today it's synchronous)
+  REPORT_READY  // Import Intelligence Report produced, awaiting the customer
+  VIEWED        // customer opened the report
+  APPROVED      // customer clicked "Start Prioritising Leads"
+  IMPORTING     // leads are being imported
+  COMPLETED     // import finished
+  ABANDONED     // left without deciding
+  CANCELLED     // explicitly cancelled (may carry a reason)
+  FAILED        // analysis or import failed
+}
+
+// Lightly-asked reason when a customer explicitly cancels. Product research.
+enum IntakeAbandonReason {
+  TOO_MANY_DUPLICATES
+  NEED_TO_CLEAN_CSV
+  WRONG_MAPPING
+  OTHER
+}
+
 enum WaStage {
   INQUIRY
   DISCUSSION
@@ -595,6 +630,87 @@ model RecommendationEvent {
   @@index([account_id, event, created_at])
   @@index([lead_id, created_at])
   @@map("recommendation_events")
+}
+
+// One INTAKE SESSION = the full lifecycle of a dataset entering Leadkaun:
+// upload → analysis → report → decision → import → (later) learning. The memory
+// of every intake, across every connector. Deliberately a lifecycle entity, not
+// a "profile" — it is the foundation for Time-to-Trust, Intake Memory, saved
+// mappings, dataset-evolution tracking, import analytics, and research.
+//
+// NEVER stores raw customer rows — only a hash, structural metadata, the frozen
+// report the customer saw, and internal scores.
+model IntakeSession {
+  id            String       @id @default(cuid())
+  account_id    String
+  workspace_id  String?
+  user_id       String?
+  upload_source IntakeSource
+
+  // ── Dataset snapshot (immutable) ──
+  rows                   Int
+  columns                Int
+  sample_hash            String? // structural signature (for "same as last time?")
+  detected_country       String?
+  detected_currency      String?
+  detected_business_type String?
+  mapping_version        String
+  analysis_version       String
+  engine_version         String // overall, e.g. "intake_engine_v1"
+
+  // ── Report snapshot — exactly what the customer saw, frozen ──
+  // If the Intake Engine improves later, we still know what was approved.
+  report Json
+
+  // ── Internal scores (never customer-visible) ──
+  import_intelligence_score Int?
+  mapping_confidence        Int?
+  contact_quality           Int?
+  business_context          Int?
+  completeness              Int?
+
+  // ── Timeline (Time-to-Trust; and Time-to-First-Value later) ──
+  upload_started_at    DateTime  @default(now())
+  analysis_finished_at DateTime?
+  report_viewed_at     DateTime?
+  approved_at          DateTime?
+  import_started_at    DateTime?
+  import_completed_at  DateTime?
+  analysis_duration_ms Int?
+
+  // ── State + outcome ──
+  state          IntakeState          @default(CREATED)
+  abandon_reason IntakeAbandonReason?
+
+  /** Set once approved and an import job is created. Not a hard relation. */
+  import_job_id String?
+
+  /** Immutable, append-only lifecycle timeline (for support / debugging / research). */
+  events IntakeSessionEvent[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([account_id, created_at])
+  @@index([workspace_id, state])
+  @@index([account_id, sample_hash])
+  @@map("intake_sessions")
+}
+
+// One immutable entry in a session's timeline. INSERT-only — never updated,
+// never deleted (except by cascade). Six months from now, this is how support
+// reconstructs exactly what happened, and how research spots patterns.
+model IntakeSessionEvent {
+  id         String        @id @default(cuid())
+  session_id String
+  state      IntakeState   // the state entered at this moment
+  note       String?       // optional context (e.g. cancel reason, error)
+  at         DateTime      @default(now())
+
+  session IntakeSession @relation(fields: [session_id], references: [id], onDelete: Cascade)
+
+  @@index([session_id, at])
+  @@map("intake_session_events")
 }
 
 model FollowUpAction {

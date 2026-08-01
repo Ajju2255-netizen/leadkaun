@@ -18,6 +18,9 @@ import { EmptyState } from "@/components/shared/EmptyState"
 import { ThemedSelect } from "@/components/shared/ThemedSelect"
 import { sourceAgeToDate, SOURCE_AGE_OPTIONS } from "@/lib/scoring/freshness"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
+import { IntakeReport } from "@/components/intake/IntakeReport"
+import type { IntakeReport as IntakeReportData } from "@/lib/intake/types"
+import { patchIntakeSession } from "@/lib/intake/client"
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -497,6 +500,38 @@ function StatusBadge({ status }: { status: ImportJob["status"] }) {
   )
 }
 
+// ── Analysing panel (between upload and the report) ──────────────────────────
+
+function AnalysingPanel({ fileName }: { fileName: string }) {
+  const steps = [
+    "Reading your columns",
+    "Understanding your contacts",
+    "Detecting the business type",
+    "Measuring data quality",
+    "Looking for duplicates",
+    "Preparing your report",
+  ]
+  return (
+    <div className="glass-2 gloss-edge rounded-2xl px-6 py-14 max-w-3xl mx-auto text-center">
+      <div
+        className="w-14 h-14 rounded-2xl mx-auto flex items-center justify-center mb-5"
+        style={{ background: "linear-gradient(180deg, #BAE6FD 0%, #7DD3FC 100%)", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.85)" }}
+      >
+        <Loader2 className="w-7 h-7 text-sky-700 animate-spin" strokeWidth={2} />
+      </div>
+      <h2 className="font-serif text-[24px] font-semibold text-ink">Analysing your leads…</h2>
+      <p className="text-[13px] text-ink-muted mt-1">{fileName || "Understanding your data before importing"}</p>
+      <ul className="mt-6 inline-flex flex-col gap-2 text-left">
+        {steps.map((s) => (
+          <li key={s} className="flex items-center gap-2.5 text-[13px] text-ink-soft">
+            <span className="w-1.5 h-1.5 rounded-full bg-sky-400" /> {s}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ImportPage() {
@@ -523,6 +558,12 @@ export default function ImportPage() {
     high_intent_count: number; total_value: number; total_rows: number | null
     errorDetail: ErrorDetail | null
   } | null>(null)
+
+  // Intake: analyse → report → approve, before importing
+  const [parsedRows, setParsedRows] = useState<Record<string, string>[] | null>(null)
+  const [report,     setReport]     = useState<IntakeReportData | null>(null)
+  const [sessionId,  setSessionId]  = useState<string | null>(null)
+  const [analysing,  setAnalysing]  = useState(false)
 
   const fileRef     = useRef<HTMLInputElement>(null)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -609,13 +650,14 @@ export default function ImportPage() {
     }
 
     setFileName(file.name)
-    setUploading(true)
-    setProgress(0)
     setResult(null)
+    setReport(null)
+    setSessionId(null)
+    const uploadStartedAt = new Date().toISOString()
+    setAnalysing(true)
 
     try {
-      // ── Parse client-side (encoding-aware) so the upload streams in small
-      //    batches — each request is short, so it never blocks or times out. ──
+      // ── Parse client-side (encoding-aware) ───────────────────────────────
       const buf     = await file.arrayBuffer()
       const utf8    = new TextDecoder("utf-8").decode(buf)
       const csvText = utf8.includes("�") ? new TextDecoder("windows-1252").decode(buf) : utf8
@@ -625,9 +667,47 @@ export default function ImportPage() {
       const rows = parsed.data
       if (rows.length === 0) {
         toast.error("CSV file is empty or has no valid rows.")
-        setProgress(null); setUploading(false); return
+        setAnalysing(false); return
       }
+      setParsedRows(rows)
 
+      // ── Analyse first — reveal understanding before importing (Law 46) ────
+      const aRes = await fetch("/api/import/analyse", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sample:            rows.slice(0, 2000),
+          total_rows:        rows.length,
+          upload_source:     "csv",
+          upload_started_at: uploadStartedAt,
+        }),
+      })
+      const aData = await aRes.json().catch(() => ({}))
+      setAnalysing(false)
+      if (aRes.ok && aData?.report) {
+        setReport(aData.report as IntakeReportData)
+        setSessionId(typeof aData.session_id === "string" ? aData.session_id : null)
+      } else {
+        // Analysis is a bonus, never a gate — fall back to a direct import.
+        toast.message("Imported directly — analysis wasn't available for this file.")
+        await runImport(rows, null)
+      }
+    } catch (err) {
+      console.error("Analyse failed:", err)
+      setAnalysing(false)
+      toast.error("Couldn't read that file. Please try again.")
+    }
+  }
+
+  // Run the actual chunked import (after the customer approves, or as a fallback).
+  async function runImport(rows: Record<string, string>[], sid: string | null) {
+    setReport(null)
+    setUploading(true)
+    setProgress(0)
+    setResult(null)
+    if (sid) patchIntakeSession(sid, "import_started")
+
+    try {
       // ── Start the job ────────────────────────────────────────────────────
       const initRes = await fetch("/api/import/csv/init", {
         method: "POST", credentials: "include",
@@ -637,13 +717,15 @@ export default function ImportPage() {
           stage_id:   stageId,
           name:       sessionName.trim() || undefined,
           total_rows: rows.length,
-          file_name:  file.name,
+          file_name:  fileName,
         }),
       })
       if (!initRes.ok) {
         const err = await initRes.json().catch(() => ({}))
         toast.error(err.error ?? "Could not start import. Check your CSV and try again.")
-        setProgress(null); setUploading(false); return
+        setProgress(null); setUploading(false)
+        if (sid) patchIntakeSession(sid, "failed")
+        return
       }
       const { jobId } = await initRes.json()
 
@@ -698,6 +780,11 @@ export default function ImportPage() {
           : null,
       })
 
+      if (sid) {
+        if (aborted) patchIntakeSession(sid, "failed")
+        else patchIntakeSession(sid, "import_completed", { import_job_id: jobId })
+      }
+
       if (aborted) {
         toast.warning(`Import stopped early — ${inserted} added before an error. Please retry the remaining rows.`)
       } else if (inserted > 0) {
@@ -712,9 +799,27 @@ export default function ImportPage() {
       console.error("CSV import failed:", err)
       toast.error("Unexpected error during import. Please try again.")
       setProgress(null)
+      if (sid) patchIntakeSession(sid, "failed")
     } finally {
       setUploading(false)
+      setParsedRows(null)
     }
+  }
+
+  // Approve the report → import the leads we already parsed.
+  function startImport() {
+    if (!parsedRows) return
+    if (sessionId) patchIntakeSession(sessionId, "approved")
+    void runImport(parsedRows, sessionId)
+  }
+
+  // "Not now" — record why (lightly) and clear the review.
+  function cancelReview(reason?: string) {
+    if (sessionId) {
+      if (reason) patchIntakeSession(sessionId, "cancelled", { reason })
+      else patchIntakeSession(sessionId, "abandoned")
+    }
+    setReport(null); setParsedRows(null); setSessionId(null); setFileName("")
   }
 
   // ── Google Sheets: pull now, optionally keep in sync ───────────────────────
@@ -836,6 +941,19 @@ export default function ImportPage() {
 
       {/* ── Connected Google Sheet (if auto-sync is on) ──────────────────── */}
       <ConnectedSheetCard />
+
+      {report && !uploading && !result ? (
+        <IntakeReport
+          report={report}
+          sessionId={sessionId}
+          importing={uploading}
+          onApprove={startImport}
+          onCancel={cancelReview}
+        />
+      ) : analysing ? (
+        <AnalysingPanel fileName={fileName} />
+      ) : (
+      <>
 
       {/* ── 2-col: Import From | Ingestion in Progress ───────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -984,6 +1102,9 @@ export default function ImportPage() {
             <p key={i} className="text-[12px] text-red-700 font-mono leading-relaxed">{msg}</p>
           ))}
         </div>
+      )}
+
+      </>
       )}
 
       {/* ── Regrade utility ──────────────────────────────────────────────── */}
