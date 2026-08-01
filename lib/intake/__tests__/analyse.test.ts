@@ -47,7 +47,7 @@ describe("analyseIntake", () => {
     expect(report.readiness.label).toBe("High")
     expect(report.duplicateEstimate.pct).toBeGreaterThan(0) // one repeated phone
     expect(report.dataReadiness.find((d) => d.area === "Phone numbers")?.rating).toBe("Excellent")
-    expect(report.closingLine).toMatch(/useful recommendations today/)
+    expect(report.closingLine).toMatch(/help from day one/)
   })
 
   it("profiles a thin B2C list honestly (unknown industry, review band)", () => {

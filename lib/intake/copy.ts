@@ -19,7 +19,7 @@ export const WHAT_HAPPENS_NEXT: string[] = [
  * continuous learning. Do not soften or remove it.
  */
 export const CLOSING_LINE =
-  "Leadkaun understands enough to make useful recommendations today. It will become more accurate as it learns from your team."
+  "Leadkaun understands enough to help from day one. As your team works, it learns how your business sells — and every recommendation becomes more informed."
 
 /**
  * "How did we determine this?" — the transparency panel (collapsed by default).
