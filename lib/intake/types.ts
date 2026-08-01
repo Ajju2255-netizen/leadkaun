@@ -26,13 +26,17 @@ export type EvidenceFinding = {
 }
 
 export type ContactQuality = {
-  /** 1–5, driven by the primary reachable channel. */
-  stars: number
   validPhonePct: number
   validEmailPct: number
   primary: "phone" | "email" | "none"
   note: string
 }
+
+/** External readiness — calm B2B language, never stars, never red. */
+export type Readiness = { label: "High" | "Medium" | "Low"; message: string }
+
+/** Per-area readiness, in words (no stars): Excellent / Good / Needs review. */
+export type DataReadiness = { area: string; rating: "Excellent" | "Good" | "Needs review"; note: string }
 
 /**
  * The confidence is DECOMPOSED (four components) — far more useful for
@@ -60,13 +64,21 @@ export type IntakeReport = {
   // ── What we found ──
   businessType: EvidenceFinding
   contactQuality: ContactQuality
+  dataReadiness: DataReadiness[]
   missingFields: string[]
   duplicateEstimate: { estimatedRows: number; pct: number; note: string }
+  /** "Things we noticed" — honest, evidence-backed observations for the report. */
+  noticed: string[]
   // ── What Leadkaun will do next (expectation-setting) ──
   whatHappensNext: string[]
   // ── Judgement ──
+  /** External-facing readiness (High/Medium/Low + calm message). */
+  readiness: Readiness
+  /** Internal confidence decomposition + derived score. Not shown as numbers. */
   confidence: IntakeConfidence
   recommendation: string
   /** The one iconic closing sentence. Always present. */
   closingLine: string
+  /** Transparency panel content ("How did we determine this?"). */
+  howWeDetermined: string[]
 }

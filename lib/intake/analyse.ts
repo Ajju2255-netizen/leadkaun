@@ -14,8 +14,8 @@
 
 import { normalisePhone } from "../import/phone-normalise"
 import { inferIndustry } from "../import/enrich-lead"
-import { WHAT_HAPPENS_NEXT, CLOSING_LINE } from "./copy"
-import type { EvidenceFinding, ContactQuality, IntakeConfidence, IntakeReport } from "./types"
+import { WHAT_HAPPENS_NEXT, CLOSING_LINE, HOW_WE_DETERMINED, READINESS_MESSAGE } from "./copy"
+import type { EvidenceFinding, ContactQuality, DataReadiness, IntakeConfidence, IntakeReport, Readiness } from "./types"
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -133,15 +133,24 @@ export function analyseIntake(input: AnalyseInput): IntakeReport {
   }
 
   // ── Contact quality ──
-  const reach = Math.max(validPhonePct, validEmailPct)
   const primary: ContactQuality["primary"] =
     validPhonePct >= validEmailPct && validPhonePct > 0 ? "phone" : validEmailPct > 0 ? "email" : "none"
   const contactQuality: ContactQuality = {
-    stars: reach >= 95 ? 5 : reach >= 80 ? 4 : reach >= 60 ? 3 : reach >= 40 ? 2 : 1,
     validPhonePct: r(validPhonePct), validEmailPct: r(validEmailPct), primary,
     note: primary === "phone" ? `${r(validPhonePct)}% have a valid phone number`
         : primary === "email" ? `${r(validEmailPct)}% have a valid email`
         : "Few contacts could be validated",
+  }
+
+  // ── Data readiness — words, not stars, not red ──
+  const rate = (p: number): DataReadiness["rating"] => (p >= 90 ? "Excellent" : p >= 60 ? "Good" : "Needs review")
+  const dataReadiness: DataReadiness[] = [
+    { area: "Phone numbers", rating: rate(validPhonePct), note: `${r(validPhonePct)}% valid` },
+    { area: "Company information", rating: rate(companyFill),
+      note: companyFill >= 60 ? "Present for most leads" : companyFill > 0 ? "Present for some leads" : "Not provided" },
+  ]
+  if (emailFill > 0) {
+    dataReadiness.push({ area: "Email addresses", rating: rate(validEmailPct), note: `${r(validEmailPct)}% valid` })
   }
 
   // ── Missing high-value fields ──
@@ -198,13 +207,29 @@ export function analyseIntake(input: AnalyseInput): IntakeReport {
     recommendation = "We're not fully confident yet. It's worth checking the highlighted issues before importing."
   }
 
+  // ── External readiness (calm language; low ≠ bad — Law 1) ──
+  const readinessLabel: Readiness["label"] = band === "ready" ? "High" : band === "review" ? "Medium" : "Low"
+  const readiness: Readiness = { label: readinessLabel, message: READINESS_MESSAGE[readinessLabel] }
+
+  // ── "Things we noticed" — honest observations, each backed by evidence ──
+  const noticed: string[] = []
+  if (duplicateEstimate.pct > 0) {
+    noticed.push(`About ${duplicateEstimate.estimatedRows.toLocaleString("en-IN")} possible duplicate ${duplicateEstimate.estimatedRows === 1 ? "lead" : "leads"} (repeated phone numbers)`)
+  }
+  if (validPhonePct >= 80) noticed.push(`Most leads have a valid phone number (${r(validPhonePct)}%)`)
+  else if (validPhonePct > 0) noticed.push(`${r(100 - validPhonePct)}% of phone numbers need a second look`)
+  if (companyFill >= 60) noticed.push("Company names are available for most leads")
+  if (budgetFill < 40) noticed.push("Budget is missing for most leads")
+  noticed.push(businessType.known ? businessType.evidence[0] : "Industry couldn't be determined confidently yet")
+
   return {
     totalLeads: totalRows,
     sampled: n,
     leadType, country, currency,
-    businessType, contactQuality, missingFields, duplicateEstimate,
+    businessType, contactQuality, dataReadiness, missingFields, duplicateEstimate, noticed,
     whatHappensNext: WHAT_HAPPENS_NEXT,
-    confidence, recommendation,
+    readiness, confidence, recommendation,
     closingLine: CLOSING_LINE,
+    howWeDetermined: HOW_WE_DETERMINED,
   }
 }

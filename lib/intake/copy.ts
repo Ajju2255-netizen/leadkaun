@@ -15,8 +15,26 @@ export const WHAT_HAPPENS_NEXT: string[] = [
 ]
 
 /**
- * The one closing sentence. Psychologically load-bearing: it says we don't
- * pretend perfection, we're honest, and we improve. Do not soften or remove it.
+ * The one closing sentence. Psychologically load-bearing: immediate value +
+ * continuous learning. Do not soften or remove it.
  */
 export const CLOSING_LINE =
-  "Leadkaun understands enough to begin. It will become more accurate as it learns from your team."
+  "Leadkaun understands enough to make useful recommendations today. It will become more accurate as it learns from your team."
+
+/**
+ * "How did we determine this?" — the transparency panel (collapsed by default).
+ * Plain-language methods, no AI mystique. Every claim in the report traces here.
+ */
+export const HOW_WE_DETERMINED: string[] = [
+  "Industry — inferred from patterns in your company names. No external lookup.",
+  "Country & currency — detected from the shape of your phone numbers.",
+  "Contact quality — every phone and email checked against a validity standard.",
+  "Duplicates — estimated by matching standardised phone numbers within your file.",
+]
+
+/** External readiness message per level. No red, no 'failure' — low ≠ bad data. */
+export const READINESS_MESSAGE: Record<"High" | "Medium" | "Low", string> = {
+  High: "Ready to import.",
+  Medium: "Ready to import — reviewing the highlighted fields will improve recommendations.",
+  Low: "Review recommended before importing.",
+}

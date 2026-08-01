@@ -44,8 +44,10 @@ describe("analyseIntake", () => {
     expect(report.businessType.claim).toContain("Manufacturing")
     expect(report.country.known).toBe(true)
     expect(report.confidence.band).toBe("ready")
+    expect(report.readiness.label).toBe("High")
     expect(report.duplicateEstimate.pct).toBeGreaterThan(0) // one repeated phone
-    expect(report.closingLine).toMatch(/understands enough to begin/)
+    expect(report.dataReadiness.find((d) => d.area === "Phone numbers")?.rating).toBe("Excellent")
+    expect(report.closingLine).toMatch(/useful recommendations today/)
   })
 
   it("profiles a thin B2C list honestly (unknown industry, review band)", () => {
@@ -59,5 +61,6 @@ describe("analyseIntake", () => {
     expect(report.missingFields).toContain("Company")
     expect(report.missingFields).toContain("Industry")
     expect(["review", "low"]).toContain(report.confidence.band)
+    expect(["Medium", "Low"]).toContain(report.readiness.label)
   })
 })
