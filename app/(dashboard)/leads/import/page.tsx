@@ -564,6 +564,7 @@ export default function ImportPage() {
   const [report,     setReport]     = useState<IntakeReportData | null>(null)
   const [sessionId,  setSessionId]  = useState<string | null>(null)
   const [analysing,  setAnalysing]  = useState(false)
+  const [analysisSeconds, setAnalysisSeconds] = useState<number | undefined>(undefined)
 
   const fileRef     = useRef<HTMLInputElement>(null)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -672,6 +673,7 @@ export default function ImportPage() {
       setParsedRows(rows)
 
       // ── Analyse first — reveal understanding before importing (Law 46) ────
+      const analyseT0 = typeof performance !== "undefined" ? performance.now() : Date.now()
       const aRes = await fetch("/api/import/analyse", {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -683,10 +685,12 @@ export default function ImportPage() {
         }),
       })
       const aData = await aRes.json().catch(() => ({}))
+      const analyseElapsed = ((typeof performance !== "undefined" ? performance.now() : Date.now()) - analyseT0) / 1000
       setAnalysing(false)
       if (aRes.ok && aData?.report) {
         setReport(aData.report as IntakeReportData)
         setSessionId(typeof aData.session_id === "string" ? aData.session_id : null)
+        setAnalysisSeconds(Math.round(analyseElapsed * 10) / 10)
       } else {
         // Analysis is a bonus, never a gate — fall back to a direct import.
         toast.message("Imported directly — analysis wasn't available for this file.")
@@ -920,6 +924,20 @@ export default function ImportPage() {
         disabled={uploading}
       />
 
+      {report && !uploading && !result ? (
+        <IntakeReport
+          report={report}
+          sessionId={sessionId}
+          analysisSeconds={analysisSeconds}
+          importing={uploading}
+          onApprove={startImport}
+          onCancel={cancelReview}
+        />
+      ) : analysing ? (
+        <AnalysingPanel fileName={fileName} />
+      ) : (
+      <>
+
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="flex items-start gap-4">
         <div
@@ -941,19 +959,6 @@ export default function ImportPage() {
 
       {/* ── Connected Google Sheet (if auto-sync is on) ──────────────────── */}
       <ConnectedSheetCard />
-
-      {report && !uploading && !result ? (
-        <IntakeReport
-          report={report}
-          sessionId={sessionId}
-          importing={uploading}
-          onApprove={startImport}
-          onCancel={cancelReview}
-        />
-      ) : analysing ? (
-        <AnalysingPanel fileName={fileName} />
-      ) : (
-      <>
 
       {/* ── 2-col: Import From | Ingestion in Progress ───────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -1104,9 +1109,6 @@ export default function ImportPage() {
         </div>
       )}
 
-      </>
-      )}
-
       {/* ── Regrade utility ──────────────────────────────────────────────── */}
       <RegradeButton />
 
@@ -1140,6 +1142,9 @@ export default function ImportPage() {
           </div>
         )}
       </div>
+
+      </>
+      )}
 
       {/* ── Google Sheets modal ──────────────────────────────────────────── */}
       <SheetsModal

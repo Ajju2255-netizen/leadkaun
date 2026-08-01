@@ -75,13 +75,13 @@ export function analyseIntake(input: AnalyseInput): IntakeReport {
   const indianPhones = sample.filter((row) => normalisePhone(row.phone ?? "").startsWith("+91")).length
   const indianPct = pct(indianPhones, n)
   const country: EvidenceFinding = indianPct >= 60
-    ? { known: true, claim: "These look like India-based leads.", confidence: r(indianPct),
+    ? { known: true, claim: "These appear to be India-based leads.", confidence: r(indianPct),
         evidence: [`${r(indianPct)}% of phone numbers are valid Indian numbers`] }
     : { known: false, claim: "We couldn't confidently determine the country yet.", confidence: r(indianPct),
         evidence: [validPhonePct < 50 ? "Most phone numbers couldn't be validated" : "Phone numbers don't fit a single country pattern"] }
 
   const currency: EvidenceFinding = country.known
-    ? { known: true, claim: "Amounts are in Indian Rupees (₹).", confidence: country.confidence,
+    ? { known: true, claim: "Budgets and values appear to be recorded in Indian Rupees (₹).", confidence: country.confidence,
         evidence: ["Inferred from India-based phone numbers"] }
     : { known: false, claim: "We couldn't confidently determine the currency yet.", confidence: 0, evidence: [] }
 
@@ -94,13 +94,13 @@ export function analyseIntake(input: AnalyseInput): IntakeReport {
   let leadType: EvidenceFinding
   if (companyFill >= 40 || b2bHintKeys.length > 0) {
     leadType = {
-      known: true, claim: "These look like B2B (business) leads.",
+      known: true, claim: "These appear to be business leads (B2B).",
       confidence: Math.min(96, r(companyFill) + b2bHintKeys.length * 10),
       evidence: b2bEvidence.length ? b2bEvidence : [`Company data present in ${r(companyFill)}% of rows`],
     }
   } else if (companyFill < 15 && b2bHintKeys.length === 0) {
     leadType = {
-      known: true, claim: "These look like B2C (consumer) leads.", confidence: r(100 - companyFill),
+      known: true, claim: "These appear to be consumer leads (B2C).", confidence: r(100 - companyFill),
       evidence: ["No company data", `Name + phone${cityFill >= 40 ? " + city" : ""} only`],
     }
   } else {
@@ -122,7 +122,7 @@ export function analyseIntake(input: AnalyseInput): IntakeReport {
   if (top && companies.length > 0 && pct(top[1], companies.length) >= 35) {
     const matchPct = pct(top[1], companies.length)
     businessType = {
-      known: true, claim: `These look like ${top[0]} leads.`, confidence: r(matchPct),
+      known: true, claim: `These appear to be ${top[0]} businesses.`, confidence: r(matchPct),
       evidence: [`${r(matchPct)}% of company names match ${top[0]} patterns`, `${companies.length} company names analysed`],
     }
   } else {
@@ -214,13 +214,13 @@ export function analyseIntake(input: AnalyseInput): IntakeReport {
   // ── "Things we noticed" — honest observations, each backed by evidence ──
   const noticed: string[] = []
   if (duplicateEstimate.pct > 0) {
-    noticed.push(`About ${duplicateEstimate.estimatedRows.toLocaleString("en-IN")} possible duplicate ${duplicateEstimate.estimatedRows === 1 ? "lead" : "leads"} (repeated phone numbers)`)
+    noticed.push(`We found ${duplicateEstimate.estimatedRows.toLocaleString("en-IN")} possible duplicate${duplicateEstimate.estimatedRows === 1 ? "" : "s"} based on repeated phone numbers`)
   }
   if (validPhonePct >= 80) noticed.push(`Most leads have a valid phone number (${r(validPhonePct)}%)`)
   else if (validPhonePct > 0) noticed.push(`${r(100 - validPhonePct)}% of phone numbers need a second look`)
   if (companyFill >= 60) noticed.push("Company names are available for most leads")
   if (budgetFill < 40) noticed.push("Budget is missing for most leads")
-  noticed.push(businessType.known ? businessType.evidence[0] : "Industry couldn't be determined confidently yet")
+  noticed.push(businessType.known ? businessType.evidence[0] : "We couldn't confidently determine the industry yet")
 
   return {
     totalLeads: totalRows,
