@@ -211,16 +211,20 @@ export function analyseIntake(input: AnalyseInput): IntakeReport {
   const readinessLabel: Readiness["label"] = band === "ready" ? "High" : band === "review" ? "Medium" : "Low"
   const readiness: Readiness = { label: readinessLabel, message: READINESS_MESSAGE[readinessLabel] }
 
-  // ── "Things we noticed" — honest observations, each backed by evidence ──
+  // ── "Things we noticed" — honest observations, positive → improvement, so
+  //    the overall read is "your data is good", not "here's what's wrong". ──
   const noticed: string[] = []
+  // Lead with the good news.
+  if (validPhonePct >= 80) noticed.push(`Most leads have a valid phone number (${r(validPhonePct)}%)`)
+  if (companyFill >= 60) noticed.push("Company names are available for most leads")
+  if (businessType.known) noticed.push(businessType.evidence[0])
+  // Then what could be improved.
+  if (validPhonePct > 0 && validPhonePct < 80) noticed.push(`${r(100 - validPhonePct)}% of phone numbers need a second look`)
   if (duplicateEstimate.pct > 0) {
     noticed.push(`We found ${duplicateEstimate.estimatedRows.toLocaleString("en-IN")} possible duplicate${duplicateEstimate.estimatedRows === 1 ? "" : "s"} based on repeated phone numbers`)
   }
-  if (validPhonePct >= 80) noticed.push(`Most leads have a valid phone number (${r(validPhonePct)}%)`)
-  else if (validPhonePct > 0) noticed.push(`${r(100 - validPhonePct)}% of phone numbers need a second look`)
-  if (companyFill >= 60) noticed.push("Company names are available for most leads")
   if (budgetFill < 40) noticed.push("Budget is missing for most leads")
-  noticed.push(businessType.known ? businessType.evidence[0] : "We couldn't confidently determine the industry yet")
+  if (!businessType.known) noticed.push("We couldn't confidently determine the industry yet")
 
   return {
     totalLeads: totalRows,
