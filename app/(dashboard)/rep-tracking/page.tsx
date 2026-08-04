@@ -7,6 +7,7 @@ import { RECOMMENDATION_TOP_N } from "@/lib/analytics/recommendation-rank"
 import { DeltaChip } from "@/components/shared/DeltaChip"
 import { Skeleton } from "@/components/ui/skeleton"
 import { AvatarCircle } from "@/components/shared/AvatarCircle"
+import { FeatureLockedCard } from "@/components/shared/FeatureLockedCard"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -78,10 +79,23 @@ interface RepTrackingData {
   top_performer: { id: string; first_name: string; last_name: string; revenue_recovered: number } | null
 }
 
+/** Thrown when the API says the account's plan doesn't include this feature. */
+class FeatureLocked extends Error {
+  requiredTier: string
+  constructor(requiredTier: string) {
+    super("Feature locked")
+    this.name = "FeatureLocked"
+    this.requiredTier = requiredTier
+  }
+}
+
 async function fetchRepTracking(): Promise<RepTrackingData> {
   const res = await fetch("/api/analytics/rep-tracking", { credentials: "include" })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
+    if (res.status === 403 && body?.code === "FEATURE_LOCKED") {
+      throw new FeatureLocked(typeof body?.requiredTier === "string" ? body.requiredTier : "Growth")
+    }
     throw new Error(body?.error ?? `HTTP ${res.status}`)
   }
   return res.json()
@@ -214,6 +228,8 @@ export default function RepTrackingPage() {
     queryKey:        ["rep-tracking"],
     queryFn:         fetchRepTracking,
     refetchInterval: 60_000,
+    // A plan lock (403) is deterministic — don't retry it; show the prompt now.
+    retry:           (failureCount, err) => !(err instanceof FeatureLocked) && failureCount < 2,
   })
 
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -229,6 +245,20 @@ export default function RepTrackingPage() {
   const leader = sortedReps[0] ?? null
   // Solo-team mode: ranking ("Leader", "Top Performer") is meaningless with one rep.
   const isSolo = sortedReps.length <= 1
+
+  // Plan-gated feature (403) → a calm upgrade prompt, not a scary error.
+  const locked = error instanceof FeatureLocked ? error : null
+  if (locked) {
+    return (
+      <div className="max-w-6xl mx-auto">
+        <FeatureLockedCard
+          feature="Rep Tracking"
+          requiredTier={locked.requiredTier}
+          description="Rep Tracking measures each rep's follow-up, speed, missed-revenue recovery, and conversion — with a single Rep Score. Upgrade to Growth to turn it on."
+        />
+      </div>
+    )
+  }
 
   // Find max values for proportional bar scaling
   const maxRevenue   = Math.max(...sortedReps.map((r) => r.revenue_recovered), 1)
