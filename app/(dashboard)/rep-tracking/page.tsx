@@ -296,7 +296,7 @@ export default function RepTrackingPage() {
         <StatCard
           label="₹ Recovered"
           value={isLoading ? <Skeleton className="h-9 w-32" /> : `₹${formatINR(account?.revenue_recovered ?? 0)}`}
-          caption="This month"
+          caption="All time"
           delta={account?.revenue_recovered_pct_change ?? null}
           deltaPositive={true}
           iconColor="#10B981"
