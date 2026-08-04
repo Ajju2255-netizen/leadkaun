@@ -37,7 +37,12 @@ export async function GET() {
     const workspaceId = session.workspace.id
 
     const now            = new Date()
-    const monthStart     = startOfIstMonth(now)
+    // Rep tracking reflects ALL-TIME performance, not just the current calendar
+    // month — otherwise an account with no wins THIS month (young, seasonal, or
+    // simply between deals) reads as all-zeros despite real recovered revenue.
+    // Epoch = "since the beginning." Period-over-period deltas collapse to null
+    // and hide, since there's no prior window to compare against.
+    const monthStart     = new Date(0)
     const lastMonthStart = startOfIstMonth(new Date(monthStart.getTime() - 1))
     const lastMonthEnd   = monthStart   // exclusive
     const dayStart       = startOfIstDay(now)
