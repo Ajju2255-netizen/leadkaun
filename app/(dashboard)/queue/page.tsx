@@ -219,7 +219,9 @@ export default function QueuePage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2 ml-auto flex-wrap">
+          {/* Its own full-width row: keeps all controls on one aligned line rather
+              than shrinking beside the title and wrapping into a ragged 2×2. */}
+          <div className="flex items-center gap-2 flex-wrap w-full">
               {/* Search */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none z-10" />
