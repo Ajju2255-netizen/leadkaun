@@ -274,11 +274,12 @@ export async function GET() {
       })
     )
 
-    // Filter to reps that have at least one KPI present (cleaner table)
-    const activeRepStats = repStats.filter((r) =>
-      r.revenue_recovered > 0 || r.response_time_seconds != null || r.follow_up_completion_pct != null ||
-      (r.recommendations_accepted + r.recommendations_ignored) > 0
-    )
+    // Show the whole team — a rep with no activity yet still belongs in the list
+    // (their KPIs render as zeros / dashes). Previously we hid zero-activity reps
+    // for a "cleaner" table, but on a fresh account that filtered out EVERY rep
+    // and the list looked empty/broken. Managers also want to see who HASN'T
+    // done anything, so this is the more correct default.
+    const activeRepStats = repStats
 
     // Account-level recommendation adoption (sum across reps)
     const acctRecsAccepted = activeRepStats.reduce((s, r) => s + r.recommendations_accepted, 0)
