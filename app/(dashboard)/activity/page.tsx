@@ -46,12 +46,12 @@ type Member = { id: string; first_name: string; last_name: string | null }
 
 type Tab = "activity" | "compliance" | "recovery" | "performance"
 
-const CAT_STYLE: Record<SignalCategory, { icon: typeof Phone; bg: string; color: string }> = {
-  call:     { icon: Phone,         bg: "linear-gradient(180deg,#BAE6FD,#7DD3FC)", color: "#0284C7" },
-  whatsapp: { icon: MessageSquare, bg: "linear-gradient(180deg,#A7F3D0,#6EE7B7)", color: "#059669" },
-  email:    { icon: Mail,          bg: "linear-gradient(180deg,#DDD6FE,#C4B5FD)", color: "#7C3AED" },
-  import:   { icon: Upload,        bg: "linear-gradient(180deg,#FED7AA,#FDBA74)", color: "#EA580C" },
-  system:   { icon: Cog,           bg: "linear-gradient(180deg,#E2E8F0,#CBD5E1)", color: "#475569" },
+const CAT_STYLE: Record<SignalCategory, { icon: typeof Phone; tintBg: string; tintFg: string }> = {
+  call:     { icon: Phone,         tintBg: "bg-sky-50",     tintFg: "text-sky-600"     },
+  whatsapp: { icon: MessageSquare, tintBg: "bg-emerald-50", tintFg: "text-emerald-600" },
+  email:    { icon: Mail,          tintBg: "bg-violet-50",  tintFg: "text-violet-600"  },
+  import:   { icon: Upload,        tintBg: "bg-orange-50",  tintFg: "text-orange-600"  },
+  system:   { icon: Cog,           tintBg: "bg-slate-100",  tintFg: "text-slate-500"   },
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────
@@ -91,18 +91,15 @@ export default function ActivityPage() {
   const members = teamData?.members ?? []
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start gap-4">
-        <div
-          className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0"
-          style={{ background: "linear-gradient(180deg, #BAE6FD 0%, #7DD3FC 100%)", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 12px rgba(14,165,233,0.25)" }}
-        >
-          <ActivityIcon className="w-6 h-6 text-sky-700" strokeWidth={2.2} />
-        </div>
+      <div className="flex items-start gap-3">
+        <span className="w-11 h-11 rounded-xl grid place-items-center bg-sky-50 text-sky-600 shrink-0">
+          <ActivityIcon className="w-5 h-5" strokeWidth={2.2} />
+        </span>
         <div className="min-w-0">
-          <h1 className="text-[28px] font-bold text-ink tracking-[-0.02em] leading-tight">Activity</h1>
-          <p className="text-[14px] text-ink-soft mt-2 leading-relaxed max-w-[560px]">
+          <h1 className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">Activity</h1>
+          <p className="text-[13px] text-ink-muted mt-1 leading-relaxed max-w-[560px]">
             {isManager
               ? "How the team is doing — what they did, whether they hit SLAs, what they recovered, and who's performing."
               : "Your activity and how you're tracking against follow-up and response SLAs."}
@@ -162,22 +159,22 @@ function ActivityFeed({ repFilter, page, setPage }: { repFilter: string; page: n
   })
 
   if (isLoading) {
-    return <div className="glass-2 gloss-edge rounded-2xl p-4 space-y-2">{[1,2,3,4,5].map((i) => <Skeleton key={i} className="h-12 w-full rounded-xl" />)}</div>
+    return <div className="rounded-2xl border border-slate-200/70 bg-white p-4 space-y-2">{[1,2,3,4,5].map((i) => <Skeleton key={i} className="h-12 w-full rounded-xl" />)}</div>
   }
   if (!data || data.items.length === 0) {
-    return <div className="glass-2 gloss-edge rounded-2xl p-6"><EmptyState icon={ActivityIcon} title="No activity yet" description="Calls, WhatsApp, and imports will appear here as your team works leads." /></div>
+    return <div className="rounded-2xl border border-slate-200/70 bg-white p-6"><EmptyState icon={ActivityIcon} title="No activity yet" description="Calls, WhatsApp, and imports will appear here as your team works leads." /></div>
   }
 
   return (
-    <div className="glass-2 gloss-edge rounded-2xl overflow-hidden">
-      <div className="divide-y divide-hairline">
+    <div className="rounded-2xl border border-slate-200/70 bg-white overflow-hidden">
+      <div className="divide-y divide-slate-100">
         {data.items.map((it) => {
           const s = CAT_STYLE[it.category] ?? CAT_STYLE.system
           const Icon = s.icon
           return (
             <div key={it.id} className="flex items-center gap-3 px-4 py-3 hover:bg-sky-50/40 transition-colors">
-              <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: s.bg, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.6)" }}>
-                <Icon className="w-4 h-4" style={{ color: s.color }} strokeWidth={2.4} />
+              <span className={`w-8 h-8 rounded-lg grid place-items-center shrink-0 ${s.tintBg} ${s.tintFg}`}>
+                <Icon className="w-4 h-4" strokeWidth={2.4} />
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-[13px] text-ink leading-snug truncate">
@@ -195,16 +192,16 @@ function ActivityFeed({ repFilter, page, setPage }: { repFilter: string; page: n
         })}
       </div>
       {/* Pager */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-t border-hairline bg-white/40">
+      <div className="flex items-center justify-between px-4 py-2.5 border-t border-slate-100 bg-slate-50/50">
         <span className="text-[11px] text-ink-muted tabular-nums">{data.total} events</span>
         <div className="flex items-center gap-1">
           <button onClick={() => setPage(Math.max(1, page - 1))} disabled={page <= 1}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-soft hover:bg-white/70 disabled:opacity-30 disabled:pointer-events-none transition-colors">
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-soft hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none transition-colors">
             <ChevronLeft className="w-4 h-4" />
           </button>
           <span className="text-[12px] font-semibold text-ink-soft tabular-nums px-1">{page}</span>
           <button onClick={() => setPage(page + 1)} disabled={!data.has_more}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-soft hover:bg-white/70 disabled:opacity-30 disabled:pointer-events-none transition-colors">
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-soft hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none transition-colors">
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
@@ -217,10 +214,10 @@ function ActivityFeed({ repFilter, page, setPage }: { repFilter: string; page: n
 
 function StatTile({ label, value, sub }: { label: string; value: React.ReactNode; sub?: string }) {
   return (
-    <div className="rounded-2xl bg-white ring-1 ring-slate-900/5 p-4">
-      <p className="text-[11px] font-semibold text-ink-muted uppercase tracking-[0.06em]">{label}</p>
-      <p className="text-[24px] font-bold text-ink tabular-nums mt-1 leading-none">{value}</p>
-      {sub && <p className="text-[11px] text-ink-muted mt-1.5">{sub}</p>}
+    <div className="rounded-2xl border border-slate-200/70 bg-white p-4">
+      <p className="text-[11px] font-semibold text-ink-soft uppercase tracking-[0.06em]">{label}</p>
+      <p className="text-[24px] font-bold text-ink tabular-nums mt-1.5 leading-none">{value}</p>
+      {sub && <p className="text-[11.5px] text-ink-muted mt-1.5">{sub}</p>}
     </div>
   )
 }
@@ -248,14 +245,14 @@ function CompliancePanel() {
       </div>
 
       {data.reps.length === 0 ? (
-        <div className="glass-2 gloss-edge rounded-2xl p-6"><EmptyState icon={ShieldCheck} title="No compliance data yet" description="Once leads are assigned and follow-ups scheduled this month, adherence appears here." /></div>
+        <div className="rounded-2xl border border-slate-200/70 bg-white p-6"><EmptyState icon={ShieldCheck} title="No compliance data yet" description="Once leads are assigned and follow-ups scheduled this month, adherence appears here." /></div>
       ) : (
-        <div className="glass-2 gloss-edge rounded-2xl overflow-hidden">
+        <div className="rounded-2xl border border-slate-200/70 bg-white overflow-hidden">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-hairline">
+              <tr className="border-b border-slate-100">
                 {["Rep", "Response SLA", "Follow-up adherence", "Escalations", "Status"].map((h, i) => (
-                  <th key={h} className={`py-2.5 px-4 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.08em] ${i === 0 ? "text-left" : i === 4 ? "text-right" : "text-left"}`}>{h}</th>
+                  <th key={h} className={`py-2.5 px-4 text-[10px] font-semibold text-ink-soft uppercase tracking-[0.08em] ${i === 0 ? "text-left" : i === 4 ? "text-right" : "text-left"}`}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -263,7 +260,7 @@ function CompliancePanel() {
               {data.reps.map((r) => {
                 const band = COMPLIANCE_BAND_STYLE[r.band]
                 return (
-                  <tr key={r.rep_id} className="border-b border-hairline last:border-0 hover:bg-sky-50/30 transition-colors">
+                  <tr key={r.rep_id} className="border-b border-slate-100 last:border-0 hover:bg-sky-50/30 transition-colors">
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2.5">
                         <AvatarCircle seed={r.name} size="sm" />
@@ -315,16 +312,16 @@ function RecoveryPanel() {
         <StatTile label="7-day pool change" value={data.value_7d_pct_change == null ? "—" : `${data.value_7d_pct_change > 0 ? "+" : ""}${data.value_7d_pct_change}%`} />
       </div>
       {data.by_rep.length > 0 && (
-        <div className="glass-2 gloss-edge rounded-2xl overflow-hidden">
+        <div className="rounded-2xl border border-slate-200/70 bg-white overflow-hidden">
           <table className="w-full">
-            <thead><tr className="border-b border-hairline">
-              {["Rep", "Missed leads", "Value at risk"].map((h, i) => <th key={h} className={`py-2.5 px-4 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.08em] ${i === 0 ? "text-left" : "text-right"}`}>{h}</th>)}
+            <thead><tr className="border-b border-slate-100">
+              {["Rep", "Missed leads", "Value at risk"].map((h, i) => <th key={h} className={`py-2.5 px-4 text-[10px] font-semibold text-ink-soft uppercase tracking-[0.08em] ${i === 0 ? "text-left" : "text-right"}`}>{h}</th>)}
             </tr></thead>
             <tbody>
               {data.by_rep.sort((a, b) => b.missed_value - a.missed_value).map((r) => {
                 const name = `${r.first_name} ${r.last_name ?? ""}`.trim() || "Unassigned"
                 return (
-                <tr key={r.rep_id} className="border-b border-hairline last:border-0 hover:bg-sky-50/30 transition-colors">
+                <tr key={r.rep_id} className="border-b border-slate-100 last:border-0 hover:bg-sky-50/30 transition-colors">
                   <td className="py-3 px-4"><div className="flex items-center gap-2.5"><AvatarCircle seed={name} size="sm" /><span className="text-[13px] font-semibold text-ink">{name}</span></div></td>
                   <td className="py-3 px-4 text-right text-[13px] tabular-nums text-ink">{r.missed_count}</td>
                   <td className="py-3 px-4 text-right text-[13px] tabular-nums font-semibold text-rose-600">{formatRupee(r.missed_value)}</td>
@@ -350,14 +347,14 @@ function PerformancePanel() {
       return r.json()
     },
   })
-  if (isLoading) return <div className="glass-2 gloss-edge rounded-2xl p-4 space-y-2">{[1,2,3].map((i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}</div>
+  if (isLoading) return <div className="rounded-2xl border border-slate-200/70 bg-white p-4 space-y-2">{[1,2,3].map((i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}</div>
   if (!data) return null
   const reps = [...(data.reps ?? [])].sort((a, b) => b.rep_score - a.rep_score)
-  if (reps.length === 0) return <div className="glass-2 gloss-edge rounded-2xl p-6"><EmptyState icon={Trophy} title="No performance data yet" description="Rep scores appear once your team starts working leads this month." /></div>
+  if (reps.length === 0) return <div className="rounded-2xl border border-slate-200/70 bg-white p-6"><EmptyState icon={Trophy} title="No performance data yet" description="Rep scores appear once your team starts working leads this month." /></div>
 
   return (
-    <div className="glass-2 gloss-edge rounded-2xl overflow-hidden">
-      <div className="divide-y divide-hairline">
+    <div className="rounded-2xl border border-slate-200/70 bg-white overflow-hidden">
+      <div className="divide-y divide-slate-100">
         {reps.map((r, i) => {
           const name = `${r.first_name} ${r.last_name ?? ""}`.trim()
           return (

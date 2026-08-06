@@ -44,16 +44,16 @@ export default function SecurityPage() {
   return (
     <div className="space-y-5 max-w-xl">
       <div className="flex items-start gap-3">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_6px_18px_rgba(14,165,233,0.32)]">
-          <Shield className="w-6 h-6 text-white" strokeWidth={2.4} />
+        <div className="w-11 h-11 rounded-xl grid place-items-center bg-sky-50 text-sky-600">
+          <Shield className="w-5 h-5" strokeWidth={2.4} />
         </div>
         <div>
-          <h1 className="text-[28px] font-bold text-ink tracking-[-0.02em] leading-tight">Security</h1>
-          <p className="text-[13px] text-slate-500 mt-0.5">Update your password.</p>
+          <h1 className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">Security</h1>
+          <p className="text-[13px] text-ink-muted mt-1">Update your password.</p>
         </div>
       </div>
 
-      <div className="glass-card px-5 py-5 space-y-4">
+      <div className="rounded-2xl border border-slate-200/70 bg-white px-5 py-5 space-y-4">
         <Field label="New password" hint="Minimum 8 characters.">
           <input type="password" className={inputCls} value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
@@ -76,7 +76,7 @@ export default function SecurityPage() {
         <button
           onClick={handleChangePassword}
           disabled={saving || !newPassword || !confirmPassword || newPassword !== confirmPassword}
-          className="h-9 px-5 rounded-full bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)] disabled:opacity-50
+          className="h-9 px-5 rounded-lg bg-sky-600 hover:bg-sky-700 disabled:opacity-50
                      text-white text-[13px] font-semibold transition-all active:scale-[0.97]"
         >
           {saving ? "Updating…" : "Update password"}

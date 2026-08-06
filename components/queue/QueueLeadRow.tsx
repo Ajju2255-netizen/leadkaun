@@ -1,23 +1,18 @@
 "use client"
 
 /**
- * QueueLeadRow — one row of the priority-queue table.
- *
- * Uses the shared QUEUE_GRID column template so the rank, avatar, identity,
- * value and next-action line up into clean vertical columns down the whole
- * list (and align with the column header + the #1 focus row).
+ * QueueLeadRow — one <tr> in the priority-queue data table (see queue/page.tsx).
+ * Columns: Lead · Signal · Value · Grade · Next action · Source · Last active ·
+ * open. The whole row opens the lead's slide-over (onClick) — behaviour unchanged.
+ * `isNext` marks the top-priority lead with a small "Next" tag.
  */
 
 import { AvatarCircle } from "@/components/shared/AvatarCircle"
 import { GradeBadge } from "@/components/shared/GradeBadge"
 import { formatRupee } from "@/lib/format"
+import { cn } from "@/lib/utils"
+import { ChevronRight } from "lucide-react"
 import type { QueueLead } from "@/hooks/useQueue"
-
-/** Shared column grid: rank · avatar · identity · value · next-action.
- *  The value column is dropped on mobile (and its cell hidden with
- *  `hidden sm:block`) so the name has room on narrow screens. */
-export const QUEUE_GRID =
-  "grid grid-cols-[18px_36px_minmax(0,1fr)_auto] sm:grid-cols-[18px_36px_minmax(0,1fr)_72px_120px] items-center gap-2.5 sm:gap-3"
 
 function activeAgo(minutes: number | null | undefined): string {
   if (minutes == null) return "—"
@@ -28,58 +23,94 @@ function activeAgo(minutes: number | null | undefined): string {
   return `${Math.floor(hours / 24)}d ago`
 }
 
+/** Next-action pill tone, keyed off grade (the action derives from grade). */
+const NEXT_TONE: Record<string, string> = {
+  A: "bg-sky-50 text-sky-700",
+  B: "bg-sky-50 text-sky-700",
+  C: "bg-amber-50 text-amber-700",
+  D: "bg-orange-50 text-orange-700",
+  E: "bg-slate-100 text-slate-500",
+  F: "bg-slate-100 text-slate-500",
+}
+
 export interface QueueLeadRowProps {
   lead: QueueLead
   onClick: (leadId: string) => void
-  /** Shown as a small rank number in the first column when set. */
-  rank?: number
+  isNext?: boolean
 }
 
-export function QueueLeadRow({ lead, onClick, rank }: QueueLeadRowProps) {
-  const fullName = [lead.first_name, lead.last_name].filter(Boolean).join(" ")
-  const action   = lead.next_action?.label ?? "View"
-  const expValue = lead.expected_value ?? 0
-  const hint     = lead.activity_hint ?? lead.stage?.name ?? "New lead"
+export function QueueLeadRow({ lead, onClick, isNext }: QueueLeadRowProps) {
+  const fullName  = [lead.first_name, lead.last_name].filter(Boolean).join(" ") || "Unnamed lead"
+  const company   = lead.company_name ?? "—"
+  const signal    = lead.activity_hint || lead.inquiry_text || lead.stage?.name || "New lead"
+  const nextLabel = lead.next_action?.label ?? "Review"
+  const source    = lead.source?.name ?? "—"
 
   return (
-    <button
+    <tr
       onClick={() => onClick(lead.id)}
-      className={`group w-full text-left ${QUEUE_GRID} rounded-xl bg-white ring-1 ring-slate-100
-                  hover:ring-sky-200 hover:bg-sky-50/40 px-3 py-2.5 transition-all
-                  focus:outline-none focus:ring-2 focus:ring-sky-300/60`}
+      className="group cursor-pointer transition-colors hover:bg-sky-50/40"
     >
-      {/* 1 · rank */}
-      <span className="text-center text-[12px] font-extrabold tabular-nums text-slate-300 group-hover:text-sky-400">
-        {rank ?? ""}
-      </span>
-
-      {/* 2 · avatar */}
-      <AvatarCircle seed={lead.first_name ?? "?"} size="md" />
-
-      {/* 3 · identity (two lines, never wraps) */}
-      <div className="min-w-0">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <p className="text-[13px] font-bold text-ink truncate">{fullName}</p>
-          <GradeBadge grade={lead.grade} size="sm" />
+      {/* Lead */}
+      <td className="py-3 pl-5 pr-3 align-middle">
+        <div className="flex items-center gap-3 min-w-0">
+          <AvatarCircle seed={lead.first_name ?? "?"} size="md" />
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-[13.5px] font-semibold text-ink truncate group-hover:text-sky-700 transition-colors">
+                {fullName}
+              </span>
+              {isNext && (
+                <span className="shrink-0 inline-flex items-center h-[18px] px-1.5 rounded-full bg-sky-100 text-sky-700 text-[9px] font-bold uppercase tracking-[0.06em]">
+                  Next
+                </span>
+              )}
+            </div>
+            <p className="text-[12px] text-ink-muted truncate mt-0.5">{company}</p>
+          </div>
         </div>
-        <p className="text-[11px] text-slate-400 truncate mt-0.5">
-          <span className="font-medium text-ink-muted">{lead.company_name ?? "—"}</span>
-          {hint && <> · {hint}</>}
-          <span className="text-slate-300"> · </span>{activeAgo(lead.active_minutes_ago)}
-        </p>
-      </div>
+      </td>
 
-      {/* 4 · value (hidden on mobile to give the name room) */}
-      <p className="hidden sm:block text-right text-[13px] font-extrabold tabular-nums text-ink">
-        {formatRupee(expValue)}
-      </p>
+      {/* Signal */}
+      <td className="py-3 px-3 align-middle hidden lg:table-cell">
+        <p className="text-[13px] text-ink-soft truncate max-w-[220px]">{signal}</p>
+      </td>
 
-      {/* 5 · next-action chip */}
-      <span className="justify-self-end inline-flex items-center justify-center h-8 px-3.5 rounded-full text-[12px] font-semibold
-                       border border-slate-200 text-slate-600 whitespace-nowrap max-w-full truncate
-                       group-hover:border-sky-300 group-hover:text-sky-700 group-hover:bg-sky-50 transition-all">
-        {action}
-      </span>
-    </button>
+      {/* Value */}
+      <td className="py-3 px-3 align-middle text-right">
+        <span className="text-[13.5px] font-semibold tabular-nums text-ink">
+          {lead.expected_value ? formatRupee(lead.expected_value) : "—"}
+        </span>
+      </td>
+
+      {/* Grade */}
+      <td className="py-3 px-3 align-middle">
+        <GradeBadge grade={lead.grade} size="md" />
+      </td>
+
+      {/* Next action */}
+      <td className="py-3 px-3 align-middle hidden sm:table-cell">
+        <span className={cn("inline-flex items-center h-7 px-3 rounded-full text-[12px] font-semibold whitespace-nowrap", NEXT_TONE[lead.grade] ?? NEXT_TONE.F)}>
+          {nextLabel}
+        </span>
+      </td>
+
+      {/* Source */}
+      <td className="py-3 px-3 align-middle hidden xl:table-cell">
+        <span className="text-[12.5px] text-ink-muted whitespace-nowrap">{source}</span>
+      </td>
+
+      {/* Last active */}
+      <td className="py-3 px-3 align-middle hidden lg:table-cell">
+        <span className="text-[12.5px] text-ink-muted whitespace-nowrap">{activeAgo(lead.active_minutes_ago)}</span>
+      </td>
+
+      {/* Open */}
+      <td className="py-3 pl-3 pr-5 align-middle text-right">
+        <span className="inline-flex w-8 h-8 items-center justify-center rounded-lg text-slate-300 group-hover:text-sky-600 group-hover:bg-sky-50 transition-colors">
+          <ChevronRight className="w-4 h-4" />
+        </span>
+      </td>
+    </tr>
   )
 }

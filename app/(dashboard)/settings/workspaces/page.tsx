@@ -57,19 +57,19 @@ export default function WorkspacesPage() {
   return (
     <div className="space-y-5 max-w-2xl">
       <div className="flex items-start gap-3">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_6px_18px_rgba(14,165,233,0.32)]">
-          <Layers className="w-6 h-6 text-white" strokeWidth={2.2} />
+        <div className="w-11 h-11 rounded-xl grid place-items-center bg-sky-50 text-sky-600">
+          <Layers className="w-5 h-5" strokeWidth={2.2} />
         </div>
         <div>
-          <h1 className="text-[28px] font-bold text-ink tracking-[-0.02em] leading-tight">Workspaces</h1>
-          <p className="text-[13px] text-slate-500 mt-0.5 leading-relaxed">
+          <h1 className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">Workspaces</h1>
+          <p className="text-[13px] text-ink-muted mt-1 leading-relaxed">
             Separate lead-intelligence environments — each has its own leads, pipeline, sources, and team. Assign who works in each.
           </p>
         </div>
       </div>
 
       {/* Create */}
-      <div className="glass-card px-5 py-4">
+      <div className="rounded-2xl border border-slate-200/70 bg-white px-5 py-4">
         <label className="text-[12px] font-semibold text-slate-600 block mb-1.5">New workspace</label>
         <div className="flex gap-2">
           <input
@@ -82,9 +82,8 @@ export default function WorkspacesPage() {
           <button
             onClick={createWorkspace}
             disabled={creating || !name.trim()}
-            className="h-10 px-4 rounded-xl inline-flex items-center gap-1.5 text-white text-[13px] font-semibold transition-all shrink-0
-                       bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600
-                       shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)] disabled:opacity-50 active:scale-[0.98]"
+            className="h-10 px-4 rounded-lg inline-flex items-center gap-1.5 text-white text-[13px] font-semibold transition-colors shrink-0
+                       bg-sky-600 hover:bg-sky-700 disabled:opacity-50"
           >
             <Plus className="w-4 h-4" /> Create
           </button>
@@ -97,7 +96,7 @@ export default function WorkspacesPage() {
       ) : (
         <div className="space-y-2.5">
           {workspaces.map((w) => (
-            <div key={w.id} className="glass-card px-5 py-4 flex items-center gap-4">
+            <div key={w.id} className="rounded-2xl border border-slate-200/70 bg-white px-5 py-4 flex items-center gap-4">
               <div className="w-10 h-10 rounded-xl bg-sky-50 flex items-center justify-center shrink-0">
                 <Layers className="w-5 h-5 text-sky-600" />
               </div>
@@ -107,7 +106,7 @@ export default function WorkspacesPage() {
                   {w.is_default && <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 ring-1 ring-amber-200 px-1.5 py-0.5 rounded-full"><Star className="w-2.5 h-2.5 fill-current" /> Default</span>}
                   {w.archived_at && <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-full">Archived</span>}
                 </div>
-                <p className="text-[12px] text-slate-500 mt-0.5 tabular-nums">{w.member_count} member{w.member_count === 1 ? "" : "s"} · {w.lead_count} lead{w.lead_count === 1 ? "" : "s"}</p>
+                <p className="text-[12px] text-ink-muted mt-1 tabular-nums">{w.member_count} member{w.member_count === 1 ? "" : "s"} · {w.lead_count} lead{w.lead_count === 1 ? "" : "s"}</p>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
                 {!w.is_default && !w.archived_at && (
@@ -124,7 +123,7 @@ export default function WorkspacesPage() {
                   {w.archived_at ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
                 </button>
                 <button onClick={() => setManageId(w.id)}
-                  className="h-8 px-3 rounded-lg inline-flex items-center gap-1.5 text-[12px] font-semibold text-sky-700 border border-sky-200 bg-sky-50/60 hover:bg-sky-50 transition-colors">
+                  className="h-8 px-3 rounded-lg inline-flex items-center gap-1.5 text-[12px] font-semibold text-sky-700 border border-sky-200 bg-sky-50 hover:bg-sky-50 transition-colors">
                   <Users className="w-3.5 h-3.5" /> Members
                 </button>
               </div>
@@ -178,13 +177,13 @@ function MembersModal({ workspace, onClose, onChanged }: { workspace: Workspace;
   return (
     <ModalPortal>
       <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-slate-900/55 backdrop-blur-sm">
-        <div className="w-full max-w-md rounded-2xl glass-3 gloss-edge p-6 space-y-4 shadow-[0_24px_48px_rgba(15,23,42,0.18)] max-h-[85vh] flex flex-col">
+        <div className="w-full max-w-md rounded-2xl border border-slate-200/70 bg-white p-6 space-y-4 shadow-[0_24px_48px_rgba(15,23,42,0.18)] max-h-[85vh] flex flex-col">
           <div className="flex items-center justify-between shrink-0">
             <div className="min-w-0">
-              <p className="text-[16px] font-bold text-slate-900 truncate">{workspace.name}</p>
+              <p className="text-[15px] font-semibold text-ink truncate">{workspace.name}</p>
               <p className="text-[12px] text-ink-muted">Who works in this workspace</p>
             </div>
-            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/70 text-slate-400 transition-colors shrink-0"><X className="w-4 h-4" /></button>
+            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white text-slate-400 transition-colors shrink-0"><X className="w-4 h-4" /></button>
           </div>
 
           {/* Add */}
@@ -208,7 +207,7 @@ function MembersModal({ workspace, onClose, onChanged }: { workspace: Workspace;
               <p className="text-[13px] text-ink-muted text-center py-6">No members yet. Add someone above.</p>
             ) : (
               data?.members.map((m) => (
-                <div key={m.id} className="flex items-center gap-3 px-2.5 py-2 rounded-xl hover:bg-white/60 transition-colors">
+                <div key={m.id} className="flex items-center gap-3 px-2.5 py-2 rounded-xl hover:bg-white transition-colors">
                   <AvatarCircle seed={name(m)} size="sm" />
                   <div className="min-w-0 flex-1">
                     <p className="text-[13px] font-semibold text-ink truncate">{name(m)}</p>
@@ -222,7 +221,7 @@ function MembersModal({ workspace, onClose, onChanged }: { workspace: Workspace;
             )}
           </div>
 
-          <button onClick={onClose} className="shrink-0 h-10 rounded-full border border-slate-200/70 text-[13px] font-semibold text-slate-600 hover:bg-white/70 transition-all bg-white/40 inline-flex items-center justify-center gap-1.5">
+          <button onClick={onClose} className="shrink-0 h-10 rounded-lg border border-slate-200/70 text-[13px] font-semibold text-slate-600 hover:bg-white transition-all bg-white inline-flex items-center justify-center gap-1.5">
             <Check className="w-4 h-4" /> Done
           </button>
         </div>

@@ -226,17 +226,17 @@ export default function BillingPage() {
   return (
     <div className="space-y-5 max-w-xl">
       <div className="flex items-start gap-3">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_6px_18px_rgba(14,165,233,0.32)]">
-          <CreditCard className="w-6 h-6 text-white" strokeWidth={2.4} />
+        <div className="w-11 h-11 rounded-xl grid place-items-center bg-sky-50 text-sky-600">
+          <CreditCard className="w-5 h-5" strokeWidth={2.4} />
         </div>
         <div>
-          <h1 className="text-[28px] font-bold text-ink tracking-[-0.02em] leading-tight">Billing</h1>
-          <p className="text-[13px] text-slate-500 mt-0.5">Your plan and payment method.</p>
+          <h1 className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">Billing</h1>
+          <p className="text-[13px] text-ink-muted mt-1">Your plan and payment method.</p>
         </div>
       </div>
 
       {!state.configured && (
-        <div className="glass-card px-5 py-4 border-amber-200 bg-amber-50/60">
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4">
           <p className="text-[13px] text-amber-900 font-medium">Online upgrades aren&apos;t available yet.</p>
           <p className="text-[12px] text-amber-800 mt-0.5">
             We&apos;re finishing our payment setup. To change your plan in the meantime, email{" "}
@@ -249,7 +249,7 @@ export default function BillingPage() {
       )}
 
       {/* ── Current plan ─────────────────────────────────────────────────── */}
-      <div className="glass-card px-5 py-5 space-y-3">
+      <div className="rounded-2xl border border-slate-200/70 bg-white px-5 py-5 space-y-3">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-[12px] font-semibold text-slate-500">Current plan</p>
@@ -313,7 +313,7 @@ export default function BillingPage() {
       </div>
 
       {/* ── Seat usage ───────────────────────────────────────────────────── */}
-      <div className="glass-card px-5 py-5 space-y-3">
+      <div className="rounded-2xl border border-slate-200/70 bg-white px-5 py-5 space-y-3">
         <div className="flex items-baseline justify-between">
           <div className="flex items-center gap-2">
             <Users className="w-3.5 h-3.5 text-slate-400" strokeWidth={2.2} />
@@ -348,7 +348,7 @@ export default function BillingPage() {
       </div>
 
       {/* ── Lead usage (this month) ──────────────────────────────────────── */}
-      <div className="glass-card px-5 py-5 space-y-3">
+      <div className="rounded-2xl border border-slate-200/70 bg-white px-5 py-5 space-y-3">
         <div className="flex items-baseline justify-between">
           <div className="flex items-center gap-2">
             <TrendingUp className="w-3.5 h-3.5 text-slate-400" strokeWidth={2.2} />
@@ -397,10 +397,10 @@ export default function BillingPage() {
             const disabled =
               !plan.sellable || !state.configured || plan.tooSmall || busyPlan !== null
             return (
-              <div key={plan.key} className="glass-card px-5 py-4 flex items-center justify-between gap-4">
+              <div key={plan.key} className="rounded-2xl border border-slate-200/70 bg-white px-5 py-4 flex items-center justify-between gap-4">
                 <div className="min-w-0">
                   <p className="text-[14px] font-bold text-ink">{plan.name}</p>
-                  <p className="text-[13px] text-slate-500 mt-0.5">
+                  <p className="text-[13px] text-ink-muted mt-1">
                     {rupees(plan.priceInr)} / month · {plan.maxSeats} users ·{" "}
                     {plan.leadLimit == null ? "unlimited leads" : `${plan.leadLimit.toLocaleString("en-IN")} leads/mo`}
                   </p>
@@ -416,8 +416,8 @@ export default function BillingPage() {
                 <button
                   onClick={() => handleSubscribe(plan)}
                   disabled={disabled}
-                  className="shrink-0 px-4 py-2 rounded-xl bg-sky-500 text-white text-[13px] font-semibold
-                    hover:bg-sky-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors
+                  className="shrink-0 px-4 py-2 rounded-lg bg-sky-600 text-white text-[13px] font-semibold
+                    hover:bg-sky-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors
                     inline-flex items-center gap-1.5"
                 >
                   {busyPlan === plan.key
@@ -446,7 +446,7 @@ export default function BillingPage() {
           </div>
         </div>
 
-        <div className="glass-card overflow-hidden">
+        <div className="rounded-2xl border border-slate-200/70 bg-white overflow-hidden">
           {history.length === 0 ? (
             <div className="px-5 py-9 text-center">
               <p className="text-[13px] font-medium text-slate-500">No invoices yet</p>

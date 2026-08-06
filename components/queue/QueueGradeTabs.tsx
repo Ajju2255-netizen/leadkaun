@@ -15,12 +15,12 @@ import { cn } from "@/lib/utils"
 export type GradeTab = "all" | "A" | "B" | "C" | "D" | "E"
 
 const TABS: { key: GradeTab; label: string; dot?: string; activeBg: string }[] = [
-  { key: "all", label: "All leads",                          activeBg: "bg-sky-600"     },
-  { key: "A",   label: "Grade A", dot: "bg-emerald-500", activeBg: "bg-emerald-500" },
-  { key: "B",   label: "Grade B", dot: "bg-sky-500",     activeBg: "bg-sky-600"     },
-  { key: "C",   label: "Grade C", dot: "bg-orange-400",  activeBg: "bg-orange-500"  },
-  { key: "D",   label: "Grade D", dot: "bg-amber-500",   activeBg: "bg-amber-500"   },
-  { key: "E",   label: "Grade E", dot: "bg-rose-500",    activeBg: "bg-rose-500"    },
+  { key: "all", label: "All",                        activeBg: "bg-sky-600"     },
+  { key: "A",   label: "A", dot: "bg-emerald-500", activeBg: "bg-emerald-500" },
+  { key: "B",   label: "B", dot: "bg-sky-500",     activeBg: "bg-sky-600"     },
+  { key: "C",   label: "C", dot: "bg-orange-400",  activeBg: "bg-orange-500"  },
+  { key: "D",   label: "D", dot: "bg-amber-500",   activeBg: "bg-amber-500"   },
+  { key: "E",   label: "E", dot: "bg-rose-500",    activeBg: "bg-rose-500"    },
 ]
 
 export interface QueueGradeTabsProps {

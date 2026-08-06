@@ -8,7 +8,7 @@ import { toast } from "sonner"
 import Papa from "papaparse"
 import { mapHeader } from "@/lib/import/column-map"
 import {
-  Download, FileSpreadsheet, FileType2, UserPlus, X,
+  Download, FileSpreadsheet, UserPlus, X,
   CloudUpload, Cog, ShieldCheck, Users, CheckCircle2,
   AlertCircle, Clock, Star, IndianRupee, ArrowRight,
   Sparkles, RotateCw, Loader2,
@@ -134,27 +134,19 @@ function PipelineSteps({ current }: { current: Stage }) {
         const active  = cur === idx && current !== "complete"
         const Icon    = step.icon
 
-        const bg =
-          done   ? "linear-gradient(180deg, #6EE7B7 0%, #10B981 100%)" :
-          active ? "linear-gradient(180deg, #38BDF8 0%, #0EA5E9 100%)" :
-                   "linear-gradient(180deg, #F1F5F9 0%, #E2E8F0 100%)"
-        const shadow =
-          done   ? "inset 0 1px 0 rgba(255,255,255,0.6), 0 4px 12px rgba(16,185,129,0.30)" :
-          active ? "inset 0 1px 0 rgba(255,255,255,0.6), 0 4px 12px rgba(14,165,233,0.30)" :
-                   "inset 0 1px 0 rgba(255,255,255,0.85)"
-        const iconColor = done || active ? "white" : "#94A3B8"
+        const circleCls =
+          done   ? "bg-emerald-500 text-white" :
+          active ? "bg-sky-500 text-white" :
+                   "bg-slate-100 text-slate-400"
 
         return (
           <div key={step.stage} className="flex flex-col items-center relative">
             {/* connector line — to the right of every step except last */}
             {i < PIPELINE_STEPS.length - 1 && (
-              <div className={`absolute top-7 left-[60%] right-[-40%] h-[2px] ${cur > idx ? "bg-emerald-400" : "bg-slate-200"} transition-colors duration-500`} />
+              <div className={`absolute top-6 left-[60%] right-[-40%] h-[2px] ${cur > idx ? "bg-emerald-400" : "bg-slate-200"} transition-colors duration-500`} />
             )}
-            <div
-              className={`relative w-14 h-14 rounded-full flex items-center justify-center shrink-0 transition-all duration-500 ${active ? "scale-110" : ""}`}
-              style={{ background: bg, boxShadow: shadow }}
-            >
-              <Icon className="w-6 h-6" style={{ color: iconColor }} strokeWidth={2.5} />
+            <div className={`relative w-12 h-12 rounded-full flex items-center justify-center shrink-0 transition-all duration-500 ${circleCls} ${active ? "scale-105" : ""}`}>
+              <Icon className="w-5 h-5" strokeWidth={2.4} />
               {active && (
                 <span className="absolute inset-0 rounded-full ring-4 ring-sky-200/60 animate-pulse" />
               )}
@@ -169,121 +161,7 @@ function PipelineSteps({ current }: { current: Stage }) {
   )
 }
 
-// ── Import From — left column ────────────────────────────────────────────────
-
-function ImportFromCard({
-  uploading,
-  onCsvClick,
-  onSheetsClick,
-  onManualClick,
-}: {
-  uploading: boolean
-  onCsvClick: () => void
-  onSheetsClick: () => void
-  onManualClick: () => void
-}) {
-  return (
-    <div className="glass-2 gloss-edge rounded-2xl p-6">
-      <h2 className="text-[16px] font-semibold text-ink mb-4">Import From</h2>
-      <div className="space-y-2.5">
-
-        {/* CSV File — active */}
-        <button
-          type="button"
-          disabled={uploading}
-          onClick={onCsvClick}
-          className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 border-dashed transition-all text-left
-            ${uploading ? "border-slate-200 opacity-60 cursor-not-allowed" : "border-emerald-200 bg-emerald-50/30 hover:border-emerald-400 hover:bg-emerald-50/60 cursor-pointer"}
-          `}
-        >
-          <div
-            className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
-            style={{
-              background: "linear-gradient(180deg, #A7F3D0 0%, #6EE7B7 100%)",
-              boxShadow:  "inset 0 1px 0 rgba(255,255,255,0.85), 0 2px 6px rgba(16,185,129,0.18)",
-            }}
-          >
-            <FileType2 className="w-5 h-5 text-emerald-700" strokeWidth={2} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-[13px] font-semibold text-ink leading-tight">CSV File</p>
-            <p className="text-[11px] text-ink-muted mt-0.5">Upload — max 10 MB</p>
-          </div>
-          <span className="text-[11px] font-semibold text-emerald-600 shrink-0">Click ↑</span>
-        </button>
-
-        {/* Google Sheets — paste a shared link */}
-        <button
-          type="button"
-          disabled={uploading}
-          onClick={onSheetsClick}
-          className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 border-dashed transition-all text-left
-            ${uploading ? "border-slate-200 opacity-60 cursor-not-allowed" : "border-sky-200 bg-sky-50/30 hover:border-sky-400 hover:bg-sky-50/60 cursor-pointer"}
-          `}
-        >
-          <div
-            className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
-            style={{
-              background: "linear-gradient(180deg, #BAE6FD 0%, #7DD3FC 100%)",
-              boxShadow:  "inset 0 1px 0 rgba(255,255,255,0.85)",
-            }}
-          >
-            <FileSpreadsheet className="w-5 h-5 text-sky-700" strokeWidth={2} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-[13px] font-semibold text-ink leading-tight">Google Sheets</p>
-            <p className="text-[11px] text-ink-muted mt-0.5">Import from a shared sheet link</p>
-          </div>
-          <span className="text-[11px] font-semibold text-sky-600 shrink-0">Paste →</span>
-        </button>
-
-        {/* Manual Entry — add one lead by hand */}
-        <button
-          type="button"
-          disabled={uploading}
-          onClick={onManualClick}
-          className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 border-dashed transition-all text-left
-            ${uploading ? "border-slate-200 opacity-60 cursor-not-allowed" : "border-violet-200 bg-violet-50/30 hover:border-violet-400 hover:bg-violet-50/60 cursor-pointer"}
-          `}
-        >
-          <div
-            className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
-            style={{
-              background: "linear-gradient(180deg, #DDD6FE 0%, #C4B5FD 100%)",
-              boxShadow:  "inset 0 1px 0 rgba(255,255,255,0.85)",
-            }}
-          >
-            <UserPlus className="w-5 h-5 text-violet-700" strokeWidth={2} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-[13px] font-semibold text-ink leading-tight">Manual Entry</p>
-            <p className="text-[11px] text-ink-muted mt-0.5">Add a single lead by hand</p>
-          </div>
-          <span className="text-[11px] font-semibold text-violet-600 shrink-0">Add →</span>
-        </button>
-      </div>
-
-      {/* New to this? grab the template + see what's recognised */}
-      <div className="mt-4 pt-4 border-t border-hairline space-y-2.5">
-        <button
-          type="button"
-          onClick={downloadSampleCsv}
-          className="w-full inline-flex items-center justify-center gap-1.5 h-9 rounded-lg border border-sky-200 bg-sky-50/60 text-[12px] font-semibold text-sky-700 hover:bg-sky-50 transition-colors"
-        >
-          <Download className="w-3.5 h-3.5" /> Download sample template
-        </button>
-        <p className="text-[11px] text-ink-muted leading-relaxed">
-          <span className="font-semibold text-ink-soft">Required:</span> name, phone.{" "}
-          <span className="font-semibold text-ink-soft">Optional:</span> email, company, designation, city, state, pincode,
-          budget, interest level (High/Medium/Low), last contact days, notes.
-          Column names are matched automatically — “Mobile No”, “Full Name”, etc. all work.
-        </p>
-      </div>
-    </div>
-  )
-}
-
-// ── Upload form (the right column when idle) ────────────────────────────────
+// ── Upload form (batch-context fields for the idle panel) ────────────────────
 
 function UploadForm({
   sources, stages, sourceId, stageId, sessionName, freshness,
@@ -299,22 +177,6 @@ function UploadForm({
   const inputCls = "w-full h-10 px-3 rounded-lg border border-hairline-strong bg-white text-[13px] text-ink outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 transition-colors disabled:opacity-50"
   return (
     <div className="space-y-4">
-      <div className="text-center py-6">
-        <div
-          className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center mb-4"
-          style={{
-            background: "linear-gradient(180deg, #F1F5F9 0%, #E2E8F0 100%)",
-            boxShadow:  "inset 0 1px 0 rgba(255,255,255,0.85)",
-          }}
-        >
-          <CloudUpload className="w-8 h-8 text-ink-muted" strokeWidth={1.6} />
-        </div>
-        <p className="text-[14px] font-semibold text-ink">Ready when you are</p>
-        <p className="text-[12px] text-ink-muted mt-1">
-          Pick a source + stage, then click <span className="font-semibold text-emerald-700">CSV File</span> on the left to upload.
-        </p>
-      </div>
-
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="space-y-1.5">
           <label className="text-[10px] font-semibold text-ink-soft uppercase tracking-[0.08em] block">Batch Name</label>
@@ -367,7 +229,7 @@ function UploadForm({
           <button
             onClick={onRetryMeta}
             disabled={uploading}
-            className="h-7 px-3 rounded-full bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)] text-white text-[12px] font-semibold transition-all active:scale-[0.97] disabled:opacity-50"
+            className="h-7 px-3 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-[12px] font-semibold transition-colors active:scale-[0.97] disabled:opacity-50"
           >
             Retry
           </button>
@@ -388,7 +250,7 @@ function LiveProgress({ stage, progress, fileName }: { stage: Stage; progress: n
     stage === "complete"      ? "Done!" :
                                 "Idle"
   return (
-    <div className="rounded-xl bg-white/60 border border-hairline p-5">
+    <div className="rounded-xl border border-slate-200/70 bg-white p-5">
       <div className="flex items-center justify-between mb-3">
         <p className="text-[14px] font-semibold text-ink truncate pr-3">{stageLabel}</p>
         <span className="text-[14px] font-bold text-emerald-600 tabular-nums shrink-0">{progress ?? 0}%</span>
@@ -414,22 +276,16 @@ function LiveProgress({ stage, progress, fileName }: { stage: Stage; progress: n
 // ── 5-tile Ingestion Summary ─────────────────────────────────────────────────
 
 function SummaryTile({
-  label, value, icon, iconBg, iconColor,
+  label, value, icon, tintBg, tintFg,
 }: {
-  label: string; value: React.ReactNode; icon: React.ReactNode; iconBg: string; iconColor: string
+  label: string; value: React.ReactNode; icon: React.ReactNode; tintBg: string; tintFg: string
 }) {
   return (
-    <div className="rounded-xl bg-white/70 border border-hairline p-4 text-center">
-      <div
-        className="w-11 h-11 rounded-full mx-auto flex items-center justify-center mb-3"
-        style={{
-          background: iconBg,
-          boxShadow:  `inset 0 1px 0 rgba(255,255,255,0.85), 0 3px 8px ${iconColor}22`,
-        }}
-      >
-        <span style={{ color: iconColor }}>{icon}</span>
+    <div className="rounded-xl border border-slate-200/70 bg-white p-4 text-center">
+      <div className={`w-10 h-10 rounded-lg mx-auto grid place-items-center mb-3 ${tintBg} ${tintFg}`}>
+        {icon}
       </div>
-      <p className="text-[11px] text-ink-muted font-medium">{label}</p>
+      <p className="text-[11.5px] text-ink-muted font-medium">{label}</p>
       <p className="text-[24px] font-bold text-ink tabular-nums mt-1 leading-none">{value}</p>
     </div>
   )
@@ -437,43 +293,38 @@ function SummaryTile({
 
 function IngestionSummary({ job, isLoading }: { job: ImportJob | null; isLoading: boolean }) {
   return (
-    <div className="glass-2 gloss-edge rounded-2xl p-6">
-      <h2 className="text-[16px] font-semibold text-ink mb-5">Ingestion Summary</h2>
+    <div className="rounded-2xl border border-slate-200/70 bg-white p-5">
+      <h2 className="text-[15px] font-semibold text-ink mb-4">Ingestion summary</h2>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         <SummaryTile
           label="Total Rows"
           value={isLoading ? <Skeleton className="h-7 w-16 mx-auto" /> : (job?.total_rows ?? 0).toLocaleString("en-IN")}
           icon={<Users className="w-5 h-5" strokeWidth={2} />}
-          iconBg="linear-gradient(180deg, #BAE6FD 0%, #7DD3FC 100%)"
-          iconColor="#0284C7"
+          tintBg="bg-sky-50" tintFg="text-sky-600"
         />
         <SummaryTile
           label="New Leads"
           value={isLoading ? <Skeleton className="h-7 w-16 mx-auto" /> : (job?.inserted ?? 0).toLocaleString("en-IN")}
           icon={<CheckCircle2 className="w-5 h-5" strokeWidth={2} />}
-          iconBg="linear-gradient(180deg, #A7F3D0 0%, #6EE7B7 100%)"
-          iconColor="#059669"
+          tintBg="bg-emerald-50" tintFg="text-emerald-600"
         />
         <SummaryTile
           label="Duplicates Removed"
           value={isLoading ? <Skeleton className="h-7 w-16 mx-auto" /> : (job?.duplicates ?? 0).toLocaleString("en-IN")}
           icon={<ShieldCheck className="w-5 h-5" strokeWidth={2} />}
-          iconBg="linear-gradient(180deg, #FED7AA 0%, #FDBA74 100%)"
-          iconColor="#EA580C"
+          tintBg="bg-orange-50" tintFg="text-orange-600"
         />
         <SummaryTile
           label="Hot Leads (A/B)"
           value={isLoading ? <Skeleton className="h-7 w-16 mx-auto" /> : (job?.high_intent_count ?? 0).toLocaleString("en-IN")}
           icon={<Star className="w-5 h-5 fill-current" strokeWidth={2} />}
-          iconBg="linear-gradient(180deg, #DDD6FE 0%, #C4B5FD 100%)"
-          iconColor="#7C3AED"
+          tintBg="bg-violet-50" tintFg="text-violet-600"
         />
         <SummaryTile
           label="Pipeline Value"
           value={isLoading ? <Skeleton className="h-7 w-16 mx-auto" /> : `₹${formatINR(job?.total_value ?? 0)}`}
           icon={<IndianRupee className="w-5 h-5" strokeWidth={2} />}
-          iconBg="linear-gradient(180deg, #BBF7D0 0%, #86EFAC 100%)"
-          iconColor="#059669"
+          tintBg="bg-emerald-50" tintFg="text-emerald-600"
         />
       </div>
     </div>
@@ -512,14 +363,11 @@ function AnalysingPanel({ fileName }: { fileName: string }) {
     "Preparing your report",
   ]
   return (
-    <div className="glass-2 gloss-edge rounded-2xl px-6 py-14 max-w-3xl mx-auto text-center">
-      <div
-        className="w-14 h-14 rounded-2xl mx-auto flex items-center justify-center mb-5"
-        style={{ background: "linear-gradient(180deg, #BAE6FD 0%, #7DD3FC 100%)", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.85)" }}
-      >
-        <Loader2 className="w-7 h-7 text-sky-700 animate-spin" strokeWidth={2} />
+    <div className="rounded-2xl border border-slate-200/70 bg-white px-6 py-14 max-w-3xl mx-auto text-center">
+      <div className="w-14 h-14 rounded-2xl mx-auto grid place-items-center mb-5 bg-sky-50 text-sky-600">
+        <Loader2 className="w-7 h-7 animate-spin" strokeWidth={2} />
       </div>
-      <h2 className="font-serif text-[24px] font-semibold text-ink">Analysing your leads…</h2>
+      <h2 className="text-[22px] font-semibold text-ink tracking-[-0.01em]">Analysing your leads…</h2>
       <p className="text-[13px] text-ink-muted mt-1">{fileName || "Understanding your data before importing"}</p>
       <ul className="mt-6 inline-flex flex-col gap-2 text-left">
         {steps.map((s) => (
@@ -572,6 +420,7 @@ export default function ImportPage() {
   // Google Sheets + Manual Entry modals
   const [sheetsOpen, setSheetsOpen] = useState(false)
   const [manualOpen, setManualOpen] = useState(false)
+  const [dragOver,   setDragOver]   = useState(false)
 
   // Invalidate every lead-derived cache so a new import/lead shows up app-wide
   // without a manual page refresh.
@@ -633,7 +482,23 @@ export default function ImportPage() {
     const file = e.target.files?.[0]
     if (!file) return
     e.target.value = ""
+    await processFile(file)
+  }
 
+  // Drag-and-drop onto the CSV dropzone — same pipeline as the file picker.
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setDragOver(false)
+    if (uploading) return
+    if (!sourceId || !stageId) {
+      toast.error("Please select a lead source and initial stage first")
+      return
+    }
+    const file = e.dataTransfer.files?.[0]
+    if (file) void processFile(file)
+  }
+
+  async function processFile(file: File) {
     // ── Guard the file before we touch it ────────────────────────────────────
     const isCsv = file.name.toLowerCase().endsWith(".csv") ||
       file.type === "text/csv" || file.type === "application/vnd.ms-excel"
@@ -939,19 +804,13 @@ export default function ImportPage() {
       <>
 
       {/* ── Header ────────────────────────────────────────────────────────── */}
-      <div className="flex items-start gap-4">
-        <div
-          className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0"
-          style={{
-            background: "linear-gradient(180deg, #BAE6FD 0%, #7DD3FC 100%)",
-            boxShadow:  "inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 12px rgba(14,165,233,0.25)",
-          }}
-        >
-          <Download className="w-6 h-6 text-sky-700" strokeWidth={2.2} />
-        </div>
+      <div className="flex items-start gap-3">
+        <span className="w-11 h-11 rounded-xl grid place-items-center bg-sky-50 text-sky-600 shrink-0">
+          <Download className="w-5 h-5" strokeWidth={2.2} />
+        </span>
         <div>
-          <h1 className="text-[28px] font-bold text-ink tracking-[-0.02em] leading-tight">Lead Ingestion</h1>
-          <p className="text-[14px] text-ink-soft mt-2 leading-relaxed max-w-[560px]">
+          <h1 className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">Lead Ingestion</h1>
+          <p className="text-[13px] text-ink-muted mt-1 leading-relaxed max-w-[560px]">
             Import from CSV, Google Sheets, or add manually. Indian phone normalisation + dedup built in.
           </p>
         </div>
@@ -960,38 +819,109 @@ export default function ImportPage() {
       {/* ── Connected Google Sheet (if auto-sync is on) ──────────────────── */}
       <ConnectedSheetCard />
 
-      {/* ── 2-col: Import From | Ingestion in Progress ───────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      {stage === "idle" ? (
+        /* ── Guided import panel: batch details → upload → other methods ─── */
+        <div className="rounded-2xl border border-slate-200/70 bg-white p-5 sm:p-6 space-y-6">
 
-        <ImportFromCard
-          uploading={uploading}
-          onCsvClick={handleCsvClick}
-          onSheetsClick={() => setSheetsOpen(true)}
-          onManualClick={() => setManualOpen(true)}
-        />
+          {/* Step 1 — batch details */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <span className="w-5 h-5 rounded-full bg-sky-100 text-sky-700 text-[11px] font-bold grid place-items-center shrink-0">1</span>
+              <h2 className="text-[15px] font-semibold text-ink">Set the batch details</h2>
+            </div>
+            <UploadForm
+              sources={sources} stages={stages}
+              sourceId={sourceId} stageId={stageId} sessionName={sessionName} freshness={freshness}
+              setSourceId={setSourceId} setStageId={setStageId} setSessionName={setSessionName} setFreshness={setFreshness}
+              uploading={uploading}
+              metaError={metaError} onRetryMeta={loadMeta}
+            />
+          </div>
 
-        <div className="lg:col-span-2 glass-2 gloss-edge rounded-2xl p-6">
-          <h2 className="text-[16px] font-semibold text-ink mb-5">
-            {stage === "idle" ? "Get started"
-              : stage === "complete" ? (result?.aborted ? "Import stopped early" : "Ingestion complete")
-              : "Ingestion in Progress"}
+          {/* Step 2 — upload (drag & drop or browse) */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="w-5 h-5 rounded-full bg-sky-100 text-sky-700 text-[11px] font-bold grid place-items-center shrink-0">2</span>
+              <h2 className="text-[15px] font-semibold text-ink">Upload your file</h2>
+            </div>
+
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={handleCsvClick}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleCsvClick() } }}
+              onDragOver={(e) => { e.preventDefault(); if (!uploading) setDragOver(true) }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={handleDrop}
+              aria-disabled={uploading}
+              className={`rounded-2xl border-2 border-dashed px-6 py-10 text-center transition-colors outline-none focus-visible:ring-2 focus-visible:ring-sky-300/60
+                ${uploading ? "opacity-60 cursor-not-allowed border-slate-200"
+                  : dragOver ? "border-sky-400 bg-sky-50/70 cursor-pointer"
+                  : "border-slate-300 hover:border-sky-300 hover:bg-sky-50/30 cursor-pointer"}`}
+            >
+              <div className="w-14 h-14 rounded-2xl mx-auto grid place-items-center mb-3 bg-sky-50 text-sky-600">
+                <CloudUpload className="w-7 h-7" strokeWidth={1.8} />
+              </div>
+              <p className="text-[14px] font-semibold text-ink">Drag &amp; drop your CSV here</p>
+              <p className="text-[12.5px] text-ink-muted mt-1">
+                or <span className="font-semibold text-sky-600">browse files</span> · CSV, max 10 MB
+              </p>
+              {(!sourceId || !stageId) && (
+                <p className="text-[12px] font-medium text-amber-600 mt-3">Pick a source and stage above first.</p>
+              )}
+            </div>
+
+            {/* helper + secondary methods */}
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5">
+              <button
+                type="button"
+                onClick={downloadSampleCsv}
+                className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-sky-700 hover:text-sky-800 transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" /> Download sample template
+              </button>
+              <div className="flex items-center gap-2">
+                <span className="text-[12px] text-ink-muted">Other ways:</span>
+                <button
+                  type="button"
+                  disabled={uploading}
+                  onClick={() => setSheetsOpen(true)}
+                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-slate-200 text-[12px] font-semibold text-ink-soft hover:bg-slate-50 transition-colors disabled:opacity-50"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-sky-600" /> Google Sheets
+                </button>
+                <button
+                  type="button"
+                  disabled={uploading}
+                  onClick={() => setManualOpen(true)}
+                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-slate-200 text-[12px] font-semibold text-ink-soft hover:bg-slate-50 transition-colors disabled:opacity-50"
+                >
+                  <UserPlus className="w-3.5 h-3.5 text-violet-600" /> Add manually
+                </button>
+              </div>
+            </div>
+
+            {/* recognised columns */}
+            <p className="mt-3 text-[11.5px] text-ink-muted leading-relaxed">
+              <span className="font-semibold text-ink-soft">Required:</span> name, phone.{" "}
+              <span className="font-semibold text-ink-soft">Optional:</span> email, company, designation, city, state, pincode,
+              budget, interest level (High/Medium/Low), last contact days, notes.
+              Column names are matched automatically — “Mobile No”, “Full Name”, etc. all work.
+            </p>
+          </div>
+        </div>
+      ) : (
+        /* ── Processing / complete panel ─────────────────────────────────── */
+        <div className="rounded-2xl border border-slate-200/70 bg-white p-5 sm:p-6">
+          <h2 className="text-[15px] font-semibold text-ink mb-5">
+            {stage === "complete" ? (result?.aborted ? "Import stopped early" : "Ingestion complete") : "Importing your leads…"}
           </h2>
 
-          {/* Pipeline steps — always visible */}
           <PipelineSteps current={stage} />
 
-          {/* Progress / form */}
           <div className="mt-6">
-            {stage === "idle" ? (
-              <UploadForm
-                sources={sources} stages={stages}
-                sourceId={sourceId} stageId={stageId} sessionName={sessionName} freshness={freshness}
-                setSourceId={setSourceId} setStageId={setStageId} setSessionName={setSessionName} setFreshness={setFreshness}
-                uploading={uploading}
-                metaError={metaError} onRetryMeta={loadMeta}
-              />
-            ) : stage === "complete" && result ? (
-              <div className="rounded-xl bg-white/60 border border-hairline p-5">
+            {stage === "complete" && result ? (
+              <div className="rounded-xl border border-slate-200/70 bg-white p-5">
                 <div className="flex items-center justify-between mb-3">
                   <p className={`text-[14px] font-semibold ${result.aborted ? "text-amber-700" : "text-emerald-700"}`}>
                     {result.aborted ? "Stopped early" : "Done!"}
@@ -1017,7 +947,7 @@ export default function ImportPage() {
             )}
           </div>
         </div>
-      </div>
+      )}
 
       {/* ── Ingestion Summary (5-tile) ───────────────────────────────────── */}
       {showSummary && <IngestionSummary job={summaryJob} isLoading={false} />}
@@ -1036,7 +966,7 @@ export default function ImportPage() {
           {result.inserted > 0 && (
             <Link
               href={`/leads?batch=${result.jobId}`}
-              className="h-9 px-3.5 rounded-xl text-[12px] font-semibold text-amber-800 border border-amber-300 bg-white/70 hover:bg-amber-100 transition-colors shrink-0 whitespace-nowrap"
+              className="h-9 px-3.5 rounded-lg text-[12px] font-semibold text-amber-800 border border-amber-300 bg-white hover:bg-amber-100 transition-colors shrink-0 whitespace-nowrap"
             >
               View added
             </Link>
@@ -1046,34 +976,24 @@ export default function ImportPage() {
 
       {/* ── Success callout (post-import) ─────────────────────────────────── */}
       {result && !result.aborted && result.inserted > 0 && (
-        <div className="glass-2 gloss-edge rounded-2xl p-5 flex items-center gap-4">
-          <div
-            className="w-12 h-12 rounded-full flex items-center justify-center shrink-0"
-            style={{
-              background: "linear-gradient(180deg, #6EE7B7 0%, #10B981 100%)",
-              boxShadow:  "inset 0 1px 0 rgba(255,255,255,0.6), 0 4px 12px rgba(16,185,129,0.30)",
-            }}
-          >
-            <CheckCircle2 className="w-6 h-6 text-white" strokeWidth={2.5} />
+        <div className="rounded-2xl border border-emerald-200/70 bg-emerald-50/40 p-5 flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full grid place-items-center shrink-0 bg-emerald-100 text-emerald-600">
+            <CheckCircle2 className="w-6 h-6" strokeWidth={2.5} />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[16px] font-semibold text-ink">Ingestion completed successfully!</p>
+            <p className="text-[15px] font-semibold text-ink">Ingestion completed successfully!</p>
             <p className="text-[13px] text-ink-soft mt-0.5">Leads are now live in your Priority Queue.</p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <Link
               href={`/leads?batch=${result.jobId}`}
-              className="h-10 px-4 rounded-xl text-[13px] font-semibold text-sky-700 border border-sky-200 bg-white/70 hover:bg-sky-50 transition-colors"
+              className="h-10 px-4 rounded-lg text-[13px] font-semibold text-emerald-700 border border-emerald-200 bg-white hover:bg-emerald-50 transition-colors"
             >
               View this batch
             </Link>
             <button
               onClick={() => router.push("/queue")}
-              className="btn-gloss-primary inline-flex items-center gap-1.5 h-10 px-4 rounded-xl text-[13px] font-semibold text-white"
-              style={{
-                background: "linear-gradient(180deg, #38BDF8 0%, #0EA5E9 100%)",
-                boxShadow:  "inset 0 1px 0 rgba(255,255,255,0.45), 0 6px 16px rgba(14,165,233,0.30)",
-              }}
+              className="inline-flex items-center gap-1.5 h-10 px-4 rounded-lg text-[13px] font-semibold text-white bg-sky-600 hover:bg-sky-700 transition-colors active:scale-[0.98]"
             >
               Start executing <ArrowRight className="w-3.5 h-3.5" />
             </button>
@@ -1113,8 +1033,8 @@ export default function ImportPage() {
       <RegradeButton />
 
       {/* ── Import History ───────────────────────────────────────────────── */}
-      <div className="glass-2 gloss-edge rounded-2xl p-6">
-        <h2 className="text-[16px] font-semibold text-ink mb-4">Import History</h2>
+      <div className="rounded-2xl border border-slate-200/70 bg-white p-5">
+        <h2 className="text-[15px] font-semibold text-ink mb-4">Import history</h2>
         {historyLoading ? (
           <div className="space-y-2">
             {[1,2,3].map((i) => <Skeleton key={i} className="h-12 w-full rounded-lg" />)}
@@ -1126,13 +1046,13 @@ export default function ImportPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-hairline">
-                  <th className="text-left  py-2 pr-4 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.08em]">Batch</th>
-                  <th className="text-left  py-2 pr-4 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.08em]">Date</th>
-                  <th className="text-left  py-2 pr-4 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.08em]">Status</th>
-                  <th className="text-right py-2 pr-4 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.08em]">Added</th>
-                  <th className="text-right py-2 pr-4 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.08em]">Hot</th>
-                  <th className="text-right py-2 pr-4 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.08em]">Value</th>
-                  <th className="text-right py-2     text-[10px] font-semibold text-ink-muted uppercase tracking-[0.08em]">Dupes</th>
+                  <th className="text-left  py-2 pr-4 text-[10px] font-semibold text-ink-soft uppercase tracking-[0.08em]">Batch</th>
+                  <th className="text-left  py-2 pr-4 text-[10px] font-semibold text-ink-soft uppercase tracking-[0.08em]">Date</th>
+                  <th className="text-left  py-2 pr-4 text-[10px] font-semibold text-ink-soft uppercase tracking-[0.08em]">Status</th>
+                  <th className="text-right py-2 pr-4 text-[10px] font-semibold text-ink-soft uppercase tracking-[0.08em]">Added</th>
+                  <th className="text-right py-2 pr-4 text-[10px] font-semibold text-ink-soft uppercase tracking-[0.08em]">Hot</th>
+                  <th className="text-right py-2 pr-4 text-[10px] font-semibold text-ink-soft uppercase tracking-[0.08em]">Value</th>
+                  <th className="text-right py-2     text-[10px] font-semibold text-ink-soft uppercase tracking-[0.08em]">Dupes</th>
                 </tr>
               </thead>
               <tbody>
@@ -1207,7 +1127,7 @@ function RegradeButton() {
   }
 
   return (
-    <div className="rounded-2xl bg-white/70 border border-hairline px-5 py-4 flex items-center justify-between gap-4">
+    <div className="rounded-2xl border border-slate-200/70 bg-white px-5 py-4 flex items-center justify-between gap-4">
       <div className="flex items-center gap-3">
         <div className="w-9 h-9 rounded-lg bg-violet-50 flex items-center justify-center shrink-0">
           <RotateCw className="w-4 h-4 text-violet-600" strokeWidth={2.2} />
@@ -1272,9 +1192,9 @@ function ConnectedSheetCard() {
   }
 
   return (
-    <div className="glass-2 gloss-edge rounded-2xl p-5 flex items-center gap-4">
-      <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: "linear-gradient(180deg, #BAE6FD 0%, #7DD3FC 100%)", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.85)" }}>
-        <FileSpreadsheet className="w-5 h-5 text-sky-700" strokeWidth={2} />
+    <div className="rounded-2xl border border-slate-200/70 bg-white p-5 flex items-center gap-4">
+      <div className="w-11 h-11 rounded-xl grid place-items-center shrink-0 bg-sky-50 text-sky-600">
+        <FileSpreadsheet className="w-5 h-5" strokeWidth={2} />
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
@@ -1294,7 +1214,7 @@ function ConnectedSheetCard() {
       <button
         onClick={disconnect}
         disabled={disconnecting}
-        className="h-9 px-3.5 rounded-xl text-[12px] font-semibold text-ink-soft border border-hairline bg-white/70 hover:bg-slate-100 transition-colors shrink-0 disabled:opacity-50"
+        className="h-9 px-3.5 rounded-lg text-[12px] font-semibold text-ink-soft border border-slate-200 bg-white hover:bg-slate-50 transition-colors shrink-0 disabled:opacity-50"
       >
         {disconnecting ? "…" : "Disconnect"}
       </button>
@@ -1305,9 +1225,9 @@ function ConnectedSheetCard() {
 // ── Shared modal shell ─────────────────────────────────────────────────────────
 
 function ModalShell({
-  title, subtitle, icon, accent, onClose, children,
+  title, subtitle, icon, accentBg, onClose, children,
 }: {
-  title: string; subtitle?: string; icon: React.ReactNode; accent: string
+  title: string; subtitle?: string; icon: React.ReactNode; accentBg: string
   onClose: () => void; children: React.ReactNode
 }) {
   return (
@@ -1317,9 +1237,9 @@ function ModalShell({
       role="dialog"
       aria-modal="true"
     >
-      <div className="mt-[5vh] w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-hairline" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-start gap-3 p-5 border-b border-hairline">
-          <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: accent, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.85)" }}>
+      <div className="mt-[5vh] w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-slate-200/70" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start gap-3 p-5 border-b border-slate-100">
+          <div className={`w-10 h-10 rounded-lg grid place-items-center shrink-0 ${accentBg}`}>
             {icon}
           </div>
           <div className="flex-1 min-w-0">
@@ -1351,8 +1271,8 @@ function SheetsModal({
     <ModalShell
       title="Import from Google Sheets"
       subtitle="Paste a shared sheet link — we pull it once through the same scoring pipeline."
-      icon={<FileSpreadsheet className="w-5 h-5 text-sky-700" strokeWidth={2} />}
-      accent="linear-gradient(180deg, #BAE6FD 0%, #7DD3FC 100%)"
+      icon={<FileSpreadsheet className="w-5 h-5 text-sky-600" strokeWidth={2} />}
+      accentBg="bg-sky-50"
       onClose={onClose}
     >
       <div className="space-y-4">
@@ -1383,7 +1303,7 @@ function SheetsModal({
           </p>
         )}
 
-        <label className="flex items-start gap-2.5 cursor-pointer select-none rounded-lg border border-hairline px-3 py-2.5 hover:bg-slate-50/60 transition-colors">
+        <label className="flex items-start gap-2.5 cursor-pointer select-none rounded-lg border border-slate-200 px-3 py-2.5 hover:bg-slate-50 transition-colors">
           <input
             type="checkbox"
             checked={keepInSync}
@@ -1404,8 +1324,7 @@ function SheetsModal({
             type="button"
             disabled={!valid || !ready}
             onClick={() => onImport(url.trim(), keepInSync)}
-            className="h-10 px-4 rounded-lg text-[13px] font-semibold text-white disabled:opacity-50 inline-flex items-center gap-1.5 transition-all active:scale-[0.98]"
-            style={{ background: "linear-gradient(180deg, #38BDF8 0%, #0EA5E9 100%)", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.45), 0 4px 12px rgba(14,165,233,0.30)" }}
+            className="h-10 px-4 rounded-lg text-[13px] font-semibold text-white bg-sky-600 hover:bg-sky-700 disabled:opacity-50 inline-flex items-center gap-1.5 transition-colors active:scale-[0.98]"
           >
             <FileSpreadsheet className="w-4 h-4" /> {keepInSync ? "Import & sync" : "Import sheet"}
           </button>
@@ -1539,8 +1458,8 @@ function ManualLeadModal({
     <ModalShell
       title="Add a lead"
       subtitle="Scored on the same A–F engine as an import — intent included."
-      icon={<UserPlus className="w-5 h-5 text-violet-700" strokeWidth={2} />}
-      accent="linear-gradient(180deg, #DDD6FE 0%, #C4B5FD 100%)"
+      icon={<UserPlus className="w-5 h-5 text-violet-600" strokeWidth={2} />}
+      accentBg="bg-violet-50"
       onClose={onClose}
     >
       <div className="space-y-4">
@@ -1592,8 +1511,7 @@ function ManualLeadModal({
             type="button"
             disabled={!canSubmit}
             onClick={submit}
-            className="h-10 px-4 rounded-lg text-[13px] font-semibold text-white disabled:opacity-50 inline-flex items-center gap-1.5 transition-all active:scale-[0.98]"
-            style={{ background: "linear-gradient(180deg, #A78BFA 0%, #8B5CF6 100%)", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.45), 0 4px 12px rgba(139,92,246,0.30)" }}
+            className="h-10 px-4 rounded-lg text-[13px] font-semibold text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 inline-flex items-center gap-1.5 transition-colors active:scale-[0.98]"
           >
             {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
             {submitting ? "Adding…" : "Add lead"}

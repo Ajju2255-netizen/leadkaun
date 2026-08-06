@@ -77,19 +77,19 @@ export default function SourcesPage() {
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_6px_18px_rgba(14,165,233,0.32)] shrink-0">
-            <Radio className="w-6 h-6 text-white" strokeWidth={2.4} />
+          <div className="w-11 h-11 rounded-xl grid place-items-center bg-sky-50 text-sky-600 shrink-0">
+            <Radio className="w-5 h-5" strokeWidth={2.4} />
           </div>
           <div>
-            <h1 className="text-[28px] font-bold text-ink tracking-[-0.02em] leading-tight">Lead Sources</h1>
-            <p className="text-[13px] text-slate-500 mt-0.5">
+            <h1 className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">Lead Sources</h1>
+            <p className="text-[13px] text-ink-muted mt-1">
               Where your leads come from. Intent baseline affects initial scoring.
             </p>
           </div>
         </div>
         <button
           onClick={() => setShowForm((o) => !o)}
-          className="flex items-center gap-1.5 h-9 px-4 rounded-full bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)]
+          className="flex items-center gap-1.5 h-9 px-4 rounded-lg bg-sky-600 hover:bg-sky-700
                      text-white text-[12px] font-semibold transition-all active:scale-[0.97] shrink-0"
         >
           <Plus className="w-3.5 h-3.5" />
@@ -99,7 +99,7 @@ export default function SourcesPage() {
 
       {/* ── Add form ────────────────────────────────────────────────────── */}
       {showForm && (
-        <div className="glass-card px-5 py-4 space-y-3">
+        <div className="rounded-2xl border border-slate-200/70 bg-white px-5 py-4 space-y-3">
           <p className="section-label">New custom source</p>
           <div className="flex gap-2 items-end">
             <div className="flex-1 space-y-1.5">
@@ -128,7 +128,7 @@ export default function SourcesPage() {
             <button
               onClick={handleAdd}
               disabled={!name.trim() || adding}
-              className="h-10 px-5 rounded-full bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)] disabled:opacity-50
+              className="h-10 px-5 rounded-lg bg-sky-600 hover:bg-sky-700 disabled:opacity-50
                          text-white text-[13px] font-semibold transition-all shrink-0"
             >
               {adding ? "Adding…" : "Add"}
@@ -142,7 +142,7 @@ export default function SourcesPage() {
 
       {/* ── Custom sources ──────────────────────────────────────────────── */}
       {custom.length > 0 && (
-        <div className="glass-card overflow-hidden">
+        <div className="rounded-2xl border border-slate-200/70 bg-white overflow-hidden">
           <div className="px-5 pt-4 pb-3 border-b border-slate-100">
             <div className="flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-sky-500" />
@@ -158,7 +158,7 @@ export default function SourcesPage() {
       )}
 
       {/* ── Default sources ─────────────────────────────────────────────── */}
-      <div className="glass-card overflow-hidden">
+      <div className="rounded-2xl border border-slate-200/70 bg-white overflow-hidden">
         <div className="px-5 pt-4 pb-3 border-b border-slate-100">
           <div className="flex items-center gap-1.5">
             <Radio className="w-3.5 h-3.5 text-slate-400" />

@@ -136,10 +136,7 @@ function ScoreBarCell({ score, weight }: { score: number; weight: 40 | 30 }) {
         <span className="text-[12px] font-bold text-ink tabular-nums leading-none">{display}</span>
         <span className="text-[10px] text-ink-muted tabular-nums leading-none">/{weight}</span>
       </div>
-      <div
-        className="h-[3px] w-full rounded-full overflow-hidden"
-        style={{ background: "rgba(15,23,42,0.06)" }}
-      >
+      <div className="h-[3px] w-full rounded-full overflow-hidden bg-slate-100">
         <div
           className="h-full rounded-full transition-all duration-500"
           style={{ width: `${pct}%`, background: fill }}
@@ -166,16 +163,11 @@ function ScoreDonut({
             #0EA5E9 ${f}% ${i}%,
             #FB923C ${i}% 100%
           )`,
-          boxShadow: "0 4px 12px rgba(15,23,42,0.06)",
         }}
         aria-hidden
       />
       <div
-        className="absolute inset-[10px] rounded-full flex flex-col items-center justify-center"
-        style={{
-          background: "var(--bg-pure)",
-          boxShadow: "inset 0 1px 0 rgba(255,255,255,1), 0 1px 2px rgba(15,23,42,0.04)",
-        }}
+        className="absolute inset-[10px] rounded-full flex flex-col items-center justify-center bg-white"
       >
         <span className="text-[24px] font-bold text-ink tabular-nums leading-none">{avgTotal}</span>
         <span className="text-[9px] font-semibold text-ink-muted uppercase tracking-[0.10em] mt-0.5">/100</span>
@@ -233,8 +225,8 @@ function StatCard({
   children: React.ReactNode
 }) {
   return (
-    <div className={`glass-2 gloss-edge rounded-2xl p-5 ${className}`}>
-      <div className="flex items-center gap-2 text-[10px] font-bold text-ink-muted uppercase tracking-[0.14em]">
+    <div className={`rounded-2xl border border-slate-200/70 bg-white p-5 ${className}`}>
+      <div className="flex items-center gap-2 text-[10px] font-semibold text-ink-soft uppercase tracking-[0.14em]">
         {icon}
         <span>{label}</span>
       </div>
@@ -366,8 +358,8 @@ function FilterChip({
     <div ref={ref} className="relative">
       <div className={`flex items-center rounded-full border text-[12px] font-medium transition-all ${
         isActive
-          ? "bg-sky-100/60 border-sky-300/60 text-sky-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.7),0_2px_6px_rgba(14,165,233,0.14)]"
-          : "glass-1 border-white/70 text-slate-600 hover:text-slate-900"
+          ? "bg-sky-50 border-sky-200 text-sky-700"
+          : "bg-white border-slate-200 text-slate-600 hover:text-slate-900"
       }`}>
         <button
           onClick={() => setOpen(o => !o)}
@@ -387,11 +379,9 @@ function FilterChip({
         )}
       </div>
       {open && (
-        // Outer holds the positioning; inner holds the glass styling. `gloss-edge`
-        // sets `position: relative` (for its ::before), which would otherwise
-        // override `absolute` and push the page down in normal flow.
+        // Outer holds the absolute positioning; inner holds the card styling.
         <div className="absolute left-0 top-full mt-1.5 z-50 min-w-[180px]">
-          <div className="rounded-xl glass-3 gloss-edge overflow-hidden">
+          <div className="rounded-xl border border-slate-200/70 bg-white overflow-hidden">
             {children}
           </div>
         </div>
@@ -509,7 +499,7 @@ function StageCell({
               <button
                 onClick={() => note.trim() && submit(pending.id, note.trim())}
                 disabled={!note.trim() || saving}
-                className="flex-1 h-9 rounded-full bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)] text-[12px] font-bold text-white transition-colors disabled:opacity-50"
+                className="flex-1 h-9 rounded-lg bg-sky-600 hover:bg-sky-700 text-[12px] font-bold text-white transition-colors disabled:opacity-50"
               >{saving ? "Moving…" : "Confirm"}</button>
             </div>
           </div>
@@ -743,19 +733,17 @@ export default function LeadsPage() {
   }
 
   return (
-    <div className="space-y-4 max-w-7xl">
+    <div className="space-y-4">
 
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-white
-                          bg-gradient-to-br from-sky-400 to-sky-600
-                          shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_6px_18px_rgba(14,165,233,0.32)]">
+          <div className="w-11 h-11 rounded-xl grid place-items-center bg-sky-50 text-sky-600">
             <Users2 className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-[28px] font-bold text-ink tracking-[-0.02em] leading-tight">All Leads</h1>
-            <p className="text-[13px] text-slate-500 mt-0.5">
+            <h1 className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">All Leads</h1>
+            <p className="text-[13px] text-ink-muted mt-1">
               {isLoading
                 ? "Loading…"
                 : `${total.toLocaleString()} lead${total !== 1 ? "s" : ""}${activeFilters > 0 ? " · filtered" : ""}`}
@@ -766,17 +754,15 @@ export default function LeadsPage() {
           <button
             onClick={handleExport}
             disabled={exporting || isLoading}
-            className="flex items-center gap-1.5 h-9 px-4 rounded-full glass-1 border border-white/70 text-[12px] font-semibold text-slate-700 hover:text-slate-900 transition-all disabled:opacity-50"
+            className="flex items-center gap-1.5 h-9 px-4 rounded-full bg-white border border-slate-200 text-[12px] font-semibold text-slate-700 hover:text-slate-900 transition-all disabled:opacity-50"
           >
             <Download className="w-3.5 h-3.5" />
             {exporting ? "Exporting…" : "Export CSV"}
           </button>
           {isManager && (
             <Link href="/leads/import"
-              className="h-9 px-4 inline-flex items-center gap-1.5 rounded-full text-white text-[12px] font-semibold
-                         bg-gradient-to-b from-sky-400 to-sky-500
-                         shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)]
-                         hover:from-sky-500 hover:to-sky-600 transition-all active:scale-[0.98]">
+              className="h-9 px-4 inline-flex items-center gap-1.5 rounded-lg text-white text-[12px] font-semibold
+                         bg-sky-600 hover:bg-sky-700 transition-colors active:scale-[0.98]">
               <span className="text-[14px] font-bold leading-none">+</span> Import
             </Link>
           )}
@@ -792,7 +778,7 @@ export default function LeadsPage() {
             value={search}
             onChange={e => { setSearch(e.target.value); setPage(1) }}
             placeholder="Search name, phone, company…"
-            className="pl-9 pr-3 h-9 w-60 rounded-full glass-1 border border-white/70 text-[12px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-400 transition-all"
+            className="pl-9 pr-3 h-9 w-60 rounded-full bg-white border border-slate-200 text-[12px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-400 transition-all"
           />
         </div>
 
@@ -889,14 +875,14 @@ export default function LeadsPage() {
         >
           <div className="p-3 space-y-2.5 min-w-[210px]">
             <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.08em] mb-1">From</p>
+              <p className="text-[10px] font-semibold text-ink-soft uppercase tracking-[0.08em] mb-1">From</p>
               <input type="date" value={dateFrom}
                 onChange={e => { setDateFrom(e.target.value); setPage(1) }}
                 className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-sky-500/30"
               />
             </div>
             <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.08em] mb-1">To</p>
+              <p className="text-[10px] font-semibold text-ink-soft uppercase tracking-[0.08em] mb-1">To</p>
               <input type="date" value={dateTo}
                 onChange={e => { setDateTo(e.target.value); setPage(1) }}
                 className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-sky-500/30"
@@ -919,41 +905,38 @@ export default function LeadsPage() {
       {hotLeads.length > 0 && grade === "all" && (
         <button
           onClick={() => { setGrade("A"); setPage(1) }}
-          className="relative overflow-hidden w-full flex items-center gap-3 rounded-2xl glass-3 gloss-edge px-5 py-3.5 text-left transition-all active:scale-[0.995] hover:shadow-[0_12px_32px_rgba(15,23,42,0.08)]"
+          className="group w-full flex items-center gap-3.5 rounded-2xl border border-amber-200/70 bg-amber-50/50
+                     px-4 py-3.5 text-left transition-colors hover:bg-amber-50
+                     focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/60"
         >
-          {/* peach signature blob */}
-          <div className="absolute -right-10 -top-10 w-44 h-44 rounded-full pointer-events-none opacity-70"
-               style={{ background: "radial-gradient(closest-side, rgba(253,186,116,0.45), transparent 70%)" }} />
-          {/* sky aura blob */}
-          <div className="absolute -left-12 -bottom-10 w-40 h-40 rounded-full pointer-events-none opacity-50"
-               style={{ background: "radial-gradient(closest-side, rgba(56,189,248,0.32), transparent 70%)" }} />
-
-          <div className="relative w-9 h-9 rounded-xl flex items-center justify-center text-white shrink-0
-                          bg-gradient-to-br from-orange-300 to-orange-500
-                          shadow-[inset_0_1px_0_rgba(255,255,255,0.7),0_4px_12px_rgba(251,146,60,0.32)]">
-            <Flame className="w-4 h-4" strokeWidth={2.5} />
-          </div>
-          <div className="relative flex-1 min-w-0">
-            <p className="text-[13px] font-bold text-slate-900">
-              {hotLeads.length} Grade A lead{hotLeads.length > 1 ? "s" : ""} need immediate attention
+          <span className="w-9 h-9 rounded-xl grid place-items-center bg-amber-100 text-amber-600 shrink-0">
+            <Flame className="w-[18px] h-[18px]" strokeWidth={2.4} />
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-[13.5px] font-semibold text-ink">
+              <span className="tabular-nums">{hotLeads.length}</span> Grade A lead{hotLeads.length > 1 ? "s" : ""} need immediate attention
             </p>
-            <p className="text-[11px] text-slate-500 truncate mt-0.5">
+            <p className="text-[12px] text-ink-muted truncate mt-0.5">
               {hotLeads.slice(0, 3).map(l => `${l.first_name} ${l.last_name ?? ""}`.trim()).join(" · ")}
               {hotLeads.length > 3 ? ` +${hotLeads.length - 3} more` : ""}
             </p>
           </div>
-          <ArrowUpRight className="relative w-4 h-4 text-sky-600 shrink-0" />
+          <span className="hidden sm:inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-white/80 border border-amber-200
+                           text-amber-700 text-[12px] font-semibold shrink-0 group-hover:bg-white transition-colors">
+            View all <ArrowUpRight className="w-3.5 h-3.5" />
+          </span>
+          <ArrowUpRight className="sm:hidden w-4 h-4 text-amber-600 shrink-0" />
         </button>
       )}
 
       {/* ── Leads table ───────────────────────────────────────────────────── */}
-      <div className="rounded-2xl glass-2 gloss-edge overflow-x-auto">
+      <div className="rounded-2xl border border-slate-200/70 bg-white overflow-x-auto">
 
         {/* Header row — shows column labels normally, or the bulk actions when
             leads are selected. Both occupy the SAME fixed-height row, so
             selecting a lead never pushes the table down. */}
         <div className={`grid grid-cols-[32px_1fr_56px_48px_88px_88px_88px_130px_52px_92px] gap-x-3 min-w-[900px] items-center px-5 min-h-[44px] border-b ${
-          checkedIds.size > 0 ? "bg-sky-100/40 border-sky-200/40" : "border-slate-100"
+          checkedIds.size > 0 ? "bg-sky-50 border-sky-200" : "border-slate-100"
         }`}>
           <div className="flex items-center">
             <input
@@ -972,7 +955,7 @@ export default function LeadsPage() {
               <div className="flex items-center gap-2 ml-auto">
                 <button
                   onClick={handleBulkExport}
-                  className="h-7 px-3 rounded-full glass-1 border border-white/70 text-sky-700
+                  className="h-7 px-3 rounded-full bg-white border border-slate-200 text-sky-700
                              text-[12px] font-semibold hover:text-sky-800 transition-all active:scale-[0.97]"
                 >
                   Export CSV
@@ -992,7 +975,7 @@ export default function LeadsPage() {
                 <button
                   onClick={() => setCheckedIds(new Set())}
                   className="h-7 w-7 flex items-center justify-center rounded-full
-                             text-sky-500 hover:text-sky-700 hover:bg-white/70 transition-all"
+                             text-sky-500 hover:text-sky-700 hover:bg-white transition-all"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -1012,7 +995,7 @@ export default function LeadsPage() {
             ].map(({ label, align }) => (
               <span
                 key={label}
-                className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.08em]"
+                className="text-[10px] font-semibold text-ink-soft uppercase tracking-[0.08em]"
                 style={{ textAlign: align as "left"|"right"|"center" }}
               >
                 {label}
@@ -1059,10 +1042,9 @@ export default function LeadsPage() {
                   {!hasActiveFilters && (
                     <Link
                       href="/leads/import"
-                      className="inline-flex items-center gap-1.5 mt-4 h-9 px-4 rounded-full text-white
-                                 bg-gradient-to-b from-sky-400 to-sky-500
-                                 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)]
-                                 text-[12px] font-semibold transition-all active:scale-[0.98]"
+                      className="inline-flex items-center gap-1.5 mt-4 h-9 px-4 rounded-lg text-white
+                                 bg-sky-600 hover:bg-sky-700
+                                 text-[12px] font-semibold transition-colors active:scale-[0.98]"
                     >
                       Import leads →
                     </Link>
@@ -1199,14 +1181,8 @@ export default function LeadsPage() {
             icon={<Zap className="w-3 h-3 text-sky-500" strokeWidth={2.5} />}
           >
             <div className="flex items-center gap-3">
-              <div
-                className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
-                style={{
-                  background: "linear-gradient(180deg, #BAE6FD 0%, #7DD3FC 100%)",
-                  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 10px rgba(14,165,233,0.22)",
-                }}
-              >
-                <Zap className="w-5 h-5 text-sky-700" strokeWidth={2.5} fill="currentColor" />
+              <div className="w-11 h-11 rounded-lg grid place-items-center bg-sky-50 text-sky-600 shrink-0">
+                <Zap className="w-5 h-5" strokeWidth={2.5} />
               </div>
               <div>
                 <p className="text-[30px] font-bold text-ink tabular-nums leading-none">
@@ -1285,12 +1261,12 @@ export default function LeadsPage() {
             <button
               disabled={page <= 1}
               onClick={() => setPage(p => p - 1)}
-              className="h-9 px-4 rounded-full glass-1 border border-white/70 text-[12px] font-semibold text-slate-700 hover:text-slate-900 disabled:opacity-40 transition-all"
+              className="h-9 px-4 rounded-full bg-white border border-slate-200 text-[12px] font-semibold text-slate-700 hover:text-slate-900 disabled:opacity-40 transition-all"
             >← Previous</button>
             <button
               disabled={page >= pages}
               onClick={() => setPage(p => p + 1)}
-              className="h-9 px-4 rounded-full glass-1 border border-white/70 text-[12px] font-semibold text-slate-700 hover:text-slate-900 disabled:opacity-40 transition-all"
+              className="h-9 px-4 rounded-full bg-white border border-slate-200 text-[12px] font-semibold text-slate-700 hover:text-slate-900 disabled:opacity-40 transition-all"
             >Next →</button>
           </div>
         </div>

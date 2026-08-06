@@ -115,7 +115,7 @@ function ToggleChips({
             className={`
               inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold border transition-all
               ${active
-                ? "bg-sky-600 text-white border-sky-600 shadow-[0_1px_2px_rgba(14, 165, 233,0.25)]"
+                ? "bg-sky-600 text-white border-sky-600"
                 : "bg-white text-slate-600 border-slate-200 hover:border-sky-300 hover:text-sky-700 hover:bg-sky-50"
               }
             `}
@@ -173,9 +173,9 @@ function SuggestionsPanel({
   }
 
   return (
-    <div className="rounded-xl border border-sky-100 bg-sky-50/60 overflow-hidden">
+    <div className="rounded-xl border border-sky-100 bg-sky-50 overflow-hidden">
       <div
-        className="flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-sky-50/80 transition-colors"
+        className="flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-sky-50 transition-colors"
         onClick={() => setExpanded((e) => !e)}
       >
         <div className="flex items-center gap-2.5">
@@ -336,9 +336,9 @@ function WinInsightsCard({ suggestions }: { suggestions: Suggestions }) {
 
 function Section({ title, desc, children }: { title: string; desc: string; children: React.ReactNode }) {
   return (
-    <div className="glass-card px-5 py-4 space-y-3">
+    <div className="rounded-2xl border border-slate-200/70 bg-white px-5 py-4 space-y-3">
       <div>
-        <p className="text-[14px] font-bold text-slate-900">{title}</p>
+        <p className="text-[14px] font-semibold text-ink">{title}</p>
         <p className="text-[12px] text-slate-400 mt-0.5">{desc}</p>
       </div>
       {children}
@@ -430,15 +430,15 @@ export default function IcpPage() {
 
       {/* ── Header ────────────────────────────────────────────────────── */}
       <div className="flex items-start gap-3">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_6px_18px_rgba(14,165,233,0.32)] shrink-0">
-          <Target className="w-6 h-6 text-white" strokeWidth={2.4} />
+        <div className="w-11 h-11 rounded-xl grid place-items-center bg-sky-50 text-sky-600 shrink-0">
+          <Target className="w-5 h-5" strokeWidth={2.4} />
         </div>
         <div>
           <div className="flex items-baseline gap-2">
-            <h1 className="text-[28px] font-bold text-ink tracking-[-0.02em] leading-tight">Best Customers</h1>
+            <h1 className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">Best Customers</h1>
             <span className="text-[13px] text-slate-400 font-normal">ICP Settings</span>
           </div>
-          <p className="text-[13px] text-slate-500 mt-0.5 leading-relaxed max-w-xl">
+          <p className="text-[13px] text-ink-muted mt-1 leading-relaxed max-w-xl">
             Tell us who your best customers are — the industries, locations, and roles that close best.
             The more you define, the smarter your lead scoring gets.
           </p>
@@ -463,7 +463,7 @@ export default function IcpPage() {
 
       {/* ── No-leads hint ────────────────────────────────────────────── */}
       {suggestions && suggestions.total_analyzed < 5 && (
-        <div className="glass-card flex items-start gap-3 px-4 py-3.5">
+        <div className="rounded-2xl border border-slate-200/70 bg-white flex items-start gap-3 px-4 py-3.5">
           <div className="w-7 h-7 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 mt-0.5">
             <Lightbulb className="w-3.5 h-3.5 text-slate-400" />
           </div>
@@ -553,9 +553,9 @@ export default function IcpPage() {
         </Section>
 
         {/* SQL Thresholds */}
-        <div className="glass-card px-5 py-4 space-y-5">
+        <div className="rounded-2xl border border-slate-200/70 bg-white px-5 py-4 space-y-5">
           <div className="border-b border-slate-100 pb-4">
-            <p className="text-[14px] font-bold text-slate-900">SQL Thresholds</p>
+            <p className="text-[14px] font-semibold text-ink">SQL Thresholds</p>
             <p className="text-[12px] text-slate-400 mt-0.5">
               A lead is flagged as Sales Qualified when both scores exceed these thresholds.
             </p>
@@ -611,10 +611,9 @@ export default function IcpPage() {
           <button
             type="submit"
             disabled={saving}
-            className="flex items-center gap-2 h-11 px-6 rounded-full bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)]
+            className="flex items-center gap-2 h-11 px-6 rounded-lg bg-sky-600 hover:bg-sky-700
                        text-white text-[14px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed
-                       active:scale-[0.97] transition-all
-                       shadow-[0_2px_8px_rgba(14, 165, 233,0.3),inset_0_1px_0_rgba(255,255,255,0.12)]"
+                       transition-colors"
           >
             <Save className="w-4 h-4" />
             {saving ? "Saving…" : "Save & Regrade Leads"}

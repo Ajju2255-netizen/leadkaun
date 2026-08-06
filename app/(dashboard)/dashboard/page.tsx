@@ -74,12 +74,12 @@ function formatINR(n: number): string {
 }
 
 
-const ACTIVITY_STYLE: Record<ActivityItem["category"], { icon: typeof Phone; bg: string; color: string }> = {
-  call:     { icon: Phone,        bg: "linear-gradient(180deg, #BAE6FD 0%, #7DD3FC 100%)", color: "#0284C7" },
-  whatsapp: { icon: MessageSquare,bg: "linear-gradient(180deg, #A7F3D0 0%, #6EE7B7 100%)", color: "#059669" },
-  email:    { icon: Mail,         bg: "linear-gradient(180deg, #DDD6FE 0%, #C4B5FD 100%)", color: "#7C3AED" },
-  import:   { icon: Upload,       bg: "linear-gradient(180deg, #FED7AA 0%, #FDBA74 100%)", color: "#EA580C" },
-  system:   { icon: Cog,          bg: "linear-gradient(180deg, #E2E8F0 0%, #CBD5E1 100%)", color: "#475569" },
+const ACTIVITY_STYLE: Record<ActivityItem["category"], { icon: typeof Phone; tintBg: string; tintFg: string }> = {
+  call:     { icon: Phone,         tintBg: "bg-sky-50",     tintFg: "text-sky-600"     },
+  whatsapp: { icon: MessageSquare, tintBg: "bg-emerald-50", tintFg: "text-emerald-600" },
+  email:    { icon: Mail,          tintBg: "bg-violet-50",  tintFg: "text-violet-600"  },
+  import:   { icon: Upload,        tintBg: "bg-orange-50",  tintFg: "text-orange-600"  },
+  system:   { icon: Cog,           tintBg: "bg-slate-100",  tintFg: "text-slate-500"   },
 }
 
 // Vibrant funnel band colors (top → bottom of funnel)
@@ -96,40 +96,34 @@ const FUNNEL_COLORS = [
 // ── Components ────────────────────────────────────────────────────────────
 
 function KpiCard({
-  label, value, pctChange, icon, iconBg, iconColor, invertDelta = false,
+  label, value, pctChange, icon, tintBg, tintFg, invertDelta = false,
 }: {
   label: string
   value: React.ReactNode
   pctChange: number | null
   icon: React.ReactNode
-  iconBg: string
-  iconColor: string
+  tintBg: string
+  tintFg: string
   invertDelta?: boolean
 }) {
   return (
-    <div className="glass-3 gloss-edge rounded-2xl p-5">
-      <div className="flex items-start gap-3">
-        <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-          style={{
-            background: iconBg,
-            boxShadow:  `inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 10px ${iconColor}22`,
-          }}
-        >
-          <span style={{ color: iconColor }}>{icon}</span>
-        </div>
-        <p className="text-[12px] font-semibold text-ink-soft leading-tight pt-1">{label}</p>
+    <div className="rounded-2xl border border-slate-200/70 bg-white p-4">
+      <div className="flex items-center gap-2 min-w-0">
+        <span className={`w-8 h-8 rounded-lg grid place-items-center shrink-0 ${tintBg} ${tintFg}`}>
+          {icon}
+        </span>
+        <p className="text-[12px] font-medium text-ink-soft truncate">{label}</p>
       </div>
-      <div className="mt-3 text-[30px] font-bold tabular-nums leading-none text-ink">
+      <div className="mt-3 text-[26px] font-bold tabular-nums leading-none text-ink">
         {value}
       </div>
-      <div className="mt-2 flex items-center gap-1.5">
+      <div className="mt-2 flex items-center gap-1.5 min-h-[16px]">
         {pctChange == null ? (
-          <span className="text-[12px] text-ink-muted">— vs last month</span>
+          <span className="text-[11.5px] text-ink-muted">— vs last month</span>
         ) : (
           <>
             <DeltaChip delta={pctChange} invert={invertDelta} />
-            <span className="text-[12px] text-ink-muted">vs last month</span>
+            <span className="text-[11.5px] text-ink-muted">vs last month</span>
           </>
         )}
       </div>
@@ -216,40 +210,33 @@ export default function DashboardPage() {
     <div className="space-y-6">
 
       {/* ── Header row ──────────────────────────────────────────────────── */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-4">
-          <div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0"
-            style={{
-              background: "linear-gradient(180deg, #BAE6FD 0%, #7DD3FC 100%)",
-              boxShadow:  "inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 12px rgba(14,165,233,0.25)",
-            }}
-          >
-            <LayoutDashboard className="w-6 h-6 text-sky-700" strokeWidth={2} />
-          </div>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="flex items-start gap-3">
+          <span className="w-11 h-11 rounded-xl grid place-items-center bg-sky-50 text-sky-600 shrink-0">
+            <LayoutDashboard className="w-5 h-5" strokeWidth={2} />
+          </span>
           <div>
-            <h1 className="text-[28px] font-bold text-ink tracking-[-0.02em] leading-tight">
+            <h1 className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">
               Sales Behaviour Pulse
             </h1>
-            <p className="text-[14px] text-ink-soft mt-2 leading-relaxed max-w-[560px]">
+            <p className="text-[13px] text-ink-muted mt-1 leading-relaxed max-w-[560px]">
               Today&apos;s revenue radar — what your team did, what&apos;s slipping, and where the next ₹ is hiding.
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {/* Static period indicator — the pulse is this-month scoped. */}
+          <span className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg text-[13px] font-semibold text-ink-soft bg-white border border-slate-200">
+            <Calendar className="w-4 h-4 text-ink-muted" strokeWidth={2} />
+            This month
+          </span>
           <Link
             href="/leads/import"
-            className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl text-[13px] font-semibold text-sky-700 border border-sky-200 bg-white/70 hover:bg-sky-50/80 transition-colors"
+            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg text-[13px] font-semibold text-white bg-sky-600 hover:bg-sky-700 transition-colors active:scale-[0.98]"
           >
             <Plus className="w-4 h-4" strokeWidth={2.5} />
             Import leads
           </Link>
-          {/* Static period indicator — the pulse is this-month scoped. Not a
-              filter (kept as a label, not a fake disabled button). */}
-          <span className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl text-[13px] font-semibold text-ink-soft bg-slate-50 border border-hairline">
-            <Calendar className="w-4 h-4 text-ink-muted" strokeWidth={2} />
-            This month
-          </span>
         </div>
       </div>
 
@@ -260,40 +247,35 @@ export default function DashboardPage() {
           value={isLoading ? <Skeleton className="h-8 w-20" /> : (k?.new_leads.value ?? 0).toLocaleString("en-IN")}
           pctChange={k?.new_leads.pct_change ?? null}
           icon={<Users className="w-5 h-5" strokeWidth={2} />}
-          iconBg="linear-gradient(180deg, #BAE6FD 0%, #7DD3FC 100%)"
-          iconColor="#0284C7"
+          tintBg="bg-sky-50" tintFg="text-sky-600"
         />
         <KpiCard
           label="First Contacts Made"
           value={isLoading ? <Skeleton className="h-8 w-20" /> : (k?.first_contacts.value ?? 0).toLocaleString("en-IN")}
           pctChange={k?.first_contacts.pct_change ?? null}
           icon={<Send className="w-5 h-5" strokeWidth={2} />}
-          iconBg="linear-gradient(180deg, #FED7AA 0%, #FDBA74 100%)"
-          iconColor="#EA580C"
+          tintBg="bg-orange-50" tintFg="text-orange-600"
         />
         <KpiCard
           label="Follow-ups Completed"
           value={isLoading ? <Skeleton className="h-8 w-20" /> : (k?.followups_done.value ?? 0).toLocaleString("en-IN")}
           pctChange={k?.followups_done.pct_change ?? null}
           icon={<CheckCircle2 className="w-5 h-5" strokeWidth={2} />}
-          iconBg="linear-gradient(180deg, #DDD6FE 0%, #C4B5FD 100%)"
-          iconColor="#7C3AED"
+          tintBg="bg-violet-50" tintFg="text-violet-600"
         />
         <KpiCard
           label="Leads Won"
           value={isLoading ? <Skeleton className="h-8 w-20" /> : (k?.wins.value ?? 0).toLocaleString("en-IN")}
           pctChange={k?.wins.pct_change ?? null}
           icon={<Trophy className="w-5 h-5" strokeWidth={2} />}
-          iconBg="linear-gradient(180deg, #A7F3D0 0%, #6EE7B7 100%)"
-          iconColor="#059669"
+          tintBg="bg-emerald-50" tintFg="text-emerald-600"
         />
         <KpiCard
           label="Revenue"
           value={isLoading ? <Skeleton className="h-8 w-20" /> : `₹${formatINR(k?.revenue.value ?? 0)}`}
           pctChange={k?.revenue.pct_change ?? null}
           icon={<IndianRupee className="w-5 h-5" strokeWidth={2} />}
-          iconBg="linear-gradient(180deg, #BBF7D0 0%, #86EFAC 100%)"
-          iconColor="#059669"
+          tintBg="bg-teal-50" tintFg="text-teal-600"
         />
       </div>
 
@@ -301,10 +283,10 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
 
         {/* Funnel — wider (3/5) */}
-        <div className="lg:col-span-3 glass-2 gloss-edge rounded-2xl p-6">
+        <div className="lg:col-span-3 rounded-2xl border border-slate-200/70 bg-white p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-baseline gap-2">
-              <h2 className="text-[16px] font-semibold text-ink">Pipeline Funnel</h2>
+              <h2 className="text-[15px] font-semibold text-ink">Pipeline Funnel</h2>
               <span className="text-[10px] text-ink-muted font-medium uppercase tracking-[0.10em]">all-time</span>
             </div>
             <span className="text-[11px] text-ink-muted font-mono uppercase tracking-[0.10em]">
@@ -318,42 +300,51 @@ export default function DashboardPage() {
             </div>
           ) : (
             <>
-              <div className="space-y-2.5">
-                {funnel?.stages.map((s, i) => {
-                  const color = FUNNEL_COLORS[i % FUNNEL_COLORS.length]
-                  const widthPct = Math.max(6, s.pct)  // ensure visibility for non-zero counts
-                  return (
-                    <div key={s.key} className="grid grid-cols-[140px_1fr_auto] items-center gap-3">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className={`w-2 h-2 rounded-full shrink-0 ${color.swatch}`} />
-                        <span className="text-[13px] text-ink truncate">{s.name}</span>
-                      </div>
-                      <div className="relative h-7 bg-slate-100/60 rounded-lg overflow-hidden">
-                        {s.count > 0 && (
-                          <div
-                            className={`absolute inset-y-0 left-0 ${color.bar} rounded-lg`}
-                            style={{
-                              width:     `${widthPct}%`,
-                              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -1px 0 rgba(0,0,0,0.08)",
-                            }}
-                          />
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1.5 shrink-0 min-w-[100px] justify-end">
-                        <span className="text-[14px] font-semibold tabular-nums text-ink">
-                          {s.count.toLocaleString("en-IN")}
-                        </span>
-                        <span className="text-[12px] text-ink-muted tabular-nums">({s.pct}%)</span>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
+              {funnel && funnel.total_entered > 0 ? (
+                <>
+                  {/* One segmented bar — how the pipeline's leads are split across
+                      stages. Segment widths are each stage's share of the total. */}
+                  <div className="flex h-9 w-full gap-0.5 rounded-lg overflow-hidden">
+                    {funnel.stages.map((s, i) => {
+                      if (s.count <= 0) return null
+                      const color = FUNNEL_COLORS[i % FUNNEL_COLORS.length]
+                      const w = (s.count / funnel.total_entered) * 100
+                      return (
+                        <div
+                          key={s.key}
+                          className={`${color.bar} h-full transition-all duration-500`}
+                          style={{ width: `${w}%`, minWidth: 3 }}
+                          title={`${s.name}: ${s.count.toLocaleString("en-IN")} (${s.pct}%)`}
+                        />
+                      )
+                    })}
+                  </div>
+
+                  {/* Legend */}
+                  <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5">
+                    {funnel.stages.map((s, i) => {
+                      const color = FUNNEL_COLORS[i % FUNNEL_COLORS.length]
+                      return (
+                        <div key={s.key} className="flex items-center gap-2 min-w-0">
+                          <span className={`w-2.5 h-2.5 rounded-[3px] shrink-0 ${color.swatch}`} />
+                          <span className="text-[12.5px] text-ink-soft truncate flex-1">{s.name}</span>
+                          <span className="text-[13px] font-semibold text-ink tabular-nums shrink-0">
+                            {s.count.toLocaleString("en-IN")}
+                          </span>
+                          <span className="text-[11.5px] text-ink-muted tabular-nums shrink-0 w-9 text-right">{s.pct}%</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </>
+              ) : (
+                <div className="py-8 text-center text-[13px] text-ink-muted">No leads in the pipeline yet.</div>
+              )}
 
               {/* Conversion callout */}
-              <div className="mt-5 flex items-start gap-3 rounded-xl px-4 py-3 bg-sky-50/70 border border-sky-100">
-                <div className="w-9 h-9 rounded-lg bg-white/80 flex items-center justify-center shrink-0">
-                  <Sparkles className="w-4.5 h-4.5 text-sky-500" strokeWidth={2} />
+              <div className="mt-5 flex items-start gap-3 rounded-xl px-4 py-3 bg-sky-50 border border-sky-100">
+                <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center shrink-0">
+                  <Sparkles className="w-5 h-5 text-sky-500" strokeWidth={2} />
                 </div>
                 <div className="min-w-0">
                   <p className="text-[13px] text-ink">
@@ -369,9 +360,9 @@ export default function DashboardPage() {
         </div>
 
         {/* Top performing reps — narrower (2/5) */}
-        <div className="lg:col-span-2 glass-2 gloss-edge rounded-2xl p-6">
+        <div className="lg:col-span-2 rounded-2xl border border-slate-200/70 bg-white p-5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-[16px] font-semibold text-ink">Top Performing Reps</h2>
+            <h2 className="text-[15px] font-semibold text-ink">Top Performing Reps</h2>
             <Link href="/rep-tracking" className="text-[12px] text-sky-600 font-semibold hover:text-sky-700">
               View all →
             </Link>
@@ -405,7 +396,7 @@ export default function DashboardPage() {
                           {rep.wins} {rep.wins === 1 ? "win" : "wins"}
                         </span>
                       </div>
-                      <div className="h-1.5 bg-slate-100/80 rounded-full overflow-hidden">
+                      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                         <div
                           className={`h-full ${barCls} rounded-full transition-all`}
                           style={{ width: `${widthPct}%` }}
@@ -427,8 +418,8 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
         {/* Hot Sources */}
-        <div className="glass-2 gloss-edge rounded-2xl p-6">
-          <h2 className="text-[16px] font-semibold text-ink mb-4">Active Sources</h2>
+        <div className="rounded-2xl border border-slate-200/70 bg-white p-5">
+          <h2 className="text-[15px] font-semibold text-ink mb-4">Active Sources</h2>
           {isLoading ? (
             <div className="space-y-2">
               {[1,2,3,4].map((i) => <Skeleton key={i} className="h-8 w-full rounded-lg" />)}
@@ -459,14 +450,14 @@ export default function DashboardPage() {
               })}
             </ul>
           )}
-          <Link href="/leads" className="mt-5 pt-3 block text-center text-[12px] text-sky-600 font-semibold hover:text-sky-700 border-t border-hairline">
+          <Link href="/leads" className="mt-5 pt-3 block text-center text-[12px] text-sky-600 font-semibold hover:text-sky-700 border-t border-slate-100">
             View all leads →
           </Link>
         </div>
 
         {/* Recent Activity */}
-        <div className="glass-2 gloss-edge rounded-2xl p-6">
-          <h2 className="text-[16px] font-semibold text-ink mb-4">Recent Activity</h2>
+        <div className="rounded-2xl border border-slate-200/70 bg-white p-5">
+          <h2 className="text-[15px] font-semibold text-ink mb-4">Recent Activity</h2>
           {isLoading ? (
             <div className="space-y-3">
               {[1,2,3,4,5].map((i) => <Skeleton key={i} className="h-10 w-full rounded-lg" />)}
@@ -482,14 +473,8 @@ export default function DashboardPage() {
                 const Icon = sty.icon
                 return (
                   <li key={a.id} className="flex items-start gap-2.5">
-                    <div
-                      className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
-                      style={{
-                        background: sty.bg,
-                        boxShadow:  "inset 0 1px 0 rgba(255,255,255,0.85)",
-                      }}
-                    >
-                      <Icon className="w-3.5 h-3.5" strokeWidth={2} style={{ color: sty.color }} />
+                    <div className={`w-8 h-8 rounded-lg grid place-items-center shrink-0 mt-0.5 ${sty.tintBg} ${sty.tintFg}`}>
+                      <Icon className="w-3.5 h-3.5" strokeWidth={2} />
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-[13px] text-ink leading-tight">{a.title}</p>
@@ -497,7 +482,7 @@ export default function DashboardPage() {
                         {a.lead_name}{a.company ? ` · ${a.company}` : ""}
                       </p>
                     </div>
-                    <span className="text-[11px] text-ink-faint tabular-nums shrink-0 mt-0.5">
+                    <span className="text-[11px] text-ink-muted tabular-nums shrink-0 mt-0.5">
                       {timeAgo(a.created_at)}
                     </span>
                   </li>
@@ -508,8 +493,8 @@ export default function DashboardPage() {
         </div>
 
         {/* Behaviour Health */}
-        <div className="glass-2 gloss-edge rounded-2xl p-6">
-          <h2 className="text-[16px] font-semibold text-ink mb-4">Behaviour Health</h2>
+        <div className="rounded-2xl border border-slate-200/70 bg-white p-5">
+          <h2 className="text-[15px] font-semibold text-ink mb-4">Behaviour Health</h2>
           {isLoading ? (
             <Skeleton className="h-[120px] w-[120px] rounded-full mx-auto" />
           ) : health ? (

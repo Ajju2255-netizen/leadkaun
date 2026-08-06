@@ -6,7 +6,7 @@ import Link from "next/link"
 import {
   TrendingDown, TrendingUp, Minus, CheckCircle2,
   Zap, AlertTriangle, PhoneOff, Snowflake,
-  BarChart3, Target, Clock, IndianRupee, ArrowRight,
+  BarChart3, Clock, ArrowRight,
 } from "lucide-react"
 import { useHasRole } from "@/hooks/useCurrentUser"
 import { GradeBadge } from "@/components/shared/GradeBadge"
@@ -56,31 +56,23 @@ async function fetchIntelligence(period: string): Promise<IntelData> {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const LOSS_META: Record<string, { icon: React.ReactNode; iconBg: string; iconColor: string; bar: string }> = {
+const LOSS_META: Record<string, { icon: React.ReactNode; tintBg: string; tintFg: string; bar: string }> = {
   "Follow-up delay or skip": {
-    icon:      <AlertTriangle className="w-4 h-4" />,
-    iconBg:    "linear-gradient(180deg, #FECACA 0%, #FCA5A5 100%)",
-    iconColor: "#DC2626",
-    bar:       "bg-red-500",
+    icon:   <AlertTriangle className="w-4 h-4" />,
+    tintBg: "bg-red-50",    tintFg: "text-red-600",    bar: "bg-red-500",
   },
   "Never contacted": {
-    icon:      <PhoneOff className="w-4 h-4" />,
-    iconBg:    "linear-gradient(180deg, #FED7AA 0%, #FDBA74 100%)",
-    iconColor: "#EA580C",
-    bar:       "bg-orange-400",
+    icon:   <PhoneOff className="w-4 h-4" />,
+    tintBg: "bg-orange-50", tintFg: "text-orange-600", bar: "bg-orange-400",
   },
   "Engaged but went cold": {
-    icon:      <Snowflake className="w-4 h-4" />,
-    iconBg:    "linear-gradient(180deg, #FEF3C7 0%, #FDE68A 100%)",
-    iconColor: "#D97706",
-    bar:       "bg-amber-400",
+    icon:   <Snowflake className="w-4 h-4" />,
+    tintBg: "bg-amber-50",  tintFg: "text-amber-600",  bar: "bg-amber-400",
   },
 }
 const DEFAULT_LOSS = {
-  icon:      <AlertTriangle className="w-4 h-4" />,
-  iconBg:    "linear-gradient(180deg, #E2E8F0 0%, #CBD5E1 100%)",
-  iconColor: "#475569",
-  bar:       "bg-slate-400",
+  icon:   <AlertTriangle className="w-4 h-4" />,
+  tintBg: "bg-slate-100", tintFg: "text-slate-500", bar: "bg-slate-400",
 }
 
 const GRADE_PLAYBOOK: Record<string, { action: string; defaultH: number; channel: "CALL" | "WHATSAPP"; desc: string }> = {
@@ -102,26 +94,23 @@ function formatValue(v: number): string {
 // ── KPI card ─────────────────────────────────────────────────────────────────
 
 function KpiCard({
-  label, value, sub, icon, iconBg, iconColor, valueColor = "text-ink",
+  label, value, sub, icon, tintBg, tintFg, valueColor = "text-ink",
 }: {
   label: string; value: React.ReactNode; sub?: React.ReactNode
-  icon: React.ReactNode; iconBg: string; iconColor: string; valueColor?: string
+  icon: React.ReactNode; tintBg: string; tintFg: string; valueColor?: string
 }) {
   return (
-    <div className="glass-3 gloss-edge rounded-2xl p-5">
-      <div className="flex items-start gap-3">
-        <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-          style={{ background: iconBg, boxShadow: `inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 10px ${iconColor}22` }}
-        >
-          <span style={{ color: iconColor }}>{icon}</span>
-        </div>
-        <p className="text-[12px] font-semibold text-ink-soft leading-tight pt-1">{label}</p>
+    <div className="rounded-2xl border border-slate-200/70 bg-white p-4">
+      <div className="flex items-center gap-2 min-w-0">
+        <span className={`w-8 h-8 rounded-lg grid place-items-center shrink-0 ${tintBg} ${tintFg}`}>
+          {icon}
+        </span>
+        <p className="text-[12px] font-medium text-ink-soft truncate">{label}</p>
       </div>
-      <div className={`mt-3 text-[30px] font-bold tabular-nums leading-none ${valueColor}`}>
+      <div className={`mt-3 text-[26px] font-bold tabular-nums leading-none ${valueColor}`}>
         {value}
       </div>
-      <div className="mt-2 text-[12px] text-ink-muted min-h-[16px]">{sub}</div>
+      <div className="mt-2 text-[11.5px] text-ink-muted min-h-[16px]">{sub}</div>
     </div>
   )
 }
@@ -179,23 +168,17 @@ export default function AnalyticsPage() {
     : null
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6">
 
       {/* ── Header ────────────────────────────────────────────────────────── */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-4">
-          <div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0"
-            style={{
-              background: "linear-gradient(180deg, #BAE6FD 0%, #7DD3FC 100%)",
-              boxShadow:  "inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 12px rgba(14,165,233,0.25)",
-            }}
-          >
-            <BarChart3 className="w-6 h-6 text-sky-700" strokeWidth={2.2} />
-          </div>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="flex items-start gap-3">
+          <span className="w-11 h-11 rounded-xl grid place-items-center bg-sky-50 text-sky-600 shrink-0">
+            <BarChart3 className="w-5 h-5" strokeWidth={2.2} />
+          </span>
           <div>
-            <h1 className="text-[28px] font-bold text-ink tracking-[-0.02em] leading-tight">Analytics</h1>
-            <p className="text-[14px] text-ink-soft mt-2 leading-relaxed max-w-[560px]">
+            <h1 className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">Analytics</h1>
+            <p className="text-[13px] text-ink-muted mt-1 leading-relaxed max-w-[560px]">
               Find what&apos;s slowing your pipeline — loss patterns, recovery potential, and where to act next.
             </p>
           </div>
@@ -203,18 +186,18 @@ export default function AnalyticsPage() {
         <div className="flex items-center gap-2 shrink-0">
           <Link
             href="/missed"
-            className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl text-[13px] font-semibold text-sky-700 border border-sky-200 bg-white/70 hover:bg-sky-50 transition-colors"
+            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg text-[13px] font-semibold text-sky-700 border border-sky-200 bg-white hover:bg-sky-50 transition-colors"
           >
             Missed Opps <ArrowRight className="w-3.5 h-3.5" />
           </Link>
-          {/* Period toggle — glassy pill */}
-          <div className="flex items-center gap-0.5 bg-white/80 border border-hairline-strong rounded-xl p-1">
+          {/* Period toggle */}
+          <div className="flex items-center gap-0.5 bg-slate-100 rounded-lg p-0.5">
             {(["7d", "30d", "90d"] as const).map((p) => (
               <button
                 key={p} onClick={() => setPeriod(p)}
-                className={`px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all ${
+                className={`px-3 py-1.5 rounded-md text-[12px] font-semibold transition-colors ${
                   period === p
-                    ? "bg-sky-500 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_2px_6px_rgba(14,165,233,0.30)]"
+                    ? "bg-white text-sky-700 shadow-sm"
                     : "text-ink-soft hover:text-ink"
                 }`}
               >
@@ -225,34 +208,75 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      {/* ── 5 KPI cards ─────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        <KpiCard
-          label="₹ Missed"
-          value={isLoading ? <Skeleton className="h-8 w-20" /> : formatValue(data?.total_missed_value ?? 0)}
-          valueColor="text-red-600"
-          sub={data ? `${data.total_missed_count} leads` : null}
-          icon={<AlertTriangle className="w-5 h-5" strokeWidth={2} />}
-          iconBg="linear-gradient(180deg, #FECACA 0%, #FCA5A5 100%)"
-          iconColor="#DC2626"
-        />
-        <KpiCard
-          label="₹ Recoverable"
-          value={isLoading ? <Skeleton className="h-8 w-20" /> : formatValue(pred?.recovery_potential ?? 0)}
-          valueColor="text-emerald-600"
-          sub={pred && pred.recovery_potential > 0 ? <Link href="/follow-ups" className="hover:text-sky-600">overdue follow-ups →</Link> : "no overdue"}
-          icon={<Target className="w-5 h-5" strokeWidth={2} />}
-          iconBg="linear-gradient(180deg, #BBF7D0 0%, #86EFAC 100%)"
-          iconColor="#059669"
-        />
+      {/* ── Headline insight — the page's thesis ────────────────────────── */}
+      {isLoading ? (
+        <div className="rounded-2xl border border-slate-200/70 bg-white p-6"><Skeleton className="h-24 w-full rounded-xl" /></div>
+      ) : (data?.total_missed_value ?? 0) > 0 ? (
+        <section className="rounded-2xl border border-slate-200/70 bg-white p-5 sm:p-6">
+          <div className="flex flex-col lg:flex-row lg:items-stretch gap-5 justify-between">
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-faint">The headline</p>
+              <div className="mt-2 flex items-baseline gap-2.5 flex-wrap">
+                <span className="text-[34px] font-bold tabular-nums text-red-600 leading-none">{formatValue(data?.total_missed_value ?? 0)}</span>
+                <span className="text-[13.5px] text-ink-muted">missed · {data?.total_missed_count ?? 0} lead{(data?.total_missed_count ?? 0) === 1 ? "" : "s"}</span>
+                {(trendUp || trendDn) && (
+                  <span className={`inline-flex items-center gap-1 text-[12px] font-semibold ${trendColor}`}>
+                    {trendUp ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}{trendLabel}
+                  </span>
+                )}
+              </div>
+              {loss.length > 0 && (
+                <p className="text-[13.5px] text-ink-soft mt-3 leading-relaxed max-w-[560px]">
+                  The biggest driver is <span className="font-semibold text-ink">{loss[0].reason.toLowerCase()}</span> — <span className="font-semibold text-red-600 tabular-nums">{formatValue(loss[0].value)}</span> ({loss[0].pct}% of losses). Work the fixes below to claw it back.
+                </p>
+              )}
+            </div>
+            {(pred?.recovery_potential ?? 0) > 0 ? (
+              <div className="shrink-0 lg:w-[248px] rounded-xl border border-emerald-200/70 bg-emerald-50/50 p-4 flex flex-col justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-emerald-700">Recoverable now</p>
+                  <p className="text-[28px] font-bold tabular-nums text-emerald-700 mt-1.5 leading-none">{formatValue(pred?.recovery_potential ?? 0)}</p>
+                  <p className="text-[11.5px] text-emerald-800/70 mt-1.5">from overdue follow-ups you can still work</p>
+                </div>
+                <Link href="/follow-ups" className="inline-flex items-center justify-center gap-1.5 h-9 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[13px] font-semibold transition-colors">
+                  Recover it <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            ) : (
+              <div className="shrink-0 lg:w-[248px] rounded-xl border border-slate-200/70 bg-slate-50 p-4 flex flex-col justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-ink-soft">Recoverable now</p>
+                  <p className="text-[28px] font-bold tabular-nums text-ink mt-1.5 leading-none">—</p>
+                  <p className="text-[11.5px] text-ink-muted mt-1.5">No overdue follow-ups to recover</p>
+                </div>
+                <Link href="/missed" className="inline-flex items-center justify-center gap-1.5 h-9 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-ink-soft text-[13px] font-semibold transition-colors">
+                  View missed <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            )}
+          </div>
+        </section>
+      ) : (
+        <section className="rounded-2xl border border-emerald-200/70 bg-emerald-50/40 p-5 flex items-center gap-4">
+          <span className="w-11 h-11 rounded-xl grid place-items-center bg-emerald-100 text-emerald-600 shrink-0">
+            <CheckCircle2 className="w-5 h-5" strokeWidth={2.2} />
+          </span>
+          <div>
+            <p className="text-[15px] font-semibold text-ink">No missed leads this period — the pipeline is clean.</p>
+            <p className="text-[13px] text-ink-soft mt-0.5">Keep response and follow-up SLAs tight to hold the line.</p>
+          </div>
+        </section>
+      )}
+
+      {/* ── Supporting metrics ──────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
           label="Speed-to-Win avg"
           value={isLoading ? <Skeleton className="h-8 w-20" /> : pats?.avg_speed_won != null ? formatDuration(pats.avg_speed_won) : "—"}
           valueColor="text-sky-600"
           sub={pats?.avg_speed_won != null ? "for closed-won leads" : null}
           icon={<Clock className="w-5 h-5" strokeWidth={2} />}
-          iconBg="linear-gradient(180deg, #BAE6FD 0%, #7DD3FC 100%)"
-          iconColor="#0284C7"
+          tintBg="bg-sky-50" tintFg="text-sky-600"
         />
         <KpiCard
           label="Speed-to-Miss avg"
@@ -260,8 +284,7 @@ export default function AnalyticsPage() {
           valueColor="text-orange-600"
           sub={pats?.avg_speed_missed != null ? "for missed leads" : null}
           icon={<Clock className="w-5 h-5" strokeWidth={2} />}
-          iconBg="linear-gradient(180deg, #FED7AA 0%, #FDBA74 100%)"
-          iconColor="#EA580C"
+          tintBg="bg-orange-50" tintFg="text-orange-600"
         />
         <KpiCard
           label="7-Day Trend"
@@ -275,16 +298,26 @@ export default function AnalyticsPage() {
           )}
           sub={data && data.total_missed_value > 0 ? `${formatValue(data.total_missed_value)} all-time` : "no losses yet"}
           icon={<BarChart3 className="w-5 h-5" strokeWidth={2} />}
-          iconBg="linear-gradient(180deg, #DDD6FE 0%, #C4B5FD 100%)"
-          iconColor="#7C3AED"
+          tintBg="bg-violet-50" tintFg="text-violet-600"
+        />
+        <KpiCard
+          label="Loss rate"
+          value={isLoading ? <Skeleton className="h-8 w-16" /> : lossRatePct == null ? "—" : `${lossRatePct}%`}
+          valueColor={lossRatePct != null && lossRatePct >= 30 ? "text-red-600" : lossRatePct != null && lossRatePct >= 15 ? "text-orange-600" : "text-emerald-600"}
+          sub={lossRatePct != null ? `${data?.total_missed_count ?? 0} missed of ${lossUniverse}` : "no data"}
+          icon={<TrendingDown className="w-5 h-5" strokeWidth={2} />}
+          tintBg="bg-rose-50" tintFg="text-rose-600"
         />
       </div>
 
+      {/* ── Section: where you're losing ─────────────────────────────────── */}
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-faint pt-2 -mb-1">Where you&apos;re losing</p>
+
       {/* ── 7-day bar chart ─────────────────────────────────────────────────── */}
       {(!isLoading && days.some((d) => d.missed_value > 0)) && (
-        <div className="glass-2 gloss-edge rounded-2xl p-6">
+        <div className="rounded-2xl border border-slate-200/70 bg-white p-6">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="text-[16px] font-semibold text-ink">Daily Miss Trend</h2>
+            <h2 className="text-[15px] font-semibold text-ink">Daily Miss Trend</h2>
             <p className="text-[11px] font-mono uppercase tracking-[0.10em] text-ink-muted">₹ missed per day</p>
           </div>
           <MissTrendChart days={days} />
@@ -295,9 +328,9 @@ export default function AnalyticsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
 
         {/* Loss reasons (3/5) */}
-        <div className="lg:col-span-3 glass-2 gloss-edge rounded-2xl p-6">
+        <div className="lg:col-span-3 rounded-2xl border border-slate-200/70 bg-white p-6">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="text-[16px] font-semibold text-ink">Why You&apos;re Losing</h2>
+            <h2 className="text-[15px] font-semibold text-ink">Why You&apos;re Losing</h2>
             {!isLoading && (data?.total_missed_count ?? 0) > 0 && (
               <span className="text-[11px] font-mono uppercase tracking-[0.08em] text-ink-muted">
                 {data!.total_missed_count} leads · {formatValue(data!.total_missed_value)}
@@ -340,16 +373,13 @@ export default function AnalyticsPage() {
                 })()
 
                 return (
-                  <div key={r.reason} className="rounded-xl border border-hairline overflow-hidden bg-white/50">
+                  <div key={r.reason} className="rounded-xl border border-slate-100 overflow-hidden bg-white">
                     {/* Reason header */}
                     <div className="px-4 pt-4 pb-3">
                       <div className="flex items-start justify-between gap-3 mb-2">
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <div
-                            className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-                            style={{ background: meta.iconBg, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.85)" }}
-                          >
-                            <span style={{ color: meta.iconColor }}>{meta.icon}</span>
+                          <div className={`w-9 h-9 rounded-lg grid place-items-center shrink-0 ${meta.tintBg} ${meta.tintFg}`}>
+                            {meta.icon}
                           </div>
                           <div className="min-w-0">
                             <p className="text-[14px] font-semibold text-ink leading-tight truncate">{r.reason}</p>
@@ -362,14 +392,14 @@ export default function AnalyticsPage() {
                         </div>
                       </div>
                       {/* Progress bar */}
-                      <div className="h-1.5 bg-slate-100/60 rounded-full overflow-hidden">
+                      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                         <div className={`h-full rounded-full transition-all duration-700 ${meta.bar}`} style={{ width: `${r.pct}%` }} />
                       </div>
                     </div>
 
                     {/* Fix recommendation */}
                     {fixInfo && (
-                      <div className="border-t border-hairline bg-sky-50/40 px-4 py-3 flex items-start justify-between gap-3">
+                      <div className="border-t border-slate-100 bg-sky-50/40 px-4 py-3 flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5 mb-1">
                             <Zap className="w-3 h-3 text-sky-500 shrink-0" />
@@ -405,11 +435,11 @@ export default function AnalyticsPage() {
 
           {/* Grade breakdown of missed */}
           {!isLoading && grades.length > 0 && (
-            <div className="pt-4 mt-4 border-t border-hairline">
+            <div className="pt-4 mt-4 border-t border-slate-100">
               <p className="text-[11px] font-mono uppercase tracking-[0.10em] text-ink-muted mb-3">Missed by grade</p>
               <div className="flex gap-2 flex-wrap">
                 {grades.map(({ grade, count, value }) => (
-                  <div key={grade} className="flex items-center gap-2 rounded-xl bg-white/70 border border-hairline px-3 py-2">
+                  <div key={grade} className="flex items-center gap-2 rounded-xl bg-white border border-slate-100 px-3 py-2">
                     <GradeBadge grade={grade} size="sm" />
                     <div>
                       <span className="text-[13px] font-bold text-ink tabular-nums">{count}</span>
@@ -426,8 +456,8 @@ export default function AnalyticsPage() {
         <div className="lg:col-span-2 space-y-4">
 
           {/* Speed comparison */}
-          <div className="glass-2 gloss-edge rounded-2xl p-6">
-            <h2 className="text-[16px] font-semibold text-ink mb-4">Speed to First Contact</h2>
+          <div className="rounded-2xl border border-slate-200/70 bg-white p-6">
+            <h2 className="text-[15px] font-semibold text-ink mb-4">Speed to First Contact</h2>
             {isLoading ? <Skeleton className="h-28 rounded-xl" /> : (
               (pats?.avg_speed_won != null || pats?.avg_speed_missed != null) ? (
                 <div className="space-y-4">
@@ -451,8 +481,8 @@ export default function AnalyticsPage() {
           </div>
 
           {/* Recovery simulation */}
-          <div className="glass-2 gloss-edge rounded-2xl p-6">
-            <h2 className="text-[16px] font-semibold text-ink mb-4">Recovery Simulation</h2>
+          <div className="rounded-2xl border border-slate-200/70 bg-white p-6">
+            <h2 className="text-[15px] font-semibold text-ink mb-4">Recovery Simulation</h2>
             {isLoading ? <Skeleton className="h-28 rounded-xl" /> : (
               showSimulation ? (
                 <div className="space-y-3">
@@ -505,9 +535,9 @@ export default function AnalyticsPage() {
 
       {/* ── Lead Playbook (full-width) — recommended first touch, benchmarked
             against the team's own won-deal speed (read-only guidance). ─────── */}
-      <div className="glass-2 gloss-edge rounded-2xl p-6">
+      <div className="rounded-2xl border border-slate-200/70 bg-white p-6">
         <div className="flex items-center justify-between mb-1 gap-3 flex-wrap">
-          <h2 className="text-[16px] font-semibold text-ink">Lead Playbook</h2>
+          <h2 className="text-[15px] font-semibold text-ink">Lead Playbook</h2>
           <span className="text-[11px] font-mono uppercase tracking-[0.10em] text-ink-muted">Recommended first touch by grade</span>
         </div>
         <p className="text-[12px] text-ink-muted mb-4">How fast to reach each grade — measured against your own won deals.</p>
@@ -521,7 +551,7 @@ export default function AnalyticsPage() {
               const beats = won?.avg_speed != null && won.avg_speed <= pb.defaultH
 
               return (
-                <div key={grade} className="rounded-xl border border-hairline bg-white/60 px-4 py-3.5">
+                <div key={grade} className="rounded-xl border border-slate-100 bg-white px-4 py-3.5">
                   <div className="flex items-center gap-2">
                     <GradeBadge grade={grade} size="md" />
                     <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full ${
@@ -532,7 +562,7 @@ export default function AnalyticsPage() {
                   </div>
                   <p className="text-[13px] font-semibold text-ink leading-tight mt-2.5">{pb.action}</p>
                   <p className="text-[11px] text-ink-muted mt-0.5">{pb.desc}</p>
-                  <div className="mt-3 pt-2.5 border-t border-hairline flex items-center justify-between gap-2">
+                  <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2">
                     <span className="text-[11px] text-ink-muted">Your won avg</span>
                     {won?.avg_speed != null ? (
                       <span className={`text-[12px] font-bold tabular-nums ${beats ? "text-emerald-600" : "text-orange-600"}`}>
@@ -549,28 +579,31 @@ export default function AnalyticsPage() {
         )}
       </div>
 
+      {/* ── Section: team & sources ──────────────────────────────────────── */}
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-faint pt-2 -mb-1">Team &amp; sources</p>
+
       {/* ── 2-col bottom: Source Quality | Rep Performance ────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
         {/* Source Quality */}
         {(isLoading || sources.length > 0) && (
-          <div className="glass-2 gloss-edge rounded-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-hairline flex items-center justify-between">
-              <h2 className="text-[16px] font-semibold text-ink">Source Quality</h2>
+          <div className="rounded-2xl border border-slate-200/70 bg-white overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h2 className="text-[15px] font-semibold text-ink">Source Quality</h2>
               <span className="text-[11px] font-mono uppercase tracking-[0.08em] text-ink-muted">{sources.length} sources</span>
             </div>
             {isLoading ? (
               <div className="p-4 space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-10 rounded-xl" />)}</div>
             ) : (
               <div>
-                <div className="grid grid-cols-12 px-6 py-2.5 text-[10px] font-mono font-semibold text-ink-muted uppercase tracking-[0.08em] bg-sky-50/40">
+                <div className="grid grid-cols-12 px-6 py-2.5 text-[10px] font-mono font-semibold text-ink-soft uppercase tracking-[0.08em] bg-sky-50/40">
                   <span className="col-span-4">Source</span>
                   <span className="col-span-3 text-right">Leads</span>
                   <span className="col-span-2.5 text-right">Win%</span>
                   <span className="col-span-2.5 text-right">Miss%</span>
                 </div>
                 {sources.map((src) => (
-                  <div key={src.id} className="grid grid-cols-12 px-6 py-3 items-center hover:bg-sky-50/30 transition-colors border-t border-hairline first:border-0">
+                  <div key={src.id} className="grid grid-cols-12 px-6 py-3 items-center hover:bg-sky-50/30 transition-colors border-t border-slate-100 first:border-0">
                     <div className="col-span-4 min-w-0 pr-2">
                       <p className="text-[13px] font-semibold text-ink truncate">{src.name}</p>
                     </div>
@@ -611,16 +644,16 @@ export default function AnalyticsPage() {
 
         {/* Rep Performance */}
         {(isLoading || reps.length > 0) && (
-          <div className="glass-2 gloss-edge rounded-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-hairline flex items-center justify-between">
-              <h2 className="text-[16px] font-semibold text-ink">Rep Performance</h2>
+          <div className="rounded-2xl border border-slate-200/70 bg-white overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h2 className="text-[15px] font-semibold text-ink">Rep Performance</h2>
               <span className="text-[11px] font-mono uppercase tracking-[0.08em] text-ink-muted">{reps.length} reps</span>
             </div>
             {isLoading ? (
               <div className="p-4 space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-12 rounded-xl" />)}</div>
             ) : (
               <div>
-                <div className="grid grid-cols-[1fr_60px_70px_70px_60px] px-6 py-2.5 text-[10px] font-mono font-semibold text-ink-muted uppercase tracking-[0.08em] bg-sky-50/40">
+                <div className="grid grid-cols-[1fr_60px_70px_70px_60px] px-6 py-2.5 text-[10px] font-mono font-semibold text-ink-soft uppercase tracking-[0.08em] bg-sky-50/40">
                   <span>Rep</span>
                   <span className="text-right">A-rate</span>
                   <span className="text-right">Won</span>
@@ -647,7 +680,7 @@ export default function AnalyticsPage() {
                   })()
 
                   return (
-                    <div key={rep.id} className={`${idx !== 0 ? "border-t border-hairline" : ""} ${isWorst ? "bg-red-50/30" : ""}`}>
+                    <div key={rep.id} className={`${idx !== 0 ? "border-t border-slate-100" : ""} ${isWorst ? "bg-red-50/30" : ""}`}>
                       <div className="grid grid-cols-[1fr_60px_70px_70px_60px] px-6 py-3 items-center">
                         <div className="flex items-center gap-2 min-w-0">
                           <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${
@@ -688,7 +721,7 @@ export default function AnalyticsPage() {
                       </div>
                       {coaching && (
                         <div className="px-6 pb-3 -mt-1">
-                          <p className="text-[11px] text-ink-soft bg-white/70 border border-hairline rounded-lg px-3 py-1.5">
+                          <p className="text-[11px] text-ink-soft bg-white border border-slate-100 rounded-lg px-3 py-1.5">
                             {coaching}
                           </p>
                         </div>
@@ -702,26 +735,6 @@ export default function AnalyticsPage() {
         )}
       </div>
 
-      {/* Loss Rate KPI tucked at bottom for completeness */}
-      {lossRatePct !== null && (
-        <div className="rounded-2xl bg-white/70 border border-hairline px-5 py-3 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div
-              className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-              style={{ background: "linear-gradient(180deg, #FED7AA 0%, #FDBA74 100%)" }}
-            >
-              <IndianRupee className="w-4 h-4 text-orange-600" strokeWidth={2.2} />
-            </div>
-            <div>
-              <p className="text-[13px] font-semibold text-ink">Account loss rate</p>
-              <p className="text-[12px] text-ink-muted mt-0.5">{data?.total_missed_count ?? 0} missed of {lossUniverse} (won + missed)</p>
-            </div>
-          </div>
-          <span className={`text-[18px] font-bold tabular-nums ${lossRatePct >= 30 ? "text-red-600" : lossRatePct >= 15 ? "text-orange-600" : "text-emerald-600"}`}>
-            {lossRatePct}%
-          </span>
-        </div>
-      )}
     </div>
   )
 }
@@ -744,7 +757,8 @@ function SpeedRow({ label, value, pct, color, textColor }: {
 
 // ── Daily Miss Trend — area + line time-series (₹ missed per day) ──────────────
 function MissTrendChart({ days }: { days: { date: string; missed_value: number }[] }) {
-  const W = 720, H = 96, padTop = 12, padBottom = 6, padX = 4
+  // padX must clear the endpoint dot radius (5) + stroke, or the last point clips.
+  const W = 720, H = 96, padTop = 12, padBottom = 6, padX = 14
   const max = Math.max(1, ...days.map((d) => d.missed_value))
   const span = Math.max(1, days.length - 1)
   const X = (i: number) => padX + (i * (W - padX * 2)) / span
@@ -773,7 +787,7 @@ function MissTrendChart({ days }: { days: { date: string; missed_value: number }
             vectorEffect="non-scaling-stroke" />
         ))}
       </svg>
-      <div className="flex justify-between mt-1.5 px-0.5">
+      <div className="flex justify-between mt-1.5 px-[1.9%]">
         {days.map((d) => {
           const isToday = d.date === todayStr
           const dow = new Date(d.date + "T00:00:00").toLocaleDateString("en-IN", { weekday: "short" })

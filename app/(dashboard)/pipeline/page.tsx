@@ -7,14 +7,13 @@ import Link from "next/link"
 import {
   ArrowRight, Trophy, X, MoveRight, Clock, Settings2,
   KanbanSquare,
-  Phone, MessageSquare, Mail, Sparkles, Activity,
+  Sparkles,
 } from "lucide-react"
 import { GradeBadge } from "@/components/shared/GradeBadge"
 import { DeltaChip } from "@/components/shared/DeltaChip"
 import { LeadSlideOver } from "@/components/shared/LeadSlideOver"
 import { ThemedSelect } from "@/components/shared/ThemedSelect"
 import { ModalPortal } from "@/components/shared/ModalPortal"
-import { timeAgo } from "@/lib/format"
 import { startOfIstDay } from "@/lib/time/ist"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
@@ -139,23 +138,6 @@ const STAGE_PALETTE: Record<string, { dot: string; ring: string; track: string }
 }
 const STAGE_FALLBACK = { dot: "bg-slate-500", ring: "ring-slate-200/60", track: "from-slate-400 to-slate-500" }
 
-const SOURCE_COLOR: Record<string, string> = {
-  sky:    "bg-sky-500",
-  violet: "bg-violet-500",
-  mint:   "bg-emerald-500",
-  peach:  "bg-orange-400",
-  amber:  "bg-amber-500",
-  ink:    "bg-slate-400",
-}
-
-const ACTIVITY_ICON: Record<string, { icon: typeof Phone; color: string }> = {
-  call:     { icon: Phone,         color: "from-sky-400 to-sky-600" },
-  whatsapp: { icon: MessageSquare, color: "from-emerald-400 to-emerald-600" },
-  email:    { icon: Mail,          color: "from-violet-400 to-violet-600" },
-  import:   { icon: Sparkles,      color: "from-orange-400 to-orange-500" },
-  system:   { icon: Activity,      color: "from-slate-400 to-slate-500" },
-}
-
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 const FILTERS = [
@@ -272,14 +254,12 @@ export default function PipelinePage() {
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-white
-                          bg-gradient-to-br from-sky-400 to-sky-600
-                          shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_6px_18px_rgba(14,165,233,0.32)]">
+          <div className="w-11 h-11 rounded-xl grid place-items-center bg-sky-50 text-sky-600 shrink-0">
             <KanbanSquare className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-[28px] font-bold text-ink tracking-[-0.02em] leading-tight">Pipeline</h1>
-            <p className="text-[13px] text-slate-500 mt-0.5">
+            <h1 className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">Pipeline</h1>
+            <p className="text-[13px] text-ink-muted mt-1">
               Auto-stage tracker for every deal in motion — moves when calls and WhatsApp signals land
             </p>
           </div>
@@ -288,15 +268,15 @@ export default function PipelinePage() {
         {/* Right cluster */}
         <div className="flex items-center gap-2">
           {/* Grade filter chips */}
-          <div className="flex items-center gap-1 p-1 rounded-full glass-1 border border-white/70 shadow-sm">
+          <div className="flex items-center gap-1 p-1 rounded-full border border-slate-200 bg-white">
             {FILTERS.map((f) => {
               const active = gradeFilter === f.key
               return (
                 <button key={f.key} onClick={() => setGradeFilter(f.key)}
                   className={`px-3 h-7 rounded-full text-[12px] font-semibold transition-all ${
                     active
-                      ? "text-white bg-gradient-to-b from-sky-400 to-sky-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_2px_6px_rgba(14,165,233,0.32)]"
-                      : "text-slate-600 hover:text-slate-900"
+                      ? "text-white bg-sky-600"
+                      : "text-ink-muted hover:text-ink"
                   }`}>
                   {f.label}
                 </button>
@@ -304,10 +284,8 @@ export default function PipelinePage() {
             })}
           </div>
           <Link href="/leads/import"
-            className="h-9 px-4 inline-flex items-center gap-1.5 rounded-full text-[13px] font-semibold text-white
-                       bg-gradient-to-b from-sky-400 to-sky-500
-                       shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)]
-                       hover:from-sky-500 hover:to-sky-600 transition-all active:scale-[0.98]">
+            className="h-9 px-4 inline-flex items-center gap-1.5 rounded-lg text-[13px] font-semibold text-white
+                       bg-sky-600 hover:bg-sky-700 transition-colors">
             <Sparkles className="w-3.5 h-3.5" />
             Add leads
           </Link>
@@ -345,18 +323,18 @@ export default function PipelinePage() {
                 onDragOver={droppable ? (e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverStageId(stage.id) } : undefined}
                 onDragLeave={droppable ? (e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverStageId(null) } : undefined}
                 onDrop={droppable ? (e) => { e.preventDefault(); handleCardDrop(e.dataTransfer.getData("text/lead-id"), e.dataTransfer.getData("text/from-stage"), stage) } : undefined}
-                className={`w-[270px] shrink-0 flex flex-col rounded-2xl glass-2 gloss-edge p-3 max-h-[640px] transition-all ${dragOverStageId === stage.id ? "ring-2 ring-sky-400 bg-sky-50/50" : ""}`}>
+                className={`w-[270px] shrink-0 flex flex-col rounded-2xl border border-slate-200/70 bg-white p-3 max-h-[640px] transition-all ${dragOverStageId === stage.id ? "ring-2 ring-sky-400 bg-sky-50" : ""}`}>
 
                 {/* Column header */}
                 <div className="px-1 pb-3">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className={`w-2 h-2 rounded-full shrink-0 ${palette.dot}`} />
-                      <p className="text-[13px] font-bold text-slate-900 leading-none truncate">{stage.name}</p>
-                      <span className="text-[11px] font-bold text-slate-400 tabular-nums shrink-0">{stageLeads.length}</span>
+                      <p className="text-[13px] font-bold text-ink leading-none truncate">{stage.name}</p>
+                      <span className="text-[11px] font-bold text-ink-muted tabular-nums shrink-0">{stageLeads.length}</span>
                     </div>
                     {stageValue > 0 && (
-                      <p className="text-[11px] font-bold text-slate-600 tabular-nums shrink-0">{formatValue(stageValue)}</p>
+                      <p className="text-[11px] font-bold text-ink-soft tabular-nums shrink-0">{formatValue(stageValue)}</p>
                     )}
                   </div>
                   <div className={`h-1 rounded-full bg-gradient-to-r ${palette.track} opacity-70 mt-2.5`} />
@@ -385,10 +363,10 @@ export default function PipelinePage() {
                   {sorted.length === 0 && (
                     <div className={`rounded-xl border border-dashed h-16 flex items-center justify-center transition-colors ${
                       dragOverStageId === stage.id
-                        ? "border-sky-300 bg-sky-50/70"
-                        : "border-slate-200/80 bg-white/40"
+                        ? "border-sky-300 bg-sky-50"
+                        : "border-slate-200 bg-white"
                     }`}>
-                      <p className={`text-[11px] font-medium ${dragOverStageId === stage.id ? "text-sky-600" : "text-slate-400"}`}>
+                      <p className={`text-[11px] font-medium ${dragOverStageId === stage.id ? "text-sky-600" : "text-ink-muted"}`}>
                         {dragOverStageId === stage.id ? "Drop to move here" : droppable ? "Drag a deal here" : "No deals here yet"}
                       </p>
                     </div>
@@ -399,22 +377,21 @@ export default function PipelinePage() {
           })}
 
           {columns.length === 0 && (
-            <div className="rounded-2xl glass-2 gloss-edge px-8 py-16 text-center w-full">
-              <div className="w-12 h-12 rounded-xl bg-sky-50 flex items-center justify-center mx-auto mb-4">
-                <Settings2 className="w-6 h-6 text-sky-500" />
+            <div className="rounded-2xl border border-slate-200/70 bg-white px-8 py-16 text-center w-full">
+              <div className="w-12 h-12 rounded-lg grid place-items-center bg-sky-50 text-sky-600 mx-auto mb-4">
+                <Settings2 className="w-6 h-6" />
               </div>
-              <p className="text-[16px] font-semibold text-slate-900">No pipeline stages configured</p>
-              <p className="text-[12px] text-slate-500 mt-1.5 max-w-[260px] mx-auto leading-relaxed">
+              <p className="text-[16px] font-semibold text-ink">No pipeline stages configured</p>
+              <p className="text-[12px] text-ink-muted mt-1.5 max-w-[260px] mx-auto leading-relaxed">
                 {isAdmin
                   ? "Set up your stages in ICP Settings to start tracking deals."
                   : "Ask your account admin to configure pipeline stages."}
               </p>
               {isAdmin && (
                 <Link href="/settings/icp"
-                  className="inline-flex items-center gap-1.5 mt-4 h-9 px-4 rounded-full
-                             text-white bg-gradient-to-b from-sky-400 to-sky-500
-                             shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)]
-                             text-[12px] font-semibold transition-all active:scale-[0.98]">
+                  className="inline-flex items-center gap-1.5 mt-4 h-9 px-4 rounded-lg
+                             text-white bg-sky-600 hover:bg-sky-700
+                             text-[12px] font-semibold transition-colors">
                   <Settings2 className="w-3 h-3" />
                   Configure stages
                 </Link>
@@ -430,26 +407,13 @@ export default function PipelinePage() {
         <LeadSlideOver leadId={peekLeadId} onClose={() => setPeekLeadId(null)} />
       )}
 
-      {/* ── Bottom analytics row ───────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
-        <div className="lg:col-span-5">
-          <ValueTrendChart trend={summary?.value_trend ?? []} totalValue={summary?.total_value ?? 0} />
-        </div>
-        <div className="lg:col-span-4">
-          <SourceDonut sources={summary?.sources ?? []} totalLeads={summary?.kpis.total.value ?? 0} />
-        </div>
-        <div className="lg:col-span-3">
-          <ActivityFeed activities={summary?.activities ?? []} />
-        </div>
-      </div>
-
       {/* Lost / hidden won column summary at very bottom for context */}
       {lostLeadsAll.length > 0 && (
-        <div className="rounded-2xl glass-1 px-4 py-3 flex items-center gap-3 text-[12px]">
+        <div className="rounded-2xl border border-slate-200/70 bg-white px-4 py-3 flex items-center gap-3 text-[12px]">
           <span className="w-2 h-2 rounded-full bg-rose-500" />
-          <span className="font-semibold text-slate-700">Lost this account: <span className="tabular-nums">{lostLeadsAll.length}</span></span>
-          <span className="text-slate-400">·</span>
-          <span className="text-slate-500">Audit reasons in Analytics → Why You&apos;re Losing</span>
+          <span className="font-semibold text-ink-soft">Lost this account: <span className="tabular-nums">{lostLeadsAll.length}</span></span>
+          <span className="text-ink-muted">·</span>
+          <span className="text-ink-muted">Audit reasons in Analytics → Why You&apos;re Losing</span>
           <Link href="/analytics" className="ml-auto text-sky-600 hover:text-sky-700 font-semibold">View →</Link>
         </div>
       )}
@@ -488,20 +452,20 @@ function KpiCard({
   const a = ACCENT[accent]
 
   return (
-    <div className="rounded-2xl glass-3 gloss-edge p-4 flex flex-col gap-3 min-h-[132px] transition-all duration-200 hover:translate-y-[-2px] hover:shadow-[0_12px_32px_rgba(15,23,42,0.08)]">
+    <div className="rounded-2xl border border-slate-200/70 bg-white p-4 flex flex-col gap-3 min-h-[132px]">
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-1.5">
           <span className={`w-1.5 h-1.5 rounded-full ${a.dot}`} />
-          <p className="text-[12px] font-semibold text-slate-500">{label}</p>
+          <p className="text-[12px] font-semibold text-ink-soft">{label}</p>
         </div>
       </div>
       <div className="flex items-end gap-2">
-        <p className="text-[30px] font-bold text-slate-900 tabular-nums leading-none">
+        <p className="text-[30px] font-bold text-ink tabular-nums leading-none">
           {value.toLocaleString("en-IN")}{suffix ?? ""}
         </p>
         <DeltaChip delta={delta} invert={invertDelta} className="mb-0.5" />
       </div>
-      <p className="text-[10px] text-slate-400 -mt-1">vs {lastLabel ?? "last month"}</p>
+      <p className="text-[10px] text-ink-muted -mt-1">vs {lastLabel ?? "last month"}</p>
       {spark && spark.length >= 2 && <Sparkline points={spark} stroke={a.stroke} fill={a.fill} />}
     </div>
   )
@@ -571,10 +535,9 @@ function PipelineLeadCard({
         setDragging(true)
       }}
       onDragEnd={() => setDragging(false)}
-      className={`group rounded-xl glass-1 px-3 py-2.5
+      className={`group rounded-xl border border-slate-200/70 bg-white px-3 py-2.5
                   ${isWonColumn ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"}
-                  transition-all duration-200 hover:-translate-y-[1px]
-                  hover:shadow-[0_8px_22px_rgba(15,23,42,0.08)]
+                  transition-all duration-200 hover:-translate-y-[1px] hover:border-slate-300
                   ${dragging ? "opacity-40" : ""}
                   ${isHot ? "ring-1 ring-sky-200/60" : ""}`}>
 
@@ -582,10 +545,10 @@ function PipelineLeadCard({
       <div className="flex items-start gap-2">
         <GradeBadge grade={lead.grade as "A"|"B"|"C"|"D"|"E"|"F"} size="sm" />
         <div className="min-w-0 flex-1">
-          <p className="text-[13px] font-semibold text-slate-900 truncate leading-tight">
+          <p className="text-[13px] font-semibold text-ink truncate leading-tight">
             {lead.first_name} {lead.last_name ?? ""}
           </p>
-          <p className="text-[11px] text-slate-500 truncate leading-tight mt-0.5">
+          <p className="text-[11px] text-ink-muted truncate leading-tight mt-0.5">
             {lead.email ?? lead.company_name ?? "—"}
           </p>
         </div>
@@ -594,7 +557,7 @@ function PipelineLeadCard({
             Won
           </span>
         ) : lead.expected_value ? (
-          <span className="text-[12px] font-bold text-slate-900 tabular-nums shrink-0">
+          <span className="text-[12px] font-bold text-ink tabular-nums shrink-0">
             {formatValue(lead.expected_value)}
           </span>
         ) : null}
@@ -605,7 +568,7 @@ function PipelineLeadCard({
       <div className="flex items-center gap-1.5 mt-2 flex-wrap">
         <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
           !isStuck
-            ? "bg-white/70 text-slate-500 border border-slate-200/60"
+            ? "bg-white text-ink-muted border border-slate-200"
             : days >= 30
               ? "bg-rose-100 text-rose-700 border border-rose-200/60"
               : "bg-amber-100 text-amber-700 border border-amber-200/60"
@@ -648,156 +611,11 @@ function PipelineLeadCard({
             </button>
           )}
           <button onClick={onMove} title="Move to any stage"
-            className="w-5 h-5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-white/70 transition-all flex items-center justify-center">
+            className="w-5 h-5 rounded-full text-ink-muted hover:text-ink hover:bg-slate-100 transition-all flex items-center justify-center">
             <MoveRight className="w-2.5 h-2.5" />
           </button>
         </div>
       )}
-    </div>
-  )
-}
-
-// ── Value Trend Chart ─────────────────────────────────────────────────────────
-
-function ValueTrendChart({ trend, totalValue }: { trend: ValuePoint[]; totalValue: number }) {
-  const W = 600, H = 180, PAD_T = 18, PAD_B = 24, PAD_L = 8, PAD_R = 8
-  const innerW = W - PAD_L - PAD_R
-  const innerH = H - PAD_T - PAD_B
-  const max = Math.max(...trend.map((p) => p.value), 1)
-  const xs = trend.map((_, i) => PAD_L + (i / Math.max(trend.length - 1, 1)) * innerW)
-  const ys = trend.map((p) => PAD_T + (1 - p.value / max) * innerH)
-  const path = xs.map((x, i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${ys[i].toFixed(1)}`).join(" ")
-  const area = trend.length > 1 ? `${path} L${xs[xs.length - 1]},${PAD_T + innerH} L${xs[0]},${PAD_T + innerH} Z` : ""
-
-  const firstDate = trend[0]?.date
-  const lastDate  = trend[trend.length - 1]?.date
-  function fmt(d?: string) { return d ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "" }
-
-  return (
-    <div className="rounded-2xl glass-2 gloss-edge p-5 h-full">
-      <div className="flex items-start justify-between mb-3">
-        <div>
-          <p className="text-[14px] font-bold text-slate-900">Deal Value Over Time</p>
-          <p className="text-[11px] text-slate-500 mt-0.5">Won revenue · last 30 days</p>
-        </div>
-        <p className="text-[18px] font-bold text-slate-900 tabular-nums">{formatValue(totalValue)}</p>
-      </div>
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="w-full h-44">
-        <defs>
-          <linearGradient id="trend-fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stopColor="#0EA5E9" stopOpacity="0.30" />
-            <stop offset="100%" stopColor="#0EA5E9" stopOpacity="0.02" />
-          </linearGradient>
-        </defs>
-        {/* gridlines */}
-        {[0.25, 0.5, 0.75].map((p) => (
-          <line key={p} x1={PAD_L} y1={PAD_T + p * innerH} x2={W - PAD_R} y2={PAD_T + p * innerH}
-                stroke="rgba(15,23,42,0.04)" strokeWidth="1" />
-        ))}
-        {area && <path d={area} fill="url(#trend-fill)" />}
-        {area && <path d={path} fill="none" stroke="#0EA5E9" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />}
-      </svg>
-      <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 mt-1">
-        <span>{fmt(firstDate)}</span>
-        <span>{fmt(lastDate)}</span>
-      </div>
-    </div>
-  )
-}
-
-// ── Source Donut ──────────────────────────────────────────────────────────────
-
-function SourceDonut({ sources, totalLeads }: { sources: SourceRow[]; totalLeads: number }) {
-  const COLORS: Record<string, string> = {
-    sky: "#0EA5E9", violet: "#8B5CF6", mint: "#10B981", peach: "#FB923C", amber: "#F59E0B", ink: "#94A3B8",
-  }
-  const total = sources.reduce((a, b) => a + b.count, 0) || 1
-  const r = 52, c = 2 * Math.PI * r
-  let offset = 0
-  const segments = sources.map((s) => {
-    const len = (s.count / total) * c
-    const seg = { color: COLORS[s.color] ?? COLORS.ink, dasharray: `${len} ${c - len}`, dashoffset: -offset }
-    offset += len
-    return seg
-  })
-
-  return (
-    <div className="rounded-2xl glass-2 gloss-edge p-5 h-full">
-      <div className="flex items-start justify-between mb-3">
-        <div>
-          <p className="text-[14px] font-bold text-slate-900">Deals by Source</p>
-          <p className="text-[11px] text-slate-500 mt-0.5">Top sources this month</p>
-        </div>
-      </div>
-      <div className="flex items-center gap-4">
-        <div className="relative shrink-0">
-          <svg width="128" height="128" viewBox="0 0 128 128">
-            <circle cx="64" cy="64" r={r} fill="none" stroke="rgba(15,23,42,0.05)" strokeWidth="14" />
-            {segments.map((s, i) => (
-              <circle key={i} cx="64" cy="64" r={r} fill="none"
-                      stroke={s.color} strokeWidth="14" strokeLinecap="butt"
-                      strokeDasharray={s.dasharray} strokeDashoffset={s.dashoffset}
-                      transform="rotate(-90 64 64)" />
-            ))}
-          </svg>
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <p className="text-[18px] font-bold text-slate-900 tabular-nums leading-none">{totalLeads}</p>
-            <p className="text-[9px] font-mono uppercase text-slate-400 mt-1 tracking-wider">Total Deals</p>
-          </div>
-        </div>
-        <div className="flex-1 min-w-0 space-y-1.5">
-          {sources.length === 0 ? (
-            <p className="text-[11px] text-slate-400">No source data yet.</p>
-          ) : sources.map((s) => (
-            <div key={s.name} className="flex items-center gap-2 text-[11px]">
-              <span className={`w-2 h-2 rounded-full shrink-0 ${SOURCE_COLOR[s.color] ?? "bg-slate-400"}`} />
-              <span className="font-semibold text-slate-700 truncate flex-1">{s.name}</span>
-              <span className="text-slate-500 tabular-nums">{s.count}</span>
-              <span className="text-slate-400 tabular-nums">({s.pct}%)</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Activity Feed ─────────────────────────────────────────────────────────────
-
-function ActivityFeed({ activities }: { activities: Activity[] }) {
-  return (
-    <div className="rounded-2xl glass-2 gloss-edge p-5 h-full flex flex-col">
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-[14px] font-bold text-slate-900">Recent Activities</p>
-        <Link href="/notifications" className="text-[11px] font-semibold text-sky-600 hover:text-sky-700">
-          View all
-        </Link>
-      </div>
-      <div className="space-y-2.5 flex-1">
-        {activities.length === 0 ? (
-          <p className="text-[12px] text-slate-400">Quiet hour. New activity will land here.</p>
-        ) : activities.map((a) => {
-          const meta = ACTIVITY_ICON[a.category] ?? ACTIVITY_ICON.system
-          const Icon = meta.icon
-          return (
-            <Link key={a.id} href={`/leads/${a.lead_id}`}
-              className="flex items-start gap-2.5 group">
-              <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-white shrink-0
-                                bg-gradient-to-br ${meta.color}
-                                shadow-[inset_0_1px_0_rgba(255,255,255,0.7),0_2px_6px_rgba(15,23,42,0.08)]`}>
-                <Icon className="w-3.5 h-3.5" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-[12px] text-slate-700 leading-tight">
-                  <span className="font-semibold text-slate-900 group-hover:text-sky-700 transition-colors">{a.lead_name}</span>
-                  <span className="text-slate-500"> · {a.label}</span>
-                </p>
-                <p className="text-[10px] text-slate-400 mt-0.5 font-mono">{timeAgo(a.ts)}</p>
-              </div>
-            </Link>
-          )
-        })}
-      </div>
     </div>
   )
 }
@@ -837,38 +655,38 @@ function MoveStageModal({ leadId, stages, currentStageId, onClose, onSuccess }: 
   return (
     <ModalPortal>
     <div className="fixed inset-0 bg-slate-900/55 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
-      <div className="rounded-2xl glass-3 gloss-edge p-6 w-full max-w-sm space-y-4
+      <div className="rounded-2xl border border-slate-200/70 bg-white p-6 w-full max-w-sm space-y-4
                       shadow-[0_24px_48px_rgba(15,23,42,0.18)]">
         <div className="flex items-center justify-between">
-          <h2 className="text-[16px] font-bold text-slate-900">Move Stage</h2>
+          <h2 className="text-[15px] font-semibold text-ink">Move Stage</h2>
           <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full
-                                               text-slate-400 hover:text-slate-700 hover:bg-white/70 transition-all">
+                                               text-ink-muted hover:text-ink hover:bg-slate-100 transition-all">
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {currentStage && (
-          <div className="flex items-center gap-2 text-[12px] text-slate-500">
-            <span className="px-2 py-0.5 rounded-full bg-white/60 text-slate-600 font-medium border border-slate-200/60">{currentStage.name}</span>
-            <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
-            <span className="text-slate-400">select below</span>
+          <div className="flex items-center gap-2 text-[12px] text-ink-muted">
+            <span className="px-2 py-0.5 rounded-full bg-white text-ink-soft font-medium border border-slate-200">{currentStage.name}</span>
+            <ArrowRight className="w-3.5 h-3.5 text-ink-muted" />
+            <span className="text-ink-muted">select below</span>
           </div>
         )}
 
         <div className="space-y-1.5">
-          <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Move to</label>
+          <label className="text-[11px] font-semibold text-ink-muted uppercase tracking-wider">Move to</label>
           <div className="grid grid-cols-2 gap-2">
             {otherStages.map((s) => {
               const isBack = (s.order < (currentStage?.order ?? 0))
               const active = selectedStageId === s.id
               return (
                 <button key={s.id} onClick={() => setSelectedStageId(s.id)}
-                  className={`px-3 py-2 rounded-xl text-[12px] font-semibold border transition-all duration-150 text-left ${
+                  className={`px-3 py-2 rounded-lg text-[12px] font-semibold border transition-all duration-150 text-left ${
                     active
-                      ? "bg-gradient-to-b from-sky-400 to-sky-500 text-white border-sky-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]"
+                      ? "bg-sky-600 text-white border-sky-600"
                       : isBack
-                        ? "bg-white/60 text-slate-500 border-slate-200/70 hover:border-slate-300"
-                        : "bg-white/80 text-slate-700 border-slate-200/70 hover:border-sky-300 hover:text-sky-700"
+                        ? "bg-white text-ink-muted border-slate-200 hover:border-slate-300"
+                        : "bg-white text-ink-soft border-slate-200 hover:border-sky-300 hover:text-sky-700"
                   }`}>
                   {isBack && <span className="text-[10px] mr-1 opacity-60">↩</span>}
                   {s.name}
@@ -880,11 +698,11 @@ function MoveStageModal({ leadId, stages, currentStageId, onClose, onSuccess }: 
 
         {isBackward && (
           <div className="space-y-1.5">
-            <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+            <label className="text-[11px] font-semibold text-ink-muted uppercase tracking-wider">
               Reason for moving back <span className="text-rose-500">*</span>
             </label>
             <textarea rows={2}
-              className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-[13px] bg-white/80
+              className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-[13px] bg-white
                          focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 resize-none"
               placeholder="e.g. Customer went quiet, re-qualifying…"
               value={note} onChange={(e) => setNote(e.target.value)} />
@@ -893,15 +711,13 @@ function MoveStageModal({ leadId, stages, currentStageId, onClose, onSuccess }: 
 
         <div className="flex gap-2 pt-1">
           <button onClick={onClose}
-            className="flex-1 h-10 rounded-full border border-slate-200/70 text-[13px] font-semibold
-                       text-slate-600 hover:bg-white/70 transition-all duration-150 bg-white/40">
+            className="flex-1 h-10 rounded-lg border border-slate-200 text-[13px] font-semibold
+                       text-ink-soft hover:bg-slate-50 transition-all duration-150 bg-white">
             Cancel
           </button>
           <button onClick={submit} disabled={saving || !selectedStageId}
-            className="flex-1 h-10 rounded-full text-white text-[13px] font-semibold transition-all duration-150
-                       bg-gradient-to-b from-sky-400 to-sky-500
-                       shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)]
-                       disabled:opacity-50">
+            className="flex-1 h-10 rounded-lg text-white text-[13px] font-semibold transition-colors
+                       bg-sky-600 hover:bg-sky-700 disabled:opacity-50">
             {saving ? "Moving…" : "Move"}
           </button>
         </div>
@@ -934,26 +750,26 @@ function WonModal({ leadId, onClose, onSuccess }: { leadId: string; onClose: () 
   return (
     <ModalPortal>
     <div className="fixed inset-0 bg-slate-900/55 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
-      <div className="rounded-2xl glass-3 gloss-edge p-6 w-full max-w-sm space-y-4
+      <div className="rounded-2xl border border-slate-200/70 bg-white p-6 w-full max-w-sm space-y-4
                       shadow-[0_24px_48px_rgba(15,23,42,0.18)]">
         <div className="flex items-center justify-between">
-          <h2 className="text-[16px] font-bold text-slate-900">Mark as Won</h2>
+          <h2 className="text-[15px] font-semibold text-ink">Mark as Won</h2>
           <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full
-                                               text-slate-400 hover:text-slate-700 hover:bg-white/70 transition-all">
+                                               text-ink-muted hover:text-ink hover:bg-slate-100 transition-all">
             <X className="w-4 h-4" />
           </button>
         </div>
         <div className="space-y-1.5">
-          <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+          <label className="text-[11px] font-semibold text-ink-muted uppercase tracking-wider">
             Deal Value (₹) <span className="text-rose-500">*</span>
           </label>
           <input type="number"
-            className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-[14px] bg-white/80
+            className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-[14px] bg-white
                        focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
             placeholder="e.g. 50000" value={value} onChange={(e) => setValue(e.target.value)} />
         </div>
         <div className="space-y-1.5">
-          <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+          <label className="text-[11px] font-semibold text-ink-muted uppercase tracking-wider">
             Win Reason <span className="text-rose-500">*</span>
           </label>
           <ThemedSelect
@@ -965,15 +781,13 @@ function WonModal({ leadId, onClose, onSuccess }: { leadId: string; onClose: () 
         </div>
         <div className="flex gap-2 pt-1">
           <button onClick={onClose}
-            className="flex-1 h-10 rounded-full border border-slate-200/70 text-[13px] font-semibold
-                       text-slate-600 hover:bg-white/70 transition-all duration-150 bg-white/40">
+            className="flex-1 h-10 rounded-lg border border-slate-200 text-[13px] font-semibold
+                       text-ink-soft hover:bg-slate-50 transition-all duration-150 bg-white">
             Cancel
           </button>
           <button onClick={submit} disabled={saving}
-            className="flex-1 h-10 rounded-full text-white text-[13px] font-semibold transition-all duration-150
-                       bg-gradient-to-b from-emerald-400 to-emerald-500
-                       shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(16,185,129,0.32)]
-                       disabled:opacity-50">
+            className="flex-1 h-10 rounded-lg text-white text-[13px] font-semibold transition-colors
+                       bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50">
             {saving ? "Saving…" : "Mark Won"}
           </button>
         </div>
@@ -1004,17 +818,17 @@ function LostModal({ leadId, onClose, onSuccess }: { leadId: string; onClose: ()
   return (
     <ModalPortal>
     <div className="fixed inset-0 bg-slate-900/55 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
-      <div className="rounded-2xl glass-3 gloss-edge p-6 w-full max-w-sm space-y-4
+      <div className="rounded-2xl border border-slate-200/70 bg-white p-6 w-full max-w-sm space-y-4
                       shadow-[0_24px_48px_rgba(15,23,42,0.18)]">
         <div className="flex items-center justify-between">
-          <h2 className="text-[16px] font-bold text-slate-900">Mark as Lost</h2>
+          <h2 className="text-[15px] font-semibold text-ink">Mark as Lost</h2>
           <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full
-                                               text-slate-400 hover:text-slate-700 hover:bg-white/70 transition-all">
+                                               text-ink-muted hover:text-ink hover:bg-slate-100 transition-all">
             <X className="w-4 h-4" />
           </button>
         </div>
         <div className="space-y-1.5">
-          <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+          <label className="text-[11px] font-semibold text-ink-muted uppercase tracking-wider">
             Loss Reason <span className="text-rose-500">*</span>
           </label>
           <ThemedSelect
@@ -1026,15 +840,13 @@ function LostModal({ leadId, onClose, onSuccess }: { leadId: string; onClose: ()
         </div>
         <div className="flex gap-2 pt-1">
           <button onClick={onClose}
-            className="flex-1 h-10 rounded-full border border-slate-200/70 text-[13px] font-semibold
-                       text-slate-600 hover:bg-white/70 transition-all duration-150 bg-white/40">
+            className="flex-1 h-10 rounded-lg border border-slate-200 text-[13px] font-semibold
+                       text-ink-soft hover:bg-slate-50 transition-all duration-150 bg-white">
             Cancel
           </button>
           <button onClick={submit} disabled={saving}
-            className="flex-1 h-10 rounded-full text-white text-[13px] font-semibold transition-all duration-150
-                       bg-gradient-to-b from-rose-400 to-rose-500
-                       shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(244,63,94,0.32)]
-                       disabled:opacity-50">
+            className="flex-1 h-10 rounded-lg text-white text-[13px] font-semibold transition-colors
+                       bg-rose-600 hover:bg-rose-700 disabled:opacity-50">
             {saving ? "Saving…" : "Mark Lost"}
           </button>
         </div>

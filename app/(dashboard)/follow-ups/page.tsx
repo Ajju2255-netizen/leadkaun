@@ -1,15 +1,21 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, type ReactNode } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { Phone, MessageCircle, Check, Clock3, X, CalendarCheck } from "lucide-react"
+import {
+  Phone, MessageCircle, Check, Clock3, X, CalendarCheck,
+  AlertTriangle, CalendarClock, IndianRupee, CheckCircle2, Gauge,
+  type LucideIcon,
+} from "lucide-react"
 import { GradeBadge } from "@/components/shared/GradeBadge"
+import { EmptyState } from "@/components/shared/EmptyState"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
 import { LeadSlideOver } from "@/components/shared/LeadSlideOver"
 import { ThemedSelect } from "@/components/shared/ThemedSelect"
 import { ModalPortal } from "@/components/shared/ModalPortal"
+import { cn } from "@/lib/utils"
 import Link from "next/link"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -59,6 +65,16 @@ function overdueLabel(dueDate: string): { text: string; isOverdue: boolean; urge
   return            { text: `Overdue ${Math.floor(hours / 24)}d`,  isOverdue: true, urgent: false }
 }
 
+const CHANNEL_LABEL: Record<string, string> = {
+  CALL: "Call", WHATSAPP: "WhatsApp", EMAIL: "Email", SMS: "SMS", MEETING: "Meeting",
+}
+function taskLabel(action: FollowUpAction): string {
+  const tip = action.tip_text?.trim()
+  if (tip) return tip
+  const ch = CHANNEL_LABEL[action.action_type] ?? (action.action_type.charAt(0) + action.action_type.slice(1).toLowerCase())
+  return `${ch} follow-up`
+}
+
 function sortActions(actions: FollowUpAction[]): FollowUpAction[] {
   const GRADE_ORDER: Record<string, number> = { A: 0, B: 1, C: 2, D: 3, E: 4, F: 5 }
   return [...actions].sort((a, b) => {
@@ -94,6 +110,41 @@ async function fetchTeam(): Promise<{ members: { id: string; first_name: string;
   return res.json()
 }
 
+// Shared column template: grade · lead · task · due · value · actions.
+// Columns drop responsively (task on <lg, due on <sm) so the row stays full
+// without a dead gap, and the header aligns to the rows.
+const FU_GRID =
+  "grid items-center gap-3 lg:gap-4 " +
+  "grid-cols-[32px_minmax(0,1fr)_84px_148px] " +
+  "sm:grid-cols-[32px_minmax(0,1fr)_118px_84px_148px] " +
+  "lg:grid-cols-[32px_minmax(0,1.4fr)_minmax(0,1.4fr)_118px_84px_148px]"
+
+// ── Stat card ─────────────────────────────────────────────────────────────────
+
+function StatCard({ icon: Icon, label, value, tintBg, tintFg, caption }: {
+  icon: LucideIcon
+  label: string
+  value: ReactNode
+  tintBg: string
+  tintFg: string
+  caption?: string
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200/70 bg-white p-3.5">
+      <div className="flex items-center gap-2 min-w-0">
+        <span className={cn("w-8 h-8 rounded-lg grid place-items-center shrink-0", tintBg)}>
+          <Icon className={cn("w-4 h-4", tintFg)} strokeWidth={2} />
+        </span>
+        <span className="text-[12px] font-medium text-ink-soft truncate">{label}</span>
+      </div>
+      <div className="mt-3 text-[23px] font-bold tabular-nums text-ink leading-none">{value}</div>
+      <div className="mt-2 flex items-center gap-1.5 min-h-[16px]">
+        {caption && <span className="text-[11.5px] text-ink-muted truncate">{caption}</span>}
+      </div>
+    </div>
+  )
+}
+
 // ── Row ─────────────────────────────────────────────────────────────────────────
 
 function FollowUpRow({ action, onOpen, onComplete, onSkip }: {
@@ -106,43 +157,55 @@ function FollowUpRow({ action, onOpen, onComplete, onSkip }: {
   const due      = overdueLabel(action.due_date)
   const num      = action.lead.phone.replace(/[^0-9]/g, "")
 
+  const dueTone = due.isOverdue
+    ? "bg-rose-50 text-rose-600"
+    : due.urgent
+      ? "bg-amber-50 text-amber-600"
+      : "bg-sky-50 text-sky-600"
+
   return (
-    <div className="group flex items-center gap-3 px-3.5 py-2.5 hover:bg-sky-50/40 transition-colors">
-      {/* identity — opens full detail */}
-      <button onClick={() => onOpen(action.lead.id)} className="flex items-center gap-2.5 min-w-0 flex-1 text-left">
-        <GradeBadge grade={action.lead.grade as "A"|"B"|"C"|"D"|"E"|"F"} size="sm" />
-        <div className="min-w-0">
-          <p className="text-[13px] font-bold text-slate-900 truncate leading-tight group-hover:text-sky-700 transition-colors">{fullName}</p>
-          <p className="text-[11px] truncate leading-tight mt-0.5">
-            <span className="text-slate-400">{action.lead.company_name ?? "—"}</span>
-            <span className="text-slate-300"> · </span>
-            <span className={due.isOverdue ? "text-rose-500 font-semibold" : due.urgent ? "text-orange-500 font-semibold" : "text-slate-400"}>{due.text}</span>
-          </p>
-        </div>
+    <div className={cn("group px-4 py-3 transition-colors hover:bg-slate-50/70", FU_GRID)}>
+      {/* grade */}
+      <div className="flex justify-center">
+        <GradeBadge grade={action.lead.grade} size="sm" />
+      </div>
+
+      {/* lead — opens full detail */}
+      <button onClick={() => onOpen(action.lead.id)} className="min-w-0 text-left">
+        <p className="text-[13.5px] font-semibold text-ink truncate leading-tight group-hover:text-sky-700 transition-colors">{fullName}</p>
+        <p className="text-[12px] text-ink-muted truncate leading-tight mt-0.5">{action.lead.company_name ?? "—"}</p>
       </button>
 
-      {/* value */}
-      {action.lead.expected_value ? (
-        <span className="hidden sm:block text-[13px] font-bold text-slate-700 tabular-nums shrink-0">
-          {formatValue(action.lead.expected_value)}
+      {/* task */}
+      <p className="hidden lg:block text-[12.5px] text-ink-soft truncate">{taskLabel(action)}</p>
+
+      {/* due */}
+      <div className="hidden sm:block">
+        <span className={cn("inline-flex items-center h-6 px-2.5 rounded-full text-[11.5px] font-semibold whitespace-nowrap", dueTone)}>
+          {due.text}
         </span>
-      ) : null}
+      </div>
+
+      {/* value */}
+      <span className="text-right text-[13px] font-semibold text-ink-muted tabular-nums">
+        {action.lead.expected_value ? formatValue(action.lead.expected_value) : "—"}
+      </span>
 
       {/* actions */}
-      <div className="flex items-center gap-0.5 shrink-0">
-        <a href={`tel:${action.lead.phone}`} title="Call" className="w-8 h-8 rounded-full flex items-center justify-center text-sky-600 hover:bg-sky-100 transition-colors">
+      <div className="flex items-center justify-end gap-0.5">
+        <a href={`tel:${action.lead.phone}`} title="Call" className="w-8 h-8 rounded-lg flex items-center justify-center text-sky-600 hover:bg-sky-50 transition-colors">
           <Phone className="w-4 h-4" strokeWidth={2.25} />
         </a>
         {num && (
-          <a href={`https://wa.me/${num}`} target="_blank" rel="noopener noreferrer" title="WhatsApp" className="w-8 h-8 rounded-full flex items-center justify-center text-emerald-600 hover:bg-emerald-100 transition-colors">
+          <a href={`https://wa.me/${num}`} target="_blank" rel="noopener noreferrer" title="WhatsApp" className="w-8 h-8 rounded-lg flex items-center justify-center text-emerald-600 hover:bg-emerald-50 transition-colors">
             <MessageCircle className="w-4 h-4" strokeWidth={2.25} />
           </a>
         )}
-        <span className="w-px h-5 bg-slate-200 mx-0.5" />
-        <button onClick={() => onComplete(action.id)} title="Mark done" className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 active:scale-95 transition-all">
+        <span className="w-px h-5 bg-slate-200 mx-1" />
+        <button onClick={() => onComplete(action.id)} title="Mark done" className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 active:scale-95 transition-all">
           <Check className="w-4 h-4" strokeWidth={2.5} />
         </button>
-        <button onClick={() => onSkip(action)} title="Snooze 24h" className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 active:scale-95 transition-all">
+        <button onClick={() => onSkip(action)} title="Snooze 24h" className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 active:scale-95 transition-all">
           <Clock3 className="w-4 h-4" strokeWidth={2.25} />
         </button>
       </div>
@@ -209,15 +272,16 @@ export default function FollowUpsPage() {
   const overdue    = sorted.filter((a) => a.status === "OVERDUE")
   const pending    = sorted.filter((a) => a.status !== "OVERDUE")
   const score      = engine?.score
+  const atRisk     = overdue.reduce((s, a) => s + (a.lead.expected_value ?? 0), 0)
 
   return (
-    <div className="max-w-[760px] mx-auto space-y-5 pb-12">
+    <div className="flex flex-col gap-5 min-w-0 pb-10">
 
-      {/* Header */}
-      <div className="flex items-end justify-between gap-3">
+      {/* ── HEADER ────────────────────────────────────────────────────── */}
+      <header className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-[28px] font-bold text-ink tracking-[-0.02em] leading-tight">Follow-ups</h1>
-          <p className="text-[12px] text-slate-500 mt-1.5">Work top to bottom — overdue first.</p>
+          <h1 className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">Follow-ups</h1>
+          <p className="text-[13px] text-ink-muted mt-1">Work top to bottom — overdue first.</p>
         </div>
         {isManager && teamData && teamData.members.length > 0 && (
           <ThemedSelect
@@ -229,69 +293,73 @@ export default function FollowUpsPage() {
             aria-label="Filter by rep"
           />
         )}
-      </div>
+      </header>
 
-      {/* Slim summary line */}
-      <div className="flex items-center flex-wrap gap-x-5 gap-y-1 text-[12px] text-slate-500">
-        <span><span className="font-extrabold text-rose-600 tabular-nums">{isLoading ? "—" : overdue.length}</span> overdue</span>
-        <span><span className="font-extrabold text-sky-600 tabular-nums">{isLoading ? "—" : pending.length}</span> due today</span>
-        <span><span className="font-extrabold text-emerald-600 tabular-nums">{engine?.completed_this_week ?? 0}</span> done this week</span>
-        <span className="sm:ml-auto text-slate-400">
-          Follow-up score <span className="font-extrabold text-slate-700 tabular-nums">{score != null ? `${score}%` : "—"}</span>
-        </span>
-      </div>
+      {/* ── QUICK STATS ───────────────────────────────────────────────── */}
+      <section className="rounded-2xl border border-slate-200/70 bg-white p-4 sm:p-5">
+        <h2 className="text-[14px] font-semibold text-ink mb-3.5">Quick stats</h2>
+        {isLoading ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+            {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-[104px] rounded-xl" />)}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+            <StatCard icon={AlertTriangle} label="Overdue"        value={overdue.length}                     tintBg="bg-rose-50"    tintFg="text-rose-500"    caption="need action now" />
+            <StatCard icon={CalendarClock} label="Due today"      value={pending.length}                     tintBg="bg-sky-50"     tintFg="text-sky-600"     caption="on schedule" />
+            <StatCard icon={IndianRupee}   label="At risk"        value={formatValue(atRisk)}                tintBg="bg-amber-50"   tintFg="text-amber-500"   caption="overdue value" />
+            <StatCard icon={CheckCircle2}  label="Done this week" value={engine?.completed_this_week ?? 0}   tintBg="bg-emerald-50" tintFg="text-emerald-600" caption="completed" />
+            <StatCard icon={Gauge}         label="Follow-up score" value={score != null ? `${score}%` : "—"} tintBg="bg-violet-50"  tintFg="text-violet-500"  caption="consistency" />
+          </div>
+        )}
+      </section>
 
-      {/* Loading */}
+      {/* ── LOADING ───────────────────────────────────────────────────── */}
       {isLoading && (
-        <div className="rounded-2xl glass-2 gloss-edge overflow-hidden divide-y divide-slate-100/70">
-          {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-none" />)}
+        <div className="rounded-2xl border border-slate-200/70 bg-white overflow-hidden divide-y divide-slate-100">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="px-4 py-3"><Skeleton className="h-9 w-full rounded-lg" /></div>
+          ))}
         </div>
       )}
 
-      {/* Empty */}
+      {/* ── EMPTY ─────────────────────────────────────────────────────── */}
       {!isLoading && allActions.length === 0 && (
-        <div className="rounded-2xl glass-2 gloss-edge px-6 py-14 text-center">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-500 flex items-center justify-center mx-auto mb-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_6px_16px_rgba(16,185,129,0.30)]">
-            <CalendarCheck className="w-5 h-5 text-white" strokeWidth={2.4} />
-          </div>
-          <p className="text-[14px] font-bold text-slate-900">All caught up</p>
-          <p className="text-[12px] text-slate-500 mt-1">No follow-ups due. Schedule new ones from the queue.</p>
-          <Link href="/queue" className="inline-flex items-center gap-1.5 mt-4 h-8 px-4 rounded-full text-white text-[12px] font-semibold
-                       bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 transition-all active:scale-[0.97]
-                       shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)]">
-            Work the queue
-          </Link>
+        <div className="rounded-2xl border border-slate-200/70 bg-white">
+          <EmptyState
+            icon={CalendarCheck}
+            title="All caught up"
+            description="No follow-ups due. Schedule new ones from the queue."
+            action={
+              <Link href="/queue" className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-[12px] font-semibold transition-colors">
+                Work the queue
+              </Link>
+            }
+            className="py-16"
+          />
         </div>
       )}
 
-      {/* Overdue list */}
-      {!isLoading && overdue.length > 0 && (
-        <section className="space-y-2">
-          <div className="flex items-center gap-2 px-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-            <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-rose-600">Overdue · {overdue.length}</p>
+      {/* ── FOLLOW-UP TABLE ───────────────────────────────────────────── */}
+      {!isLoading && allActions.length > 0 && (
+        <div className="rounded-2xl border border-slate-200/70 bg-white overflow-hidden">
+          {/* column header */}
+          <div className={cn(FU_GRID, "px-4 py-2.5 border-b border-slate-100 bg-slate-50/50")}>
+            <span aria-hidden />
+            <span className="text-[12px] font-semibold text-ink-soft">Lead</span>
+            <span className="hidden lg:block text-[12px] font-semibold text-ink-soft">Task</span>
+            <span className="hidden sm:block text-[12px] font-semibold text-ink-soft">Due</span>
+            <span className="text-[12px] font-semibold text-ink-soft text-right">Value</span>
+            <span aria-hidden />
           </div>
-          <div className="rounded-2xl glass-2 gloss-edge overflow-hidden divide-y divide-slate-100/70">
-            {overdue.map((a) => (
-              <FollowUpRow key={a.id} action={a} onOpen={setOpenLeadId} onComplete={complete} onSkip={setSkipTarget} />
-            ))}
-          </div>
-        </section>
-      )}
 
-      {/* Due today list */}
-      {!isLoading && pending.length > 0 && (
-        <section className="space-y-2">
-          <div className="flex items-center gap-2 px-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
-            <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-sky-600">Due today · {pending.length}</p>
-          </div>
-          <div className="rounded-2xl glass-2 gloss-edge overflow-hidden divide-y divide-slate-100/70">
-            {pending.map((a) => (
+          {/* One continuous list — sorted overdue-first; each row's Due pill colour
+              (rose = overdue, sky = upcoming) marks status. Counts live in Quick stats. */}
+          <div className="divide-y divide-slate-100">
+            {sorted.map((a) => (
               <FollowUpRow key={a.id} action={a} onOpen={setOpenLeadId} onComplete={complete} onSkip={setSkipTarget} />
             ))}
           </div>
-        </section>
+        </div>
       )}
 
       {/* Lead detail */}
@@ -327,13 +395,11 @@ export default function FollowUpsPage() {
               />
               <div className="flex gap-2">
                 <button onClick={() => { setSkipTarget(null); setSkipReason("") }}
-                  className="flex-1 h-9 rounded-full border border-slate-200 text-[13px] font-semibold text-slate-600 hover:bg-slate-50 transition-all">
+                  className="flex-1 h-9 rounded-lg border border-slate-200 text-[13px] font-semibold text-slate-600 hover:bg-slate-50 transition-all">
                   Cancel
                 </button>
                 <button onClick={handleSkipConfirm} disabled={skipReason.trim().length < 3 || skipping}
-                  className="flex-1 h-9 rounded-full bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 text-white text-[13px]
-                             font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-all
-                             shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)]">
+                  className="flex-1 h-9 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-[13px] font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                   {skipping ? "Snoozing…" : "Snooze 24h"}
                 </button>
               </div>

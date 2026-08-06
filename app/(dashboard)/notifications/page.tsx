@@ -38,8 +38,7 @@ interface NotifItem {
 const TYPE_CONFIG: Record<NotifItem["type"], {
   icon:       React.ReactNode
   label:      string
-  pillBg:     string   // gradient for the round icon pill
-  pillGlow:   string   // outer glow shadow
+  tile:       string   // flat icon-tile bg + text color
   rail:       string   // left accent rail color
   unreadTint: string   // unread-card tint
   ctaLabel:   string
@@ -48,40 +47,36 @@ const TYPE_CONFIG: Record<NotifItem["type"], {
   AT_RISK: {
     icon:       <AlertTriangle className="w-4 h-4" strokeWidth={2.5} />,
     label:      "At risk",
-    pillBg:     "bg-gradient-to-br from-rose-400 to-rose-500",
-    pillGlow:   "shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_4px_12px_rgba(244,63,94,0.32)]",
-    rail:       "bg-gradient-to-b from-rose-400 to-rose-500",
-    unreadTint: "bg-rose-50/40",
+    tile:       "bg-rose-50 text-rose-600",
+    rail:       "bg-rose-500",
+    unreadTint: "bg-rose-50",
     ctaLabel:   "Go to queue",
     chipColor:  "bg-rose-50 text-rose-700 border-rose-200",
   },
   FOLLOW_UP_DUE: {
     icon:       <Clock className="w-4 h-4" strokeWidth={2.5} />,
     label:      "Follow-up",
-    pillBg:     "bg-gradient-to-br from-orange-300 to-orange-400",
-    pillGlow:   "shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_4px_12px_rgba(251,146,60,0.32)]",
-    rail:       "bg-gradient-to-b from-orange-300 to-orange-400",
-    unreadTint: "bg-orange-50/30",
+    tile:       "bg-orange-50 text-orange-600",
+    rail:       "bg-orange-500",
+    unreadTint: "bg-orange-50",
     ctaLabel:   "Go to follow-ups",
     chipColor:  "bg-orange-50 text-orange-700 border-orange-200",
   },
   MISSED: {
     icon:       <X className="w-4 h-4" strokeWidth={3} />,
     label:      "Missed",
-    pillBg:     "bg-gradient-to-br from-slate-400 to-slate-500",
-    pillGlow:   "shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_4px_12px_rgba(100,116,139,0.30)]",
-    rail:       "bg-gradient-to-b from-slate-300 to-slate-400",
-    unreadTint: "bg-slate-50/60",
+    tile:       "bg-slate-100 text-slate-600",
+    rail:       "bg-slate-400",
+    unreadTint: "bg-slate-50",
     ctaLabel:   "View missed leads",
     chipColor:  "bg-slate-50 text-slate-700 border-slate-200",
   },
   RECOVERY: {
     icon:       <RefreshCw className="w-4 h-4" strokeWidth={2.5} />,
     label:      "Recovery",
-    pillBg:     "bg-gradient-to-br from-emerald-400 to-emerald-500",
-    pillGlow:   "shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_4px_12px_rgba(16,185,129,0.32)]",
-    rail:       "bg-gradient-to-b from-emerald-400 to-emerald-500",
-    unreadTint: "bg-emerald-50/30",
+    tile:       "bg-emerald-50 text-emerald-600",
+    rail:       "bg-emerald-500",
+    unreadTint: "bg-emerald-50",
     ctaLabel:   "Recover now",
     chipColor:  "bg-emerald-50 text-emerald-700 border-emerald-200",
   },
@@ -118,23 +113,20 @@ function NotifCard({ item, onRead, onDismiss }: {
     <div
       onClick={() => isUnread && onRead(item.id, null)}
       className={`
-        relative rounded-2xl transition-all duration-200 overflow-hidden
-        ${isUnread ? "cursor-pointer hover:-translate-y-[1px]" : "opacity-70"}
-        ${isHigh && isUnread ? "glass-2 " + cfg.unreadTint
-          : isUnread        ? "glass-2"
-                            : "glass-1"}
-        ${isUnread ? "hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_4px_18px_rgba(15,23,42,0.08)]" : ""}
+        relative rounded-2xl border border-slate-200/70 transition-colors duration-200 overflow-hidden
+        ${isUnread ? "cursor-pointer hover:border-slate-300" : "opacity-70"}
+        ${isHigh && isUnread ? cfg.unreadTint : "bg-white"}
       `}
     >
       {isUnread && (
-        <div className={`absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full ${cfg.rail} shadow-[0_0_6px_currentColor]`} />
+        <div className={`absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full ${cfg.rail}`} />
       )}
 
       <div className="px-5 py-4 pl-6">
         {/* Top row: icon pill + label + (high pill) + time */}
         <div className="flex items-center justify-between gap-3 mb-3">
           <div className="flex items-center gap-2.5">
-            <div className={`w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 text-white ${cfg.pillBg} ${cfg.pillGlow}`}>
+            <div className={`w-9 h-9 rounded-lg grid place-items-center shrink-0 ${cfg.tile}`}>
               {cfg.icon}
             </div>
             <div>
@@ -150,7 +142,7 @@ function NotifCard({ item, onRead, onDismiss }: {
             </div>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
-            <span className="text-[11px] text-slate-400 font-medium">{timeAgo(item.created_at)}</span>
+            <span className="text-[11px] text-ink-muted font-medium">{timeAgo(item.created_at)}</span>
             <div className="relative">
               <button
                 onClick={(e) => { e.stopPropagation(); setDismissOpen((o) => !o) }}
@@ -176,7 +168,7 @@ function NotifCard({ item, onRead, onDismiss }: {
         <p className="text-[12px] text-slate-500 mt-1 leading-relaxed">{item.message}</p>
 
         {item.lead && (
-          <div className="flex items-center gap-2.5 mt-3 pt-3 border-t border-white/40">
+          <div className="flex items-center gap-2.5 mt-3 pt-3 border-t border-slate-100">
             <GradeBadge grade={item.lead.grade as "A"|"B"|"C"|"D"|"E"|"F"} size="sm" />
             <span className="text-[12px] font-semibold text-slate-700 truncate flex-1">
               {item.lead.first_name} {item.lead.last_name}
@@ -196,11 +188,11 @@ function NotifCard({ item, onRead, onDismiss }: {
           <button
             onClick={(e) => { e.stopPropagation(); onRead(item.id, item.action_url) }}
             className={`
-              mt-3 w-full flex items-center justify-center gap-1.5 h-9 rounded-full
-              text-[12px] font-semibold text-white transition-all duration-150 active:scale-[0.98]
+              mt-3 w-full flex items-center justify-center gap-1.5 h-9 rounded-lg
+              text-[12px] font-semibold text-white transition-colors
               ${isHigh
-                ? "bg-gradient-to-b from-rose-400 to-rose-500 hover:from-rose-500 hover:to-rose-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(244,63,94,0.32)]"
-                : "bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)]"
+                ? "bg-rose-600 hover:bg-rose-700"
+                : "bg-sky-600 hover:bg-sky-700"
               }
             `}
           >
@@ -285,17 +277,17 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className="max-w-[760px] mx-auto space-y-5 pb-12">
+    <div className="space-y-5 pb-12">
 
       {/* ── Header ───────────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_6px_18px_rgba(14,165,233,0.32)]">
-            <Bell className="w-6 h-6 text-white" strokeWidth={2.4} />
+          <div className="w-11 h-11 rounded-xl grid place-items-center bg-sky-50 text-sky-600 shrink-0">
+            <Bell className="w-5 h-5" strokeWidth={2.4} />
           </div>
           <div>
-            <h1 className="text-[28px] font-bold text-ink tracking-[-0.02em] leading-tight">Notifications</h1>
-            <p className="text-[13px] text-slate-500 mt-0.5">
+            <h1 className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">Notifications</h1>
+            <p className="text-[13px] text-ink-muted mt-1">
               {isLoading
                 ? "Loading…"
                 : unread.length > 0
@@ -307,7 +299,7 @@ export default function NotificationsPage() {
         {unread.length > 0 && (
           <button
             onClick={markAllRead}
-            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full glass-1 text-[12px] font-semibold text-slate-700 hover:text-slate-900 transition-all"
+            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg border border-slate-200 bg-white text-[12px] font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition-colors"
           >
             <CheckCheck className="w-3.5 h-3.5" />
             Mark all read
@@ -322,12 +314,12 @@ export default function NotificationsPage() {
             const cfg = TYPE_CONFIG[t]
             const c = counts[t] ?? 0
             return (
-              <div key={t} className="rounded-2xl glass-2 gloss-edge px-4 py-3 flex items-center gap-3">
-                <div className={`w-9 h-9 rounded-2xl flex items-center justify-center text-white shrink-0 ${cfg.pillBg} ${cfg.pillGlow}`}>
+              <div key={t} className="rounded-2xl border border-slate-200/70 bg-white px-4 py-3 flex items-center gap-3">
+                <div className={`w-9 h-9 rounded-lg grid place-items-center shrink-0 ${cfg.tile}`}>
                   {cfg.icon}
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 leading-none">{cfg.label}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-ink-muted leading-none">{cfg.label}</p>
                   <p className="text-[18px] font-extrabold text-slate-900 tabular-nums leading-none mt-1.5 font-mono">{c}</p>
                 </div>
               </div>
@@ -338,24 +330,20 @@ export default function NotificationsPage() {
 
       {/* ── High-priority banner ─────────────────────────────────────────── */}
       {!isLoading && highPri.length > 0 && (
-        <div className="rounded-2xl glass-3 gloss-edge p-5 relative overflow-hidden">
-          <div
-            className="absolute -top-16 -right-16 w-56 h-56 rounded-full pointer-events-none"
-            style={{ background: "radial-gradient(circle, rgba(253,164,175,0.50) 0%, rgba(253,164,175,0) 70%)" }}
-          />
-          <div className="flex items-center gap-3 relative">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-rose-400 to-rose-500 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_6px_18px_rgba(244,63,94,0.32)]">
-              <AlertTriangle className="w-5 h-5 text-white" strokeWidth={2.4} />
+        <div className="rounded-2xl border border-slate-200/70 bg-white p-5">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl grid place-items-center bg-rose-50 text-rose-600 shrink-0">
+              <AlertTriangle className="w-5 h-5" strokeWidth={2.4} />
             </div>
             <div className="flex-1">
-              <p className="text-[16px] font-bold text-slate-900">
+              <p className="text-[15px] font-semibold text-ink">
                 {highPri.length} high-priority alert{highPri.length > 1 ? "s" : ""} — act now
               </p>
-              <p className="text-[12px] text-slate-500 mt-0.5">These leads are at risk of being lost.</p>
+              <p className="text-[12px] text-ink-muted mt-0.5">These leads are at risk of being lost.</p>
             </div>
             <button
               onClick={() => setFilter("high")}
-              className="inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 text-white text-[12px] font-semibold transition-all active:scale-[0.97] shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)]"
+              className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-[12px] font-semibold transition-colors"
             >
               See high
               <ChevronRight className="w-3.5 h-3.5" />
@@ -377,10 +365,10 @@ export default function NotificationsPage() {
               <button
                 key={k}
                 onClick={() => setFilter(k)}
-                className={`inline-flex items-center gap-1.5 h-8 px-3.5 rounded-full text-[12px] font-semibold transition-all
+                className={`inline-flex items-center gap-1.5 h-8 px-3.5 rounded-full text-[12px] font-semibold transition-colors
                   ${active
-                    ? "bg-sky-50 text-sky-700 border border-sky-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]"
-                    : "glass-1 text-slate-600 hover:text-slate-900"
+                    ? "bg-sky-50 text-sky-700 border border-sky-200"
+                    : "bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                   }`}
               >
                 {label}
@@ -402,12 +390,12 @@ export default function NotificationsPage() {
 
       {/* ── Empty ────────────────────────────────────────────────────────── */}
       {!isLoading && items.length === 0 && (
-        <div className="rounded-2xl glass-3 gloss-edge px-6 py-16 text-center">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-400 to-sky-500 flex items-center justify-center mx-auto mb-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_6px_18px_rgba(14,165,233,0.32)]">
-            <Bell className="w-6 h-6 text-white" strokeWidth={2.4} />
+        <div className="rounded-2xl border border-slate-200/70 bg-white px-6 py-16 text-center">
+          <div className="w-12 h-12 rounded-xl grid place-items-center bg-sky-50 text-sky-600 mx-auto mb-4">
+            <Bell className="w-6 h-6" strokeWidth={2.4} />
           </div>
-          <p className="text-[16px] font-bold text-slate-900">All clear</p>
-          <p className="text-[12px] text-slate-500 mt-1.5 max-w-[300px] mx-auto leading-relaxed">
+          <p className="text-[15px] font-semibold text-ink">All clear</p>
+          <p className="text-[12px] text-ink-muted mt-1.5 max-w-[300px] mx-auto leading-relaxed">
             No alerts right now. Notifications fire when leads go at-risk, follow-ups come due, or Grade A leads are missed.
           </p>
         </div>
@@ -415,8 +403,8 @@ export default function NotificationsPage() {
 
       {/* ── Filter empty ─────────────────────────────────────────────────── */}
       {!isLoading && items.length > 0 && filtered.length === 0 && (
-        <div className="rounded-2xl glass-2 gloss-edge px-6 py-12 text-center">
-          <p className="text-[13px] text-slate-500">Nothing matches this filter.</p>
+        <div className="rounded-2xl border border-slate-200/70 bg-white px-6 py-12 text-center">
+          <p className="text-[13px] text-ink-muted">Nothing matches this filter.</p>
         </div>
       )}
 
@@ -424,9 +412,9 @@ export default function NotificationsPage() {
       {!isLoading && groupedUnread.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-sky-500 shadow-[0_0_0_3px_rgba(14,165,233,0.15)]" />
+            <span className="w-2 h-2 rounded-full bg-sky-500" />
             <p className="text-[11px] font-bold uppercase tracking-wider text-sky-600">Unread · {groupedUnread.length}</p>
-            <div className="flex-1 h-px bg-gradient-to-r from-sky-200/60 to-transparent ml-2" />
+            <div className="flex-1 h-px bg-slate-100 ml-2" />
           </div>
           {groupedUnread.map((item) => (
             <NotifCard key={item.id} item={item} onRead={markRead} onDismiss={markDismiss} />
@@ -440,7 +428,7 @@ export default function NotificationsPage() {
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-slate-400" />
             <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Earlier · {groupedRead.length}</p>
-            <div className="flex-1 h-px bg-gradient-to-r from-slate-200/60 to-transparent ml-2" />
+            <div className="flex-1 h-px bg-slate-100 ml-2" />
           </div>
           {groupedRead.map((item) => (
             <NotifCard key={item.id} item={item} onRead={markRead} onDismiss={markDismiss} />

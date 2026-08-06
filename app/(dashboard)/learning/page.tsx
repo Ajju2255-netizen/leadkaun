@@ -41,15 +41,15 @@ export default function LearningPage() {
   const m = data?.maturity
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-start gap-4">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-400 to-violet-600 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_6px_18px_rgba(139,92,246,0.3)] shrink-0">
-          <Brain className="w-6 h-6 text-white" strokeWidth={2.2} />
+        <div className="w-11 h-11 rounded-xl grid place-items-center bg-sky-50 text-sky-600 shrink-0">
+          <Brain className="w-6 h-6" strokeWidth={2.2} />
         </div>
         <div>
-          <h1 className="text-[28px] font-bold text-ink tracking-[-0.02em] leading-tight">Learning Engine</h1>
-          <p className="text-[14px] text-slate-500 mt-1 leading-relaxed">
+          <h1 className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">Learning Engine</h1>
+          <p className="text-[13px] text-ink-muted mt-1 leading-relaxed">
             {isLoading
               ? "Reading your account…"
               : m && m.unlocked === 0
@@ -61,13 +61,13 @@ export default function LearningPage() {
 
       {/* Maturity bar */}
       {m && (
-        <div className="glass-card px-5 py-4">
+        <div className="rounded-2xl border border-slate-200/70 bg-white px-5 py-4">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[12px] font-bold text-slate-600">Patterns unlocked</span>
+            <span className="text-[12px] font-semibold text-ink-soft">Patterns unlocked</span>
             <span className="text-[12px] font-semibold text-violet-600 tabular-nums">{m.unlocked} / {m.total}</span>
           </div>
           <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
-            <div className="h-full rounded-full bg-gradient-to-r from-violet-400 to-violet-600 transition-all" style={{ width: `${(m.unlocked / m.total) * 100}%` }} />
+            <div className="h-full rounded-full bg-violet-500 transition-all" style={{ width: `${(m.unlocked / m.total) * 100}%` }} />
           </div>
         </div>
       )}
@@ -89,22 +89,22 @@ function InsightCard({ insight }: { insight: Insight }) {
   const learning = insight.status === "learning"
 
   return (
-    <div className={`glass-card px-5 py-4 ${learning ? "opacity-75" : ""}`}>
+    <div className={`rounded-2xl border border-slate-200/70 bg-white px-5 py-4 ${learning ? "opacity-75" : ""}`}>
       <div className="flex items-center gap-2 mb-2.5">
-        <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${learning ? "bg-slate-100" : "bg-violet-50"}`}>
-          {learning ? <Lock className="w-3.5 h-3.5 text-slate-400" /> : <Icon className="w-3.5 h-3.5 text-violet-600" />}
+        <div className={`w-7 h-7 rounded-lg grid place-items-center ${learning ? "bg-slate-100 text-slate-400" : "bg-violet-50 text-violet-600"}`}>
+          {learning ? <Lock className="w-3.5 h-3.5" /> : <Icon className="w-3.5 h-3.5" />}
         </div>
-        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{insight.title}</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-soft">{insight.title}</span>
       </div>
 
       {learning ? (
         <div>
-          <p className="text-[13px] font-semibold text-slate-500">Still learning</p>
-          <p className="text-[12px] text-slate-400 mt-1 leading-relaxed">Need {insight.need} to unlock this pattern.</p>
+          <p className="text-[13px] font-semibold text-ink-soft">Still learning</p>
+          <p className="text-[12px] text-ink-muted mt-1 leading-relaxed">Need {insight.need} to unlock this pattern.</p>
         </div>
       ) : (
         <div>
-          <p className="text-[15px] font-bold text-slate-800 leading-snug">{insight.headline}</p>
+          <p className="text-[15px] font-semibold text-ink leading-snug">{insight.headline}</p>
           {insight.detail && <p className="text-[12px] text-slate-500 mt-1.5 leading-relaxed">{insight.detail}</p>}
           <InsightItems insight={insight} />
           {insight.cta && (

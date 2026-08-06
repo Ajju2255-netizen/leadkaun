@@ -157,7 +157,7 @@ function ScoreRing({ score }: { score: number }) {
 
 function PerfBar({ pct, color }: { pct: number; color: string }) {
   return (
-    <div className="h-1 w-full rounded-full overflow-hidden mt-1.5" style={{ background: "rgba(15,23,42,0.06)" }}>
+    <div className="h-1 w-full rounded-full overflow-hidden mt-1.5 bg-slate-100">
       <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: color }} />
     </div>
   )
@@ -171,8 +171,7 @@ function StatCard({
   caption,
   delta,
   deltaPositive: _deltaPositive,
-  iconColor,
-  iconBg,
+  tileClass,
   icon,
   valueColor,
   // For response time: lower is better, so negative delta is GOOD (mint), positive is BAD (red)
@@ -183,14 +182,13 @@ function StatCard({
   caption:       string
   delta:         number | null
   deltaPositive: boolean | null
-  iconColor:     string
-  iconBg:        string
+  tileClass:     string
   icon:          React.ReactNode
   valueColor:    string
   invertDelta?:  boolean
 }) {
   return (
-    <div className="glass-3 gloss-edge rounded-2xl p-6">
+    <div className="rounded-2xl border border-slate-200/70 bg-white p-6">
       <p className="text-[12px] font-semibold text-ink-soft">{label}</p>
       <div className="mt-3 flex items-end justify-between gap-3">
         <div>
@@ -199,11 +197,8 @@ function StatCard({
           </div>
           <p className="text-[12px] text-ink-muted mt-2">{caption}</p>
         </div>
-        <div
-          className="w-14 h-14 rounded-full flex items-center justify-center shrink-0"
-          style={{ background: iconBg, boxShadow: `inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 10px ${iconColor}33` }}
-        >
-          <span style={{ color: iconColor }}>{icon}</span>
+        <div className={`w-14 h-14 rounded-xl grid place-items-center shrink-0 ${tileClass}`}>
+          {icon}
         </div>
       </div>
       {/* vs last month line */}
@@ -250,7 +245,7 @@ export default function RepTrackingPage() {
   const locked = error instanceof FeatureLocked ? error : null
   if (locked) {
     return (
-      <div className="max-w-6xl mx-auto">
+      <div>
         <FeatureLockedCard
           feature="Rep Tracking"
           requiredTier={locked.requiredTier}
@@ -265,26 +260,19 @@ export default function RepTrackingPage() {
   const maxRespSecs  = Math.max(...sortedReps.map((r) => r.response_time_seconds ?? 0), 1)
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="space-y-6">
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <div className="flex items-start gap-4">
-        <div
-          className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
-          style={{
-            background: "linear-gradient(180deg, rgba(186,230,253,0.95) 0%, rgba(125,211,252,0.85) 100%)",
-            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 12px rgba(14,165,233,0.22)",
-          }}
-        >
-          <User className="w-6 h-6 text-sky-600" strokeWidth={2.25} fill="currentColor" />
+        <div className="w-11 h-11 rounded-xl grid place-items-center bg-sky-50 text-sky-600 shrink-0">
+          <User className="w-5 h-5" strokeWidth={2.25} fill="currentColor" />
         </div>
         <div>
-          <h1 className="text-[28px] font-bold text-ink tracking-[-0.02em] leading-tight">
+          <h1 className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">
             Sales Rep Tracking
           </h1>
-          <p className="text-[14px] text-ink-soft mt-2 leading-relaxed">
-            Per-rep ₹ recovered, Grade A response time,<br />
-            follow-up completion.
+          <p className="text-[13px] text-ink-muted mt-1">
+            Per-rep ₹ recovered, Grade A response time, follow-up completion.
           </p>
         </div>
       </div>
@@ -299,8 +287,7 @@ export default function RepTrackingPage() {
           caption="All time"
           delta={account?.revenue_recovered_pct_change ?? null}
           deltaPositive={true}
-          iconColor="#10B981"
-          iconBg="linear-gradient(180deg, rgba(167,243,208,0.85) 0%, rgba(110,231,183,0.65) 100%)"
+          tileClass="bg-emerald-50 text-emerald-600"
           icon={<IndianRupee className="w-7 h-7" strokeWidth={2.5} />}
           valueColor="text-emerald-600"
         />
@@ -313,8 +300,7 @@ export default function RepTrackingPage() {
           delta={account?.avg_response_time_pct_change ?? null}
           deltaPositive={false}
           invertDelta
-          iconColor="#0EA5E9"
-          iconBg="linear-gradient(180deg, rgba(186,230,253,0.85) 0%, rgba(125,211,252,0.65) 100%)"
+          tileClass="bg-sky-50 text-sky-600"
           icon={<Clock className="w-7 h-7" strokeWidth={2.25} />}
           valueColor="text-sky-600"
         />
@@ -328,8 +314,7 @@ export default function RepTrackingPage() {
           caption="Completed"
           delta={account?.follow_up_completion_pct_change ?? null}
           deltaPositive={true}
-          iconColor="#8B5CF6"
-          iconBg="linear-gradient(180deg, rgba(221,214,254,0.85) 0%, rgba(196,181,253,0.65) 100%)"
+          tileClass="bg-violet-50 text-violet-600"
           icon={<CheckCircle className="w-7 h-7" strokeWidth={2.5} />}
           valueColor="text-violet-600"
         />
@@ -345,24 +330,20 @@ export default function RepTrackingPage() {
             : "This month"}
           delta={null}
           deltaPositive={true}
-          iconColor="#0EA5E9"
-          iconBg="linear-gradient(180deg, rgba(186,230,253,0.85) 0%, rgba(125,211,252,0.65) 100%)"
+          tileClass="bg-sky-50 text-sky-600"
           icon={<Target className="w-7 h-7" strokeWidth={2.5} />}
           valueColor="text-sky-600"
         />
       </div>
 
       {/* ── Rep Performance Overview table ──────────────────────────────────── */}
-      <div className="glass-2 gloss-edge rounded-2xl overflow-hidden">
+      <div className="rounded-2xl border border-slate-200/70 bg-white overflow-hidden">
         <div className="px-6 pt-5 pb-3">
-          <h2 className="text-[16px] font-bold text-ink">Rep Performance Overview</h2>
+          <h2 className="text-[15px] font-semibold text-ink">Rep Performance Overview</h2>
         </div>
 
         {/* Headers */}
-        <div
-          className="grid grid-cols-[1.2fr_1fr_1fr_1fr_88px] gap-4 px-6 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-muted"
-          style={{ borderBottom: "1px solid var(--hairline)" }}
-        >
+        <div className="grid grid-cols-[1.2fr_1fr_1fr_1fr_88px] gap-4 px-6 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-soft border-b border-slate-100">
           <span>Rep</span>
           <span>₹ Recovered</span>
           <span>Grade A Response Time</span>
@@ -372,7 +353,7 @@ export default function RepTrackingPage() {
 
         {/* Loading */}
         {isLoading && (
-          <div className="divide-y" style={{ borderColor: "var(--hairline)" }}>
+          <div className="divide-y divide-slate-100">
             {[...Array(4)].map((_, i) => (
               <div key={i} className="grid grid-cols-[1.2fr_1fr_1fr_1fr_88px] gap-4 px-6 py-4 items-center">
                 <div className="flex items-center gap-3">
@@ -391,14 +372,8 @@ export default function RepTrackingPage() {
         {/* Empty state */}
         {!isLoading && reps.length === 0 && !error && (
           <div className="px-6 py-12 text-center">
-            <div
-              className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3"
-              style={{
-                background: "linear-gradient(180deg, rgba(186,230,253,0.85) 0%, rgba(125,211,252,0.65) 100%)",
-                boxShadow:  "inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 10px rgba(14,165,233,0.18)",
-              }}
-            >
-              <User className="w-6 h-6 text-sky-600" strokeWidth={2.25} />
+            <div className="w-12 h-12 rounded-2xl grid place-items-center bg-sky-50 text-sky-600 mx-auto mb-3">
+              <User className="w-6 h-6" strokeWidth={2.25} />
             </div>
             <p className="text-[14px] font-semibold text-ink">No rep activity yet</p>
             <p className="text-[12px] text-ink-muted mt-1">
@@ -409,7 +384,7 @@ export default function RepTrackingPage() {
 
         {/* Rows */}
         {!isLoading && sortedReps.length > 0 && (
-          <div className="divide-y" style={{ borderColor: "var(--hairline)" }}>
+          <div className="divide-y divide-slate-100">
             {sortedReps.map((rep, idx) => {
               const fullName = `${rep.first_name} ${rep.last_name}`.trim()
 
@@ -432,7 +407,7 @@ export default function RepTrackingPage() {
                 <div key={rep.id}>
                   <button
                     onClick={() => setExpandedId(isOpen ? null : rep.id)}
-                    className={`w-full text-left grid grid-cols-[1.2fr_1fr_1fr_1fr_88px] gap-4 px-6 py-4 items-center transition-colors hover:bg-sky-50/40 ${isOpen ? "bg-sky-50/40" : ""}`}
+                    className={`w-full text-left grid grid-cols-[1.2fr_1fr_1fr_1fr_88px] gap-4 px-6 py-4 items-center transition-colors hover:bg-slate-50 ${isOpen ? "bg-slate-50" : ""}`}
                   >
                     {/* Rep */}
                     <div className="flex items-center gap-3 min-w-0">
@@ -480,8 +455,8 @@ export default function RepTrackingPage() {
                   {/* Expandable 5-component breakdown — explains the score */}
                   {isOpen && rep.rep_score_components && (
                     <div className="px-6 pb-4">
-                      <div className="rounded-xl bg-slate-50/70 ring-1 ring-slate-100 px-4 py-3.5">
-                        <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-muted mb-3">
+                      <div className="rounded-xl border border-slate-200/70 bg-slate-50 px-4 py-3.5">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-ink-soft mb-3">
                           Rep score breakdown · {score}/100
                         </p>
                         <div className="grid grid-cols-2 sm:grid-cols-5 gap-x-4 gap-y-3">
@@ -496,7 +471,7 @@ export default function RepTrackingPage() {
                                     {Math.round(val)}<span className="text-slate-400 font-medium">/{seg.max}</span>
                                   </span>
                                 </div>
-                                <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden mt-1">
+                                <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden mt-1">
                                   <div className="h-full rounded-full" style={{ width: `${pct}%`, background: scoreColor(pct).bar }} />
                                 </div>
                               </div>
@@ -529,18 +504,12 @@ export default function RepTrackingPage() {
 
       {/* ── Top Performer card — highest Rep Score (hidden for solo teams) ── */}
       {!isLoading && !isSolo && leader && (leader.rep_score > 0 || leader.revenue_recovered > 0) && (
-        <div className="glass-2 gloss-edge rounded-2xl px-5 py-4 flex items-center gap-4">
-          <div
-            className="w-12 h-12 rounded-full flex items-center justify-center shrink-0"
-            style={{
-              background: "linear-gradient(180deg, #38BDF8 0%, #0EA5E9 100%)",
-              boxShadow:  "inset 0 1px 0 rgba(255,255,255,0.45), 0 4px 12px rgba(14,165,233,0.30)",
-            }}
-          >
-            <Trophy className="w-5 h-5 text-white" strokeWidth={2.5} fill="currentColor" />
+        <div className="rounded-2xl border border-slate-200/70 bg-white px-5 py-4 flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full grid place-items-center bg-sky-50 text-sky-600 shrink-0">
+            <Trophy className="w-5 h-5" strokeWidth={2.5} fill="currentColor" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[11px] font-semibold text-ink-muted uppercase tracking-[0.14em]">Top performer</p>
+            <p className="text-[11px] font-semibold text-ink-soft uppercase tracking-[0.14em]">Top performer</p>
             <p className="text-[16px] font-bold text-ink mt-0.5">
               {leader.first_name} {leader.last_name}
             </p>
@@ -556,14 +525,7 @@ export default function RepTrackingPage() {
 
       {/* Error */}
       {error && (
-        <div
-          className="rounded-2xl px-5 py-4 text-[13px] text-red-700"
-          style={{
-            background: "rgba(254, 226, 226, 0.85)",
-            border: "1px solid rgba(252, 165, 165, 0.55)",
-            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.6)",
-          }}
-        >
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-[13px] text-rose-700">
           Failed to load rep tracking — please refresh.
         </div>
       )}

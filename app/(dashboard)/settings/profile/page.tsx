@@ -80,17 +80,17 @@ export default function ProfilePage() {
   return (
     <div className="space-y-5 max-w-xl">
       <div className="flex items-start gap-3">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_6px_18px_rgba(14,165,233,0.32)]">
-          <User className="w-6 h-6 text-white" strokeWidth={2.4} />
+        <div className="w-11 h-11 rounded-xl grid place-items-center bg-sky-50 text-sky-600">
+          <User className="w-5 h-5" strokeWidth={2.4} />
         </div>
         <div>
-          <h1 className="text-[28px] font-bold text-ink tracking-[-0.02em] leading-tight">Profile</h1>
-          <p className="text-[13px] text-slate-500 mt-0.5">Manage your personal details.</p>
+          <h1 className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">Profile</h1>
+          <p className="text-[13px] text-ink-muted mt-1">Manage your personal details.</p>
         </div>
       </div>
 
       {/* Personal info */}
-      <div className="glass-card px-5 py-5 space-y-4">
+      <div className="rounded-2xl border border-slate-200/70 bg-white px-5 py-5 space-y-4">
         <div className="flex items-center gap-2 mb-1">
           <User className="w-3.5 h-3.5 text-slate-400" />
           <p className="section-label">Personal info</p>
@@ -105,7 +105,7 @@ export default function ProfilePage() {
             </span>
           </div>
           <div>
-            <p className="text-[14px] font-bold text-slate-900">
+            <p className="text-[14px] font-semibold text-ink">
               {session?.user.firstName} {session?.user.lastName}
             </p>
             <span className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full border ${ROLE_COLORS[session?.user.role ?? "REP"]}`}>
@@ -136,7 +136,7 @@ export default function ProfilePage() {
         <button
           onClick={handleSaveInfo}
           disabled={savingInfo || !firstName.trim() || !lastName.trim()}
-          className="h-9 px-5 rounded-full bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)] disabled:opacity-50
+          className="h-9 px-5 rounded-lg bg-sky-600 hover:bg-sky-700 disabled:opacity-50
                      text-white text-[13px] font-semibold transition-all active:scale-[0.97]"
         >
           {savingInfo ? "Saving…" : "Save changes"}
@@ -144,7 +144,7 @@ export default function ProfilePage() {
       </div>
 
       {/* Account info */}
-      <div className="glass-card px-5 py-4">
+      <div className="rounded-2xl border border-slate-200/70 bg-white px-5 py-4">
         <div className="flex items-center gap-2 mb-3">
           <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
           <p className="section-label">Account info</p>

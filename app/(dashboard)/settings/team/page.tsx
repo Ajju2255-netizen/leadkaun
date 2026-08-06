@@ -172,7 +172,7 @@ export default function TeamPage() {
     return (
       <div className="max-w-2xl mx-auto space-y-6">
         <Header />
-        <div className="glass-card px-5 py-5 space-y-3">
+        <div className="rounded-2xl border border-slate-200/70 bg-white px-5 py-5 space-y-3">
           {[1,2,3].map(i => <Skeleton key={i} className="h-14 rounded-xl" />)}
         </div>
       </div>
@@ -184,7 +184,7 @@ export default function TeamPage() {
     return (
       <div className="max-w-2xl mx-auto space-y-6">
         <Header />
-        <div className="glass-card px-5 py-8 flex flex-col items-center text-center gap-2">
+        <div className="rounded-2xl border border-slate-200/70 bg-white px-5 py-8 flex flex-col items-center text-center gap-2">
           <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center">
             <Lock className="w-5 h-5 text-slate-400" />
           </div>
@@ -203,13 +203,13 @@ export default function TeamPage() {
       <Header />
 
       {/* ── Invite card ──────────────────────────────────────────────────── */}
-      <div className="glass-card px-5 py-5">
+      <div className="rounded-2xl border border-slate-200/70 bg-white px-5 py-5">
         <div className="flex items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-sky-50 flex items-center justify-center">
               <UserPlus className="w-4 h-4 text-sky-600" />
             </div>
-            <p className="text-[14px] font-bold text-slate-900">Invite a Team Member</p>
+            <p className="text-[14px] font-semibold text-ink">Invite a Team Member</p>
           </div>
           {seats && (
             <span
@@ -228,7 +228,7 @@ export default function TeamPage() {
         </div>
 
         {seatsFull && (
-          <div className="mb-4 rounded-xl border border-red-200 bg-red-50/70 px-3.5 py-2.5">
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5">
             <p className="text-[12.5px] font-medium text-red-800">
               All {seats?.limit} seats on {seats?.planName} are in use.
             </p>
@@ -272,10 +272,9 @@ export default function TeamPage() {
             type="submit"
             disabled={inviteLoading || seatsFull}
             title={seatsFull ? "No seats remaining on your plan" : undefined}
-            className="h-[42px] px-5 rounded-xl text-white text-[13px] font-semibold transition-all duration-150
-                       bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600
-                       shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)]
-                       disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] shrink-0"
+            className="h-[42px] px-5 rounded-lg text-white text-[13px] font-semibold transition-colors duration-150
+                       bg-sky-600 hover:bg-sky-700
+                       disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
           >
             {inviteLoading ? "Sending…" : seatsFull ? "No seats left" : "Send Invite"}
           </button>
@@ -283,7 +282,7 @@ export default function TeamPage() {
       </div>
 
       {/* ── Members list ─────────────────────────────────────────────────── */}
-      <div className="glass-card overflow-hidden">
+      <div className="rounded-2xl border border-slate-200/70 bg-white overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <Users className="w-4 h-4 text-slate-400" />
@@ -397,7 +396,7 @@ export default function TeamPage() {
           <div className="bg-white rounded-xl border border-slate-200 p-6 w-full max-w-sm space-y-4
                           shadow-[0_24px_48px_rgba(15,23,42,0.18)]">
             <div className="flex items-center justify-between">
-              <h2 className="text-[16px] font-bold text-slate-900">Deactivate {deactivateTarget.first_name}?</h2>
+              <h2 className="text-[15px] font-semibold text-ink">Deactivate {deactivateTarget.first_name}?</h2>
               <button onClick={() => setDeactivateTarget(null)}
                 className="w-7 h-7 flex items-center justify-center rounded-full text-slate-400
                            hover:text-slate-700 hover:bg-slate-100 transition-all">
@@ -428,14 +427,14 @@ export default function TeamPage() {
             )}
             <div className="flex gap-2 pt-1">
               <button onClick={() => setDeactivateTarget(null)}
-                className="flex-1 h-10 rounded-full border border-slate-200 text-[13px] font-semibold
+                className="flex-1 h-10 rounded-lg border border-slate-200 text-[13px] font-semibold
                            text-slate-600 hover:bg-slate-50 transition-all">
                 Cancel
               </button>
               <button
                 onClick={handleDeactivate}
                 disabled={deactivating || ((deactivateTarget._count.assigned_leads ?? 0) > 0 && !reassignTo)}
-                className="flex-1 h-10 rounded-full bg-amber-500 hover:bg-amber-600 text-white
+                className="flex-1 h-10 rounded-lg bg-amber-500 hover:bg-amber-600 text-white
                            text-[13px] font-semibold transition-all disabled:opacity-50">
                 {deactivating ? "Deactivating…" : "Deactivate"}
               </button>
@@ -452,7 +451,7 @@ export default function TeamPage() {
           <div className="bg-white rounded-xl border border-slate-200 p-6 w-full max-w-sm space-y-4
                           shadow-[0_24px_48px_rgba(15,23,42,0.18)]">
             <div className="flex items-center justify-between">
-              <h2 className="text-[16px] font-bold text-slate-900">Change Role</h2>
+              <h2 className="text-[15px] font-semibold text-ink">Change Role</h2>
               <button onClick={() => setRoleTarget(null)}
                 className="w-7 h-7 flex items-center justify-center rounded-full text-slate-400
                            hover:text-slate-700 hover:bg-slate-100 transition-all">
@@ -476,12 +475,12 @@ export default function TeamPage() {
             </div>
             <div className="flex gap-2 pt-1">
               <button onClick={() => setRoleTarget(null)}
-                className="flex-1 h-10 rounded-full border border-slate-200 text-[13px] font-semibold
+                className="flex-1 h-10 rounded-lg border border-slate-200 text-[13px] font-semibold
                            text-slate-600 hover:bg-slate-50 transition-all">
                 Cancel
               </button>
               <button onClick={handleRoleChange} disabled={roleSaving || newRole === roleTarget.role}
-                className="flex-1 h-10 rounded-full bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)] text-white
+                className="flex-1 h-10 rounded-lg bg-sky-600 hover:bg-sky-700 text-white
                            text-[13px] font-semibold transition-all disabled:opacity-50">
                 {roleSaving ? "Saving…" : "Save Role"}
               </button>
@@ -503,7 +502,7 @@ export default function TeamPage() {
           <div className="bg-white rounded-xl border border-slate-200 p-6 w-full max-w-sm space-y-4
                           shadow-[0_24px_48px_rgba(15,23,42,0.18)]">
             <div className="flex items-center justify-between">
-              <h2 className="text-[16px] font-bold text-slate-900">Remove {removeTarget.first_name}?</h2>
+              <h2 className="text-[15px] font-semibold text-ink">Remove {removeTarget.first_name}?</h2>
               <button onClick={() => setRemoveTarget(null)}
                 className="w-7 h-7 flex items-center justify-center rounded-full text-slate-400
                            hover:text-slate-700 hover:bg-slate-100 transition-all">
@@ -520,14 +519,14 @@ export default function TeamPage() {
             </p>
             <div className="flex gap-2 pt-1">
               <button onClick={() => setRemoveTarget(null)}
-                className="flex-1 h-10 rounded-full border border-slate-200 text-[13px] font-semibold
+                className="flex-1 h-10 rounded-lg border border-slate-200 text-[13px] font-semibold
                            text-slate-600 hover:bg-slate-50 transition-all">
                 Cancel
               </button>
               <button
                 onClick={handleRemove}
                 disabled={removing}
-                className="flex-1 h-10 rounded-full bg-red-600 hover:bg-red-700 text-white
+                className="flex-1 h-10 rounded-lg bg-red-600 hover:bg-red-700 text-white
                            text-[13px] font-semibold transition-all disabled:opacity-50">
                 {removing ? "Removing…" : "Remove"}
               </button>
@@ -545,12 +544,12 @@ export default function TeamPage() {
 function Header() {
   return (
     <div className="flex items-start gap-3">
-      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_6px_18px_rgba(14,165,233,0.32)]">
-        <Users className="w-6 h-6 text-white" strokeWidth={2.4} />
+      <div className="w-11 h-11 rounded-xl grid place-items-center bg-sky-50 text-sky-600">
+        <Users className="w-5 h-5" strokeWidth={2.4} />
       </div>
       <div>
-        <h1 className="text-[28px] font-bold text-ink tracking-[-0.02em] leading-tight">Team</h1>
-        <p className="text-[13px] text-slate-500 mt-0.5">Invite members, manage roles &amp; workspace access, reassign leads.</p>
+        <h1 className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">Team</h1>
+        <p className="text-[13px] text-ink-muted mt-1">Invite members, manage roles &amp; workspace access, reassign leads.</p>
       </div>
     </div>
   )
@@ -596,7 +595,7 @@ function WorkspaceAccessModal({ member, onClose }: { member: Member; onClose: ()
         <div className="w-full max-w-md rounded-2xl bg-white border border-slate-200 p-6 space-y-4 shadow-[0_24px_48px_rgba(15,23,42,0.18)] max-h-[85vh] flex flex-col">
           <div className="flex items-center justify-between shrink-0">
             <div className="min-w-0">
-              <p className="text-[16px] font-bold text-slate-900 truncate">Workspace access</p>
+              <p className="text-[15px] font-semibold text-ink truncate">Workspace access</p>
               <p className="text-[12px] text-slate-500 truncate">{member.first_name} {member.last_name}</p>
             </div>
             <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 transition-colors shrink-0"><X className="w-4 h-4" /></button>
@@ -623,7 +622,7 @@ function WorkspaceAccessModal({ member, onClose }: { member: Member; onClose: ()
                   onClick={() => toggle(ws)}
                   disabled={busy === ws.id}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all text-left disabled:opacity-50
-                    ${ws.member ? "border-sky-200 bg-sky-50/60" : "border-slate-200 hover:bg-slate-50"}`}
+                    ${ws.member ? "border-sky-200 bg-sky-50" : "border-slate-200 hover:bg-slate-50"}`}
                 >
                   <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${ws.member ? "bg-sky-100" : "bg-slate-100"}`}>
                     <Layers className={`w-4 h-4 ${ws.member ? "text-sky-600" : "text-slate-400"}`} />
@@ -641,7 +640,7 @@ function WorkspaceAccessModal({ member, onClose }: { member: Member; onClose: ()
             )}
           </div>
 
-          <button onClick={onClose} className="shrink-0 h-10 rounded-full border border-slate-200 text-[13px] font-semibold text-slate-600 hover:bg-slate-50 transition-all inline-flex items-center justify-center gap-1.5">
+          <button onClick={onClose} className="shrink-0 h-10 rounded-lg border border-slate-200 text-[13px] font-semibold text-slate-600 hover:bg-slate-50 transition-all inline-flex items-center justify-center gap-1.5">
             <Check className="w-4 h-4" /> Done
           </button>
         </div>

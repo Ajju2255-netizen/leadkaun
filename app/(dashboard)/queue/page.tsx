@@ -1,14 +1,13 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState, type ReactNode, type ComponentProps } from "react"
 import { cn } from "@/lib/utils"
 import { useQuery } from "@tanstack/react-query"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { useQueue } from "@/hooks/useQueue"
 import { useQueueRealtime } from "@/hooks/useQueueRealtime"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
-import { QueueLeadRow, QUEUE_GRID } from "@/components/queue/QueueLeadRow"
-import { QueueHeroCard } from "@/components/queue/QueueHeroCard"
+import { QueueLeadRow } from "@/components/queue/QueueLeadRow"
 import { QueueGradeTabs, type GradeTab } from "@/components/queue/QueueGradeTabs"
 import {
   QueueFilters,
@@ -18,10 +17,13 @@ import {
 import { LeadSlideOver } from "@/components/shared/LeadSlideOver"
 import { ThemedSelect } from "@/components/shared/ThemedSelect"
 import { BackToTopButton } from "@/components/shared/BackToTopButton"
+import { DeltaChip } from "@/components/shared/DeltaChip"
+import { EmptyState } from "@/components/shared/EmptyState"
 import { Skeleton } from "@/components/ui/skeleton"
 import { formatRupee } from "@/lib/format"
 import {
-  CheckCircle2, Users, Search, X, SlidersHorizontal, Rocket,
+  Users, Search, X, SlidersHorizontal, Upload, Inbox, Flame, Zap,
+  PhoneCall, IndianRupee, Trophy, ChevronLeft, ChevronRight, type LucideIcon,
 } from "lucide-react"
 import type { QueueLead } from "@/hooks/useQueue"
 
@@ -35,6 +37,72 @@ async function fetchTeam() {
   const res = await fetch("/api/team/members", { credentials: "include" })
   if (!res.ok) return { members: [] }
   return res.json() as Promise<{ members: { id: string; first_name: string; last_name: string | null }[] }>
+}
+
+const PER_PAGE = 12
+
+// ── Small presentational helpers ───────────────────────────────────────────────
+
+function StatCard({
+  icon: Icon, label, value, tintBg, tintFg, delta, caption,
+}: {
+  icon: LucideIcon
+  label: string
+  value: ReactNode
+  tintBg: string
+  tintFg: string
+  delta?: number | null
+  caption?: string
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200/70 bg-white p-3.5">
+      <div className="flex items-center gap-2 min-w-0">
+        <span className={cn("w-8 h-8 rounded-lg grid place-items-center shrink-0", tintBg)}>
+          <Icon className={cn("w-4 h-4", tintFg)} strokeWidth={2} />
+        </span>
+        <span className="text-[12px] font-medium text-ink-soft truncate">{label}</span>
+      </div>
+      <div className="mt-3 text-[23px] font-bold tabular-nums text-ink leading-none">{value}</div>
+      <div className="mt-2 flex items-center gap-1.5 min-h-[16px]">
+        <DeltaChip delta={delta} />
+        {caption && <span className="text-[11.5px] text-ink-muted truncate">{caption}</span>}
+      </div>
+    </div>
+  )
+}
+
+function Th({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <th className={cn("py-2.5 px-3 text-left text-[12px] font-semibold text-ink-soft whitespace-nowrap", className)}>
+      {children}
+    </th>
+  )
+}
+
+function PageBtn({ active, className, ...props }: ComponentProps<"button"> & { active?: boolean }) {
+  return (
+    <button
+      {...props}
+      className={cn(
+        "min-w-[32px] h-8 px-2 inline-flex items-center justify-center rounded-lg text-[13px] font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed",
+        active ? "bg-sky-600 text-white" : "text-slate-600 hover:bg-slate-100",
+        className,
+      )}
+    />
+  )
+}
+
+/** Compact page-number window: 1 … n-1 n n+1 … last */
+function pageWindow(current: number, total: number): (number | "…")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
+  const out: (number | "…")[] = [1]
+  const lo = Math.max(2, current - 1)
+  const hi = Math.min(total - 1, current + 1)
+  if (lo > 2) out.push("…")
+  for (let p = lo; p <= hi; p++) out.push(p)
+  if (hi < total - 1) out.push("…")
+  out.push(total)
+  return out
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -93,7 +161,7 @@ export default function QueuePage() {
 
   // Realtime updates — pushes invalidations when leads/signals change for
   // this account. Throttled inside the hook. Falls back to 30s polling.
-  const realtimeStatus = useQueueRealtime(session?.account?.id)
+  useQueueRealtime(session?.account?.id)
 
   const leads = useMemo<QueueLead[]>(() => data?.leads ?? [], [data?.leads])
   const kpis  = data?.kpis
@@ -125,267 +193,231 @@ export default function QueuePage() {
     return out
   }, [leads, search, sourceFilter, filters])
 
-  const topFive = filteredLeads.slice(0, 5)
-  const topFiveIds = useMemo(() => new Set(topFive.map((l) => l.id)), [topFive])
-  const hero    = topFive[0] ?? null      // #1 — gets the hero card
-  const nextUp  = topFive.slice(1)        // #2–5 — ranked rows under the hero
+  const hotCount = useMemo(() => filteredLeads.filter((l) => l.is_hot_signal).length, [filteredLeads])
 
-  // Lead set shown in the section BELOW the Top-5 hero.
-  // On "all" tab → everything except the Top-5 (avoids visible duplication).
-  // On a grade tab → all leads of that grade (including those in Top-5, so the
-  //                  user can browse the full set for that grade).
-  const belowList = useMemo(() => {
-    if (gradeTab === "all") {
-      return filteredLeads.filter((l) => !topFiveIds.has(l.id))
-    }
+  // Which leads the table shows: the whole filtered set, or one grade.
+  const tabLeads = useMemo(() => {
+    if (gradeTab === "all") return filteredLeads
     return filteredLeads.filter((l) => l.grade === gradeTab)
-  }, [filteredLeads, gradeTab, topFiveIds])
+  }, [filteredLeads, gradeTab])
 
-  // Counts per tab — drives the badge inside each pill, hides empty grades
+  // Counts per grade pill.
   const counts = useMemo(() => {
-    const c: Partial<Record<GradeTab, number>> = {
-      all: Math.max(0, filteredLeads.length - topFive.length),
-    }
+    const c: Partial<Record<GradeTab, number>> = { all: filteredLeads.length }
     for (const lead of filteredLeads) {
       const k = lead.grade as GradeTab
       c[k] = (c[k] ?? 0) + 1
     }
     return c
-  }, [filteredLeads, topFive.length])
+  }, [filteredLeads])
 
   const totalLeads = filteredLeads.length
 
+  // Client-side pagination over the visible set.
+  const [page, setPage] = useState(1)
+  useEffect(() => { setPage(1) }, [gradeTab, search, sourceFilter, repFilter, filters])
+  const pageCount = Math.max(1, Math.ceil(tabLeads.length / PER_PAGE))
+  const safePage  = Math.min(page, pageCount)
+  const pageStart = (safePage - 1) * PER_PAGE
+  const pageLeads = tabLeads.slice(pageStart, pageStart + PER_PAGE)
+
+  // Changing page scrolls back to the top of the table (the shell's main area
+  // scrolls, so scrollIntoView is used rather than window.scrollTo).
+  const tableRef = useRef<HTMLDivElement>(null)
+  function goToPage(p: number) {
+    setPage(Math.min(Math.max(1, p), pageCount))
+    tableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }
+
   return (
     <>
-      {/* One natural page scroll (the shell's main area scrolls) — no nested
-          inner-scroll, which users found confusing. */}
       <div className="flex flex-col gap-5 min-w-0 pb-10">
 
         {/* ── HEADER ────────────────────────────────────────────────────── */}
-        <header className="flex items-start gap-3 flex-wrap">
-          <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-white shrink-0
-                          bg-gradient-to-br from-sky-400 to-sky-600
-                          shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_6px_18px_rgba(14,165,233,0.32)]">
-            <Rocket className="w-5 h-5" />
-          </div>
-
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-[28px] font-bold text-ink tracking-[-0.02em] leading-tight">Priority Queue</h1>
-              <span
-                title={
-                  realtimeStatus === "live"
-                    ? "Live updates active — queue refreshes automatically"
-                    : realtimeStatus === "connecting"
-                      ? "Connecting to live updates…"
-                      : "Live updates offline — polling every 30s"
-                }
-                className={cn(
-                  "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
-                  realtimeStatus === "live"       && "text-emerald-700 bg-emerald-50",
-                  realtimeStatus === "connecting" && "text-amber-700 bg-amber-50",
-                  realtimeStatus === "offline"    && "text-slate-500 bg-slate-100",
-                )}
-              >
-                <span
-                  className={cn(
-                    "w-1.5 h-1.5 rounded-full",
-                    realtimeStatus === "live"       && "bg-emerald-500 animate-pulse",
-                    realtimeStatus === "connecting" && "bg-amber-500 animate-pulse",
-                    realtimeStatus === "offline"    && "bg-slate-400",
-                  )}
-                />
-                {realtimeStatus === "live" ? "Live" : realtimeStatus === "connecting" ? "Live…" : "Polling"}
-              </span>
-            </div>
-            <p className="text-[12px] text-ink-muted mt-1">
-              {isLoading ? "Loading your queue…" : (
-                <>
-                  <span className="font-bold text-slate-700 tabular-nums">{totalLeads}</span> to call
-                  {kpis ? (
-                    <>
-                      <span className="text-slate-300"> · </span>
-                      <span className="font-bold text-sky-700 tabular-nums">{kpis.high_priority_count}</span> high-priority
-                      {kpis.est_revenue_potential > 0 && (
-                        <>
-                          <span className="text-slate-300"> · </span>
-                          <span className="font-bold text-emerald-700 tabular-nums">{formatRupee(kpis.est_revenue_potential)}</span> in play
-                        </>
-                      )}
-                    </>
-                  ) : null}
-                </>
-              )}
-            </p>
-          </div>
-
-          {/* Its own full-width row: keeps all controls on one aligned line rather
-              than shrinking beside the title and wrapping into a ragged 2×2. */}
-          <div className="flex items-center gap-2 flex-wrap w-full">
-              {/* Search */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none z-10" />
-                <input value={search} onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search leads…"
-                  className="h-9 pl-9 pr-3 rounded-full glass-1 border border-white/70 text-[12px]
-                             text-slate-900 placeholder:text-slate-400 focus:outline-none
-                             focus:ring-2 focus:ring-sky-500/30 focus:border-sky-400 w-[180px] transition-all" />
-                {search && (
-                  <button onClick={() => setSearch("")}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 z-10">
-                    <X className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-
-              {/* Rep filter — managers only */}
-              {isManager && teamData && teamData.members.length > 0 && (
-                <ThemedSelect
-                  variant="pill"
-                  leadingIcon={<Users className="w-3.5 h-3.5 text-slate-400 shrink-0" />}
-                  value={repFilter ?? "all"}
-                  onValueChange={(v) => setRepFilter(v === "all" ? undefined : v)}
-                  options={[{ value: "all", label: "All reps" }, ...teamData.members.map((m) => ({ value: m.id, label: `${m.first_name} ${m.last_name ?? ""}`.trim() }))]}
-                  className="max-w-[160px]"
-                  aria-label="Filter by rep"
-                />
-              )}
-
-              {/* All Sources dropdown — wired to /api/lead-sources */}
-              <ThemedSelect
-                variant="pill"
-                value={sourceFilter}
-                onValueChange={setSourceFilter}
-                options={[{ value: "all", label: "All Sources" }, ...(sourcesData?.sources ?? []).map((s) => ({ value: s.id, label: s.name }))]}
-                className="max-w-[160px]"
-                aria-label="Filter by source"
-              />
-
-              {/* Filters button + popover */}
-              <div className="relative">
-                <button
-                  onClick={() => setFiltersOpen((o) => !o)}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 h-9 px-3 rounded-full glass-1 border text-[12px] font-semibold transition-all",
-                    filtersAreActive(filters)
-                      ? "bg-sky-50 border-sky-200 text-sky-700"
-                      : "border-white/70 text-slate-700 hover:bg-slate-50",
-                  )}
-                >
-                  <SlidersHorizontal className="w-3.5 h-3.5" />
-                  Filters
-                  {filtersAreActive(filters) && (
-                    <span className="ml-0.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-sky-600 text-white text-[10px] font-bold tabular-nums">
-                      {filters.channels.size + (filters.hideContactedToday ? 1 : 0)}
-                    </span>
-                  )}
-                </button>
-                <QueueFilters
-                  open={filtersOpen}
-                  onClose={() => setFiltersOpen(false)}
-                  state={filters}
-                  onChange={setFilters}
-                />
-              </div>
-            </div>
+        <header className="flex items-center justify-between gap-3 flex-wrap">
+          <h1 className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">Priority Queue</h1>
+          <a
+            href="/leads/import"
+            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-[13px] font-semibold transition-colors active:scale-[0.98]"
+          >
+            <Upload className="w-4 h-4" /> Import leads
+          </a>
         </header>
 
-          {/* Error */}
-          {error && (
-            <div className="rounded-2xl glass-2 gloss-edge px-4 py-3 text-[13px] text-rose-700 border border-rose-200/60">
-              <span className="font-semibold">Failed to load queue</span> — please refresh.
+        {/* Error */}
+        {error && (
+          <div className="rounded-2xl border border-rose-200/70 bg-rose-50/50 px-4 py-3 text-[13px] text-rose-700">
+            <span className="font-semibold">Failed to load queue</span> — please refresh.
+          </div>
+        )}
+
+        {/* ── QUICK STATS ───────────────────────────────────────────────── */}
+        <section className="rounded-2xl border border-slate-200/70 bg-white p-4 sm:p-5">
+          <h2 className="text-[14px] font-semibold text-ink mb-3.5">Quick stats</h2>
+          {isLoading ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+              {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-[104px] rounded-xl" />)}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+              <StatCard icon={Inbox}       label="Total leads"     value={data?.total ?? totalLeads}                       tintBg="bg-slate-100" tintFg="text-slate-500"  caption="in your queue" />
+              <StatCard icon={Flame}       label="High priority"   value={kpis?.high_priority_count ?? 0}                  tintBg="bg-rose-50"   tintFg="text-rose-500"
+                        delta={kpis?.high_priority_count_pct_change}
+                        caption={kpis?.high_priority_count_pct_change != null ? "vs yesterday" : "needs action"} />
+              <StatCard icon={Zap}         label="Hot right now"   value={hotCount}                                        tintBg="bg-amber-50"  tintFg="text-amber-500"  caption="live signals" />
+              <StatCard icon={PhoneCall}   label="Contacted today" value={data?.contacted_today ?? 0}                      tintBg="bg-emerald-50" tintFg="text-emerald-600" caption="today" />
+              <StatCard icon={IndianRupee} label="In play"         value={formatRupee(kpis?.est_revenue_potential ?? 0)}   tintBg="bg-sky-50"    tintFg="text-sky-600"    caption="pipeline value" />
+              <StatCard icon={Trophy}      label="Top 3 potential" value={formatRupee(kpis?.top_three_potential_revenue ?? 0)} tintBg="bg-violet-50" tintFg="text-violet-500" caption="your best 3" />
             </div>
           )}
+        </section>
 
-          {/* Loading skeletons */}
-          {isLoading && (
-            <div className="space-y-3">
-              {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-[88px] w-full rounded-2xl" />)}
+        {/* ── ALL LEADS TABLE ───────────────────────────────────────────── */}
+        <section ref={tableRef} className="scroll-mt-4 rounded-2xl border border-slate-200/70 bg-white overflow-hidden">
+          {/* Toolbar — one row (no stacking): search (left, fills) · grade tabs + refine controls (right) */}
+          <div className="flex items-center gap-2.5 flex-wrap px-4 sm:px-5 py-3.5">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none z-10" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search leads, company…"
+                className="h-9 w-full pl-9 pr-8 rounded-full bg-slate-50 border border-slate-200 text-[13px] text-slate-900
+                           placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/25
+                           focus:border-sky-400 focus:bg-white transition-all"
+              />
+              {search && (
+                <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 z-10">
+                  <X className="w-3 h-3" />
+                </button>
+              )}
             </div>
-          )}
 
-          {/* Empty state */}
-          {!isLoading && totalLeads === 0 && !error && !search.trim() && (
-            <div className="rounded-2xl glass-3 gloss-edge px-6 py-16 text-center">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 text-white
-                              bg-gradient-to-br from-emerald-400 to-emerald-500
-                              shadow-[inset_0_1px_0_rgba(255,255,255,0.7),0_6px_18px_rgba(16,185,129,0.32)]">
-                <CheckCircle2 className="w-7 h-7" />
-              </div>
-              <p className="text-[16px] font-semibold text-slate-900">All clear — queue is empty</p>
-              <p className="text-[12px] text-slate-500 mt-1.5 max-w-[260px] mx-auto leading-relaxed">
-                No active leads to chase. Import a fresh batch or wait for new inquiries to land.
-              </p>
-              <a href="/leads/import"
-                className="inline-flex items-center gap-1.5 mt-4 h-9 px-4 rounded-full text-white
-                           bg-gradient-to-b from-sky-400 to-sky-500 text-[12px] font-semibold
-                           shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)]
-                           transition-all active:scale-[0.98]">
-                Import leads →
-              </a>
-            </div>
-          )}
+            <span className="hidden lg:block h-6 w-px bg-slate-200 shrink-0 mx-1" aria-hidden />
 
-          {/* No search results */}
-          {!isLoading && totalLeads === 0 && search.trim() && (
-            <div className="rounded-2xl glass-2 gloss-edge px-6 py-12 text-center">
-              <p className="text-[14px] font-semibold text-slate-700">No results for &ldquo;{search}&rdquo;</p>
-              <button onClick={() => setSearch("")}
-                className="mt-3 text-[12px] text-sky-600 hover:text-sky-700 font-semibold">
-                Clear search
-              </button>
-            </div>
-          )}
+            <QueueGradeTabs active={gradeTab} onChange={setGradeTab} counts={counts} />
 
-          {/* Hero — the #1 lead, always the focus across grade tabs */}
-          {!isLoading && hero && (
-            <QueueHeroCard lead={hero} onOpen={setOpenLeadId} />
-          )}
+            {isManager && teamData && teamData.members.length > 0 && (
+              <ThemedSelect
+                variant="pill"
+                leadingIcon={<Users className="w-3.5 h-3.5 text-slate-400 shrink-0" />}
+                value={repFilter ?? "all"}
+                onValueChange={(v) => setRepFilter(v === "all" ? undefined : v)}
+                options={[{ value: "all", label: "All reps" }, ...teamData.members.map((m) => ({ value: m.id, label: `${m.first_name} ${m.last_name ?? ""}`.trim() }))]}
+                className="max-w-[150px]"
+                aria-label="Filter by rep"
+              />
+            )}
 
-          {/* The rest of the queue — one continuous list on the natural page
-              scroll. Grade filter sits just above it. */}
-          {!isLoading && totalLeads > 0 && (
-            <section className="flex flex-col gap-3">
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-ink-muted">
-                  {gradeTab === "all" ? "The rest of your queue" : `Grade ${gradeTab} leads`}
-                </p>
-                {totalLeads > 5 && (
-                  <QueueGradeTabs active={gradeTab} onChange={setGradeTab} counts={counts} />
+            <ThemedSelect
+              variant="pill"
+              value={sourceFilter}
+              onValueChange={setSourceFilter}
+              options={[{ value: "all", label: "All sources" }, ...(sourcesData?.sources ?? []).map((s) => ({ value: s.id, label: s.name }))]}
+              className="max-w-[150px]"
+              aria-label="Filter by source"
+            />
+
+            <div className="relative">
+              <button
+                onClick={() => setFiltersOpen((o) => !o)}
+                className={cn(
+                  "inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full border text-[13px] font-semibold transition-all",
+                  filtersAreActive(filters)
+                    ? "bg-sky-50 border-sky-200 text-sky-700"
+                    : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50",
                 )}
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                Filters
+                {filtersAreActive(filters) && (
+                  <span className="ml-0.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-sky-600 text-white text-[10px] font-bold tabular-nums">
+                    {filters.channels.size + (filters.hideContactedToday ? 1 : 0)}
+                  </span>
+                )}
+              </button>
+              <QueueFilters open={filtersOpen} onClose={() => setFiltersOpen(false)} state={filters} onChange={setFilters} />
+            </div>
+          </div>
+
+          {/* Body: loading / empty / table */}
+          {isLoading ? (
+            <div className="px-4 sm:px-5 pb-5 flex flex-col gap-2">
+              {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-14 rounded-lg" />)}
+            </div>
+          ) : totalLeads === 0 ? (
+            <EmptyState
+              icon={search.trim() ? Search : Inbox}
+              title={search.trim() ? `No results for “${search}”` : "All clear — queue is empty"}
+              description={search.trim()
+                ? "Try a different name, company or number."
+                : "No active leads to chase. Import a fresh batch or wait for new inquiries to land."}
+              action={search.trim() ? (
+                <button onClick={() => setSearch("")} className="text-[12px] text-sky-600 hover:text-sky-700 font-semibold">Clear search</button>
+              ) : (
+                <a href="/leads/import" className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-[12px] font-semibold">
+                  <Upload className="w-3.5 h-3.5" /> Import leads
+                </a>
+              )}
+              className="py-16"
+            />
+          ) : tabLeads.length === 0 ? (
+            <div className="px-5 py-14 text-center text-[13px] text-ink-muted">No Grade {gradeTab} leads right now.</div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[600px] border-collapse">
+                  <thead>
+                    <tr className="border-y border-slate-100 bg-slate-50/50">
+                      <Th className="pl-5">Lead</Th>
+                      <Th className="hidden lg:table-cell">Signal</Th>
+                      <Th className="text-right">Value</Th>
+                      <Th>Grade</Th>
+                      <Th className="hidden sm:table-cell">Next action</Th>
+                      <Th className="hidden xl:table-cell">Source</Th>
+                      <Th className="hidden lg:table-cell">Last active</Th>
+                      <Th className="pr-5"><span className="sr-only">Open</span></Th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {pageLeads.map((lead, i) => (
+                      <QueueLeadRow
+                        key={lead.id}
+                        lead={lead}
+                        onClick={setOpenLeadId}
+                        isNext={gradeTab === "all" && safePage === 1 && i === 0}
+                      />
+                    ))}
+                  </tbody>
+                </table>
               </div>
 
-              <div className="flex flex-col gap-2">
-                {/* Column header — labels the aligned columns below */}
-                <div className={`${QUEUE_GRID} px-3 pb-0.5`} aria-hidden>
-                  <span /><span />
-                  <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-300">Lead</span>
-                  <span className="hidden sm:block text-right text-[10px] font-bold uppercase tracking-[0.1em] text-slate-300">Value</span>
-                  <span className="justify-self-end text-[10px] font-bold uppercase tracking-[0.1em] text-slate-300">Next</span>
-                </div>
-
-                {gradeTab === "all" ? (
-                  // #2…N in rank order: the top-5 tail (ranked) then everyone else.
-                  <>
-                    {nextUp.map((lead, i) => (
-                      <QueueLeadRow key={lead.id} lead={lead} rank={i + 2} onClick={setOpenLeadId} />
-                    ))}
-                    {belowList.map((lead) => (
-                      <QueueLeadRow key={lead.id} lead={lead} onClick={setOpenLeadId} />
-                    ))}
-                  </>
-                ) : belowList.length > 0 ? (
-                  belowList.map((lead) => (
-                    <QueueLeadRow key={lead.id} lead={lead} onClick={setOpenLeadId} />
-                  ))
-                ) : (
-                  <div className="rounded-2xl glass-1 px-5 py-8 text-center text-[13px] text-ink-muted">
-                    No Grade {gradeTab} leads right now.
+              {/* Footer: count + pagination */}
+              <div className="flex items-center justify-between gap-3 flex-wrap px-4 sm:px-5 py-3.5 border-t border-slate-100">
+                <p className="text-[12.5px] text-ink-muted tabular-nums">
+                  Showing {pageStart + 1}–{Math.min(pageStart + PER_PAGE, tabLeads.length)} of {tabLeads.length} lead{tabLeads.length === 1 ? "" : "s"}
+                </p>
+                {pageCount > 1 && (
+                  <div className="flex items-center gap-1">
+                    <PageBtn onClick={() => goToPage(safePage - 1)} disabled={safePage === 1} aria-label="Previous page">
+                      <ChevronLeft className="w-4 h-4" />
+                    </PageBtn>
+                    {pageWindow(safePage, pageCount).map((p, idx) =>
+                      p === "…" ? (
+                        <span key={`ellipsis-${idx}`} className="w-8 text-center text-[13px] text-slate-400">…</span>
+                      ) : (
+                        <PageBtn key={p} active={p === safePage} onClick={() => goToPage(p)}>{p}</PageBtn>
+                      ),
+                    )}
+                    <PageBtn onClick={() => goToPage(safePage + 1)} disabled={safePage === pageCount} aria-label="Next page">
+                      <ChevronRight className="w-4 h-4" />
+                    </PageBtn>
                   </div>
                 )}
               </div>
-            </section>
+            </>
           )}
+        </section>
 
       </div>
 

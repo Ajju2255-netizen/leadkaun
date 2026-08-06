@@ -140,7 +140,7 @@ function EditModal({
       <div className="w-full max-w-lg bg-white rounded-xl shadow-[0_16px_48px_rgba(15,23,42,0.18)] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <h2 className="text-[16px] font-bold text-slate-900">
+          <h2 className="text-[15px] font-semibold text-ink">
             {template ? "Edit Template" : "New Template"}
           </h2>
           <button
@@ -179,7 +179,7 @@ function EditModal({
                     key={t}
                     type="button"
                     onClick={() => setType(t)}
-                    className={`flex-1 flex items-center justify-center gap-2 h-10 rounded-xl border text-[13px] font-semibold transition-all ${
+                    className={`flex-1 flex items-center justify-center gap-2 h-10 rounded-lg border text-[13px] font-semibold transition-all ${
                       active
                         ? "bg-sky-600 border-sky-600 text-white"
                         : "bg-white border-slate-200 text-slate-600 hover:border-slate-300"
@@ -267,7 +267,7 @@ function EditModal({
         <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-slate-100">
           <button
             onClick={onClose}
-            className="h-9 px-4 rounded-full border border-slate-200 text-[13px] font-semibold text-slate-600
+            className="h-9 px-4 rounded-lg border border-slate-200 text-[13px] font-semibold text-slate-600
                        hover:bg-slate-50 hover:border-slate-300 transition-all"
           >
             Cancel
@@ -275,9 +275,8 @@ function EditModal({
           <button
             onClick={handleSave}
             disabled={saving || !name.trim() || !body.trim()}
-            className="h-9 px-5 rounded-full bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)] text-white text-[13px] font-semibold
-                       disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.97] transition-all
-                       shadow-[0_1px_2px_rgba(14, 165, 233,0.25),inset_0_1px_0_rgba(255,255,255,0.12)]"
+            className="h-9 px-5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-[13px] font-semibold
+                       disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {saving ? "Saving…" : template ? "Update" : "Create"}
           </button>
@@ -298,7 +297,7 @@ function PreviewModal({ template, onClose }: { template: Template; onClose: () =
               {cfg.icon}
             </div>
             <div>
-              <h2 className="text-[16px] font-bold text-slate-900">{template.name}</h2>
+              <h2 className="text-[15px] font-semibold text-ink">{template.name}</h2>
               <p className="text-[11px] text-slate-400">{cfg.label} · {template.usage_count} uses</p>
             </div>
           </div>
@@ -335,7 +334,7 @@ function PreviewModal({ template, onClose }: { template: Template; onClose: () =
         <div className="px-6 py-4 border-t border-slate-100 flex justify-end">
           <button
             onClick={onClose}
-            className="h-9 px-5 rounded-full bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)] text-white text-[13px] font-semibold transition-all"
+            className="h-9 px-5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-[13px] font-semibold transition-all"
           >
             Done
           </button>
@@ -370,7 +369,7 @@ function DeleteModal({ template, onClose }: { template: Template; onClose: () =>
           <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center mb-4">
             <Trash2 className="w-5 h-5 text-red-600" />
           </div>
-          <h2 className="text-[16px] font-bold text-slate-900">Delete template?</h2>
+          <h2 className="text-[15px] font-semibold text-ink">Delete template?</h2>
           <p className="text-[13px] text-slate-500 mt-1 leading-relaxed">
             &ldquo;{template.name}&rdquo; will be permanently removed. This cannot be undone.
           </p>
@@ -378,14 +377,14 @@ function DeleteModal({ template, onClose }: { template: Template; onClose: () =>
         <div className="flex gap-2 px-6 pb-6">
           <button
             onClick={onClose}
-            className="flex-1 h-10 rounded-full border border-slate-200 text-[13px] font-semibold text-slate-600 hover:bg-slate-50 transition-all"
+            className="flex-1 h-10 rounded-lg border border-slate-200 text-[13px] font-semibold text-slate-600 hover:bg-slate-50 transition-all"
           >
             Cancel
           </button>
           <button
             onClick={handleDelete}
             disabled={busy}
-            className="flex-1 h-10 rounded-full bg-red-600 hover:bg-red-700 text-white text-[13px] font-semibold disabled:opacity-50 transition-all"
+            className="flex-1 h-10 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[13px] font-semibold disabled:opacity-50 transition-all"
           >
             {busy ? "Deleting…" : "Delete"}
           </button>
@@ -411,7 +410,7 @@ function TemplateCard({
   const cfg = TYPE_CONFIG[template.type]
 
   return (
-    <div className="glass-card p-4 hover:-translate-y-[1px] transition-all duration-200">
+    <div className="rounded-2xl border border-slate-200/70 bg-white p-4 hover:-translate-y-[1px] transition-all duration-200">
       <div className="flex items-start gap-3">
         {/* Icon */}
         <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${cfg.bg} ${cfg.text}`}>
@@ -423,7 +422,7 @@ function TemplateCard({
         {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-[14px] font-bold text-slate-900 truncate">{template.name}</p>
+            <p className="text-[14px] font-semibold text-ink truncate">{template.name}</p>
             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${cfg.bg} ${cfg.text}`}>
               {cfg.label}
             </span>
@@ -452,7 +451,7 @@ function TemplateCard({
       <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-slate-100">
         <button
           onClick={() => onPreview(template)}
-          className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-full border border-slate-200
+          className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg border border-slate-200
                      text-[12px] font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-50 hover:border-slate-300 transition-all"
         >
           <Eye className="w-3.5 h-3.5" />
@@ -460,9 +459,8 @@ function TemplateCard({
         </button>
         <button
           onClick={() => onEdit(template)}
-          className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-full bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)]
-                     text-white text-[12px] font-semibold transition-all
-                     shadow-[0_1px_2px_rgba(14, 165, 233,0.25),inset_0_1px_0_rgba(255,255,255,0.12)]"
+          className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg bg-sky-600 hover:bg-sky-700
+                     text-white text-[12px] font-semibold transition-colors"
         >
           <Pencil className="w-3.5 h-3.5" />
           Edit
@@ -508,12 +506,12 @@ export default function TemplatesPage() {
       {/* ── Header ────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-start gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_6px_18px_rgba(14,165,233,0.32)]">
-            <MessageSquare className="w-6 h-6 text-white" strokeWidth={2.4} />
+          <div className="w-11 h-11 rounded-xl grid place-items-center bg-sky-50 text-sky-600">
+            <MessageSquare className="w-5 h-5" strokeWidth={2.4} />
           </div>
           <div>
-            <h1 className="text-[28px] font-bold text-ink tracking-[-0.02em] leading-tight">Smart Templates</h1>
-            <p className="text-[13px] text-slate-500 mt-0.5">
+            <h1 className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">Smart Templates</h1>
+            <p className="text-[13px] text-ink-muted mt-1">
               {allTemplates.length} / 20 templates used.
             </p>
           </div>
@@ -521,10 +519,9 @@ export default function TemplatesPage() {
         <button
           onClick={() => setEditTarget("create")}
           disabled={atLimit}
-          className="flex items-center gap-1.5 h-9 px-4 rounded-full bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)] text-white
+          className="flex items-center gap-1.5 h-9 px-4 rounded-lg bg-sky-600 hover:bg-sky-700 text-white
                      text-[13px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed
-                     active:scale-[0.97] transition-all
-                     shadow-[0_1px_2px_rgba(14, 165, 233,0.25),inset_0_1px_0_rgba(255,255,255,0.12)]"
+                     transition-colors"
         >
           <Plus className="w-4 h-4" />
           New Template
@@ -562,7 +559,7 @@ export default function TemplatesPage() {
 
       {/* ── Empty ────────────────────────────────────────────────────── */}
       {!isLoading && templates.length === 0 && (
-        <div className="glass-card px-6 py-16 text-center">
+        <div className="rounded-2xl border border-slate-200/70 bg-white px-6 py-16 text-center">
           <div className="w-12 h-12 rounded-xl bg-sky-50 flex items-center justify-center mx-auto mb-4">
             <FileText className="w-6 h-6 text-sky-600" />
           </div>
@@ -572,7 +569,7 @@ export default function TemplatesPage() {
           </p>
           <button
             onClick={() => setEditTarget("create")}
-            className="mt-4 h-9 px-4 rounded-full bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_4px_12px_rgba(14,165,233,0.32)] text-white text-[13px] font-semibold transition-all"
+            className="mt-4 h-9 px-4 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-[13px] font-semibold transition-all"
           >
             Create first template
           </button>
@@ -632,7 +629,7 @@ export default function TemplatesPage() {
 
       {/* ── Merge field guide ────────────────────────────────────────── */}
       {!isLoading && allTemplates.length > 0 && (
-        <div className="glass-card px-4 py-3.5">
+        <div className="rounded-2xl border border-slate-200/70 bg-white px-4 py-3.5">
           <div className="flex items-center gap-2 mb-2">
             <Zap className="w-3.5 h-3.5 text-sky-600" />
             <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Merge Fields</p>

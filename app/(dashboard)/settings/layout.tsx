@@ -50,7 +50,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
         className={`relative flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] transition-colors duration-150
           ${active
             ? "text-slate-900 font-semibold bg-white shadow-sm border border-slate-100"
-            : "text-slate-500 font-medium hover:bg-white/60 hover:text-slate-800"}`}
+            : "text-slate-500 font-medium hover:bg-white hover:text-slate-800"}`}
       >
         <Icon className={`w-3.5 h-3.5 shrink-0 ${active ? "text-sky-600" : "text-slate-400"}`} strokeWidth={active ? 2.5 : 2} />
         {tab.label}
@@ -68,7 +68,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
         className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-[13px] whitespace-nowrap shrink-0 transition-colors
           ${active
             ? "text-white font-semibold bg-sky-500 shadow-sm"
-            : "text-slate-600 font-medium bg-white/70 border border-slate-100 hover:text-slate-900"}`}
+            : "text-slate-600 font-medium bg-white border border-slate-100 hover:text-slate-900"}`}
       >
         <Icon className="w-3.5 h-3.5 shrink-0" strokeWidth={active ? 2.5 : 2} />
         {tab.label}
