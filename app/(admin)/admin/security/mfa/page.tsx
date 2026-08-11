@@ -43,40 +43,40 @@ export default function AdminMfa() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center px-4">
-      <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-slate-900/50 p-6">
+    <div className="min-h-screen text-ink flex items-center justify-center px-4">
+      <div className="w-full max-w-sm rounded-2xl glass-2 p-6">
         <div className="flex items-center gap-2 mb-4">
-          <ShieldCheck className="w-5 h-5 text-violet-400" />
-          <p className="text-[15px] font-bold">Two-factor authentication</p>
+          <ShieldCheck className="w-5 h-5 text-sky-500" />
+          <p className="text-[15px] font-black text-ink">Two-factor authentication</p>
         </div>
 
-        {mode === "loading" && <p className="text-[13px] text-slate-400">Checking your security factors…</p>}
+        {mode === "loading" && <p className="text-[13px] text-ink-soft">Checking your security factors…</p>}
 
         {mode === "enroll" && (
           <>
-            <p className="text-[13px] text-slate-400 mb-3">Scan this with your authenticator app, then enter the 6-digit code.</p>
+            <p className="text-[13px] text-ink-soft mb-3">Scan this with your authenticator app, then enter the 6-digit code.</p>
             {/* Base64 QR data URI from Supabase MFA — next/image adds no value here. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            {qr && <img src={qr} alt="TOTP QR" className="w-44 h-44 bg-white rounded-lg p-2 mx-auto mb-3" />}
+            {qr && <img src={qr} alt="TOTP QR" className="w-44 h-44 bg-white rounded-xl p-2 mx-auto mb-3 border border-hairline" />}
           </>
         )}
         {mode === "challenge" && (
-          <p className="text-[13px] text-slate-400 mb-3">Enter the 6-digit code from your authenticator app.</p>
+          <p className="text-[13px] text-ink-soft mb-3">Enter the 6-digit code from your authenticator app.</p>
         )}
 
         {(mode === "enroll" || mode === "challenge") && (
           <form onSubmit={verify} className="space-y-3">
             <input inputMode="numeric" autoFocus required value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
               placeholder="000000"
-              className="w-full h-11 rounded-lg bg-slate-800 border border-white/10 px-3 text-center text-[18px] tracking-[0.4em] text-white outline-none focus:border-violet-400" />
-            {err && <p className="text-[12px] text-rose-400">{err}</p>}
+              className="w-full h-11 rounded-lg bg-white/80 border border-hairline-strong px-3 text-center text-[18px] tracking-[0.4em] text-ink outline-none focus:border-sky-400" />
+            {err && <p className="text-[12px] text-red-600">{err}</p>}
             <button type="submit" disabled={busy || code.length !== 6}
-              className="w-full h-10 rounded-lg bg-gradient-to-b from-violet-500 to-fuchsia-600 hover:from-violet-400 hover:to-fuchsia-500 text-white text-[13px] font-semibold disabled:opacity-50 transition-all">
+              className="btn-primary w-full h-10 text-[13px] disabled:opacity-50">
               {busy ? "Verifying…" : "Verify"}
             </button>
           </form>
         )}
-        {err && mode === "loading" && <p className="text-[12px] text-rose-400 mt-2">{err}</p>}
+        {err && mode === "loading" && <p className="text-[12px] text-red-600 mt-2">{err}</p>}
       </div>
     </div>
   )

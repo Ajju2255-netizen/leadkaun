@@ -351,6 +351,7 @@ Client id `leadkaun`, served at `/api/inngest`. Every function writes a `JobRun`
 | **Morning brief** | `0 3 * * 1-6` | 08:30 Mon–Sat | Role-specific brief emails |
 | **Missed opportunity** | `0 * * * *` | hourly | Mark stale leads missed; AT_RISK/MISSED/RECOVERY notifications |
 | **Exec-score alert** | `30 9 * * 1-6` | 15:00 Mon–Sat | Alert managers about reps scoring < 25 |
+| **Signup alert** | `*/15 * * * *` | every 15 min | Email (+ optional Slack) to platform admins for each new account. Window watermark = the last **successful** run in `job_runs`, so a failed send retries the same window instead of losing the alert. |
 | **Sheets sync** | `*/5 * * * *` | every 5 min | **No-op** (Sheets model unmigrated) |
 | **Admin daily insights** | `0 2 * * *` | 07:30 daily | Mission Control cross-account digest → `AdminInsight` |
 
@@ -435,20 +436,93 @@ A fully separate cross-tenant admin surface at **admin.leadkaun.com** (`app/(adm
 
 > **MFA is currently gated off** (`PLATFORM_MFA_REQUIRED` not "true") — the code itself flags that it should be on, since a platform admin can impersonate any tenant.
 
+## Design system
+
+Mission Control uses the **same Coastal Sunrise tokens as the product** (`app/globals.css`) — light surfaces, sky-500 primary, glass cards. Its separate identity comes from the shield mark and the orange "Leadkaun internal" chip, not from a different palette. Shared primitives live in `app/(admin)/admin/(authed)/_components/ui.tsx` (`Kpi`, `Stat`, `Bar`, `BarRow`, `FunnelStep`, `Pill`, `Dot`, `Grade`, `HealthPill`, table parts, and the `num`/`inr`/`pctOrDash`/`ago`/`duration` formatters).
+
+Two rules the kit enforces everywhere:
+
+1. **A rate with no denominator renders `—`, never `0%`.** An unmeasured metric must not read as a measured zero.
+2. **Unknown is grey, never red** (Law 1). A health pill with no traffic to judge says "no data yet"; it is not shown as degraded.
+
+## Host routing gotcha
+
+The admin host serves **clean URLs** — `admin.leadkaun.com/audit` is rewritten by middleware onto `/admin/audit`. Both forms resolve, so `usePathname()` returns `/audit` on a direct visit and `/admin/audit` after an in-app navigation. `AdminNav` normalises both sides (`norm()`) before comparing; anything else that branches on the pathname must do the same.
+
+## Navigation
+
+Nine groups, ~21 destinations (`_components/AdminNav.tsx`):
+
+`Overview` · `Business` · **Customers** (Accounts · Workspaces · Users) · **Intelligence** (Leads · Scoring · Recommendations · Signals) · **Intake** (Sessions · Analytics) · **Growth** (Activation · Acquisition) · **Operations** (Jobs · Errors · Integrations) · **Billing** (Subscriptions · Payments · Usage) · **Governance** (Audit Log · Support) · **System** (Feature Flags · Health)
+
+Renamed routes keep redirects: `/admin/customers[/:id]` → `/admin/accounts[/:id]`, `/admin/revenue` → `/admin/billing`, `/admin/analytics` → `/admin/growth/activation`.
+
 ## Modules
 
-- **Dashboard** — cross-account KPIs (companies, paying, trials, MRR, signups/active/imports/emails today), 5 system-health pills, live activity timeline, and the AI-insights banner.
-- **Customers** — a CRM list of every account with a health dot, counts, plan + MRR, last-active.
-- **Company 360°** — health score (0–100, transparent weighted: imports/active-users/adoption/activity/brief-opens over 14 days) + churn band, usage stats, team roster, workspaces, health reasons, feature-flag toggles, full timeline, the manual **PlanEditor** (SUPER_ADMIN plan/MRR upsert), and a **Login-as-Customer** button.
-- **Revenue** — MRR, ARR, paying, trials, conversion %, churn %, plan distribution (CAC/LTV/payments are provider-gated placeholders).
-- **Product Analytics** — the acquisition funnel (signup → verified → imported → scored → brief → returned → paid, with drop-off) and honest feature-adoption proxies.
-- **System** — DB ping, email counts, rate-limit keys, **cron heartbeats** (stale = no run in 48h), per-template email engagement, recent errors.
-- **Support** — debounced cross-account global search over companies/users/leads/workspaces → Company 360.
-- **Daily AI insights** — computed action items (new customers, churn-risk = paying-but-inactive-14d, inactive trials, not-yet-onboarded), snapshotted daily into `AdminInsight`.
+**Business** (`lib/admin/business.ts`) — the company scorecard, over a chosen window (today / 7d / 30d / 90d / this month / quarter / year / all time) with a delta against the equally-long window before it. Signups **and who they were** (company, owner, plan, source, users, leads, activated); users total/new/by role/by status; revenue MRR·ARR·ARPA, paying-now vs ever-paid, ₹ collected in period, last payment, churn; and 12-month signup + revenue bars.
+
+Two correctness rules this module exists to enforce:
+
+- **The account mix is computed from the account list outward**, not from the `subscriptions` table. A plan distribution built from subscriptions alone silently omits every account with no subscription row — which is exactly the free population. The page asserts `free + trialing + paid + pastDue = total` and shows a red warning if it ever fails to reconcile.
+- **Paid/free is decided by plan key, never by price.** `enterprise` is stored at `price_inr = 0` because it is negotiated per deal; a price-based test would file paying enterprise customers under "free". `FREE_PLAN_KEYS = {trial}` is the single source of that truth, used by both the mix and the signup list.
+
+It also keeps **MRR** (a forward-looking rate from `subscriptions.mrr_inr`) apart from **collected** (money that actually arrived, from `payments`). They disagree whenever a plan was set by hand, so both are shown and labelled — an empty payments table with live MRR says the plans are manual, not that revenue vanished.
+
+**Overview** (`lib/admin/overview.ts`) — the cockpit. Includes a **Latest signups** panel (who signed up, their owner email, plan, activation state, acquisition source) so a new customer is a name to act on rather than a number in a counter. KPI row where every metric carries its own definition; **Attention Required**, computed from real thresholds with the evidence stated per item (paying-but-silent-14d, ≥80% of a plan's active-lead cap, seat exhaustion, failed imports, stalled/failed intakes, never-imported accounts, a ≥2pt RAR drop, delayed jobs, email failures, erroring Sheets connections); 7 health pills; the activation funnel; the intelligence and intake headlines; the customer-health distribution; today's counters; and the live activity timeline.
+
+**Accounts** (`lib/admin/accounts.ts`) — filterable list (plan, sub status, health, activation, industry, state, sort) built from grouped aggregates, not per-row queries. **Account 360** adds a 9-step activation checklist where each step is a real row with its timestamp, seat + active-lead usage against the plan's enforced caps, grade distribution and per-account RAR with skip reasons, a team roster with per-rep operating stats, recent intake sessions, health evidence, feature-flag toggles, timeline, and the manual PlanEditor. Write controls are disabled for the `SUPPORT` role.
+
+**Workspaces** (`lib/admin/workspaces.ts`) — cross-tenant list with archived/empty/idle filters; detail shows grade distribution, per-stage lead counts, sources in use with their intent baselines, and members.
+
+**Users** (`lib/admin/users.ts`) — every user across every tenant. Distinguishes `invited` (never accepted — **still occupies a seat**) from `deactivated` (seat freed), because only one of the two frees capacity.
+
+**Leads + Lead Inspector** (`lib/admin/leads.ts`) — the support workhorse. The inspector shows the customer's own `buildScoreExplanation` output beside the raw engine layer: a **live recomputation** (`computeFitScore` / `computeQualityScore` / `assignGrade` / `checkSqlThreshold`) that flags drift between the stored grade and what the engine would produce now, the recomputed breakdowns, which grade ladder applied, the inferred industry/state, the SQL check with its thresholds, confidence decomposition, provenance, full recommendation history, every signal with intent before/after (marking clamp absorption), a merged evidence timeline, the ICP that fit was judged against, and the raw stored breakdown JSON. It surfaces the "ICP not configured → fit is a flat 38" case explicitly.
+
+**Scoring** (`lib/admin/scoring.ts`) — grade distribution, component band spread, and the screen's reason for existing: the **unknown-vs-bad split**. Low-graded leads are separated into *thin data* (no company, role, location or value known), *known mismatch*, and *flagged junk*, because a histogram cannot tell them apart. Plus fit-input coverage, ICP coverage, 7-day grade movement, and per-source scoring.
+
+**Recommendations** (`lib/admin/recommendations.ts`) — cross-account RAR with period-over-period delta, the full funnel (shown → expanded → decided → accepted → executed → outcome → positive) with per-stage conversion, the skip-reason breakdown, skip-reason × grade, acceptance by grade and by confidence band, and a per-account trust table sorted worst-first. `OUTCOME` result is read from `detail->>'result'`, so positive-outcome rate is real.
+
+**Signals** (`lib/admin/signals.ts`) — every signal with `intent_score_before/after`, the configured `SIGNAL_WEIGHTS` value next to the written value, and an *applied* column (after − before) that exposes clamp absorption.
+
+**Intake** (`lib/admin/intake.ts`) — sessions list with source/state/low-confidence/dropped filters; detail renders the **state machine** with per-state timestamps, the four-part Time-to-Trust breakdown, the dataset snapshot, the internal confidence decomposition, the **frozen report exactly as the customer saw it** (every `EvidenceFinding` with its evidence, or an honest "not determined"), the linked import job with a sample-vs-actual duplicate comparison, and the raw event log. Analytics covers the intake funnel, TTT medians with sample sizes, what real lead lists are missing, business-type/source/readiness mix, abandonment reasons, and engine-version mix.
+
+**Growth** (`lib/admin/growth.ts`) — activation funnel where each step lists the accounts that fell out at exactly that point; weekly signup cohorts with D1/D7/D30 measured from each account's own signup date; feature adoption; and acquisition by UTM source/campaign/country with activation rate and MRR per channel.
+
+**Operations** (`lib/admin/ops.ts`) — jobs judged against **per-function cadences** (`JOB_SPECS`), not one flat threshold: a 5-minute job silent for 20h is broken, a daily one is not, and the event-driven `icp-regrade` is never stale. The error centre separates **expected validation skips** from **actual system failures**, classifying free-text import errors into stable reason codes. Integrations covers Sheets, Resend, Razorpay, Inngest, Supabase and WhatsApp, with "unknown" distinct from "healthy".
+
+**Billing** (`lib/admin/subscriptions.ts`) — plans with uptake and a warning for priced plans missing `provider_plan_id` (not sellable until `razorpay-sync-plans.ts` runs), the subscription table marking manual vs provider-backed rows, payments, and a usage table showing every account against its enforced seat and active-lead caps.
+
+**Revenue history** (`lib/admin/revenue-history.ts`) — there is no stored MRR series, because `subscriptions.mrr_inr` is overwritten on every change. Both write paths do leave an append-only trail, though: the manual path records `PLAN_CHANGED` with `detail.mrrRupees`, the webhook path records it with `detail.plan`. Walking that trail in order rebuilds a per-account MRR timeline (on Account 360, merged with payments and invoices) and a platform-wide **new / expansion / contraction / churn** chart by month (on Billing).
+
+The rule that keeps it honest: an event that resolves to neither a rupee value nor a known plan key is reported as **unresolved**, never assumed to be ₹0 — assuming zero would invent a churn that never happened. Both screens state that this is a reconstruction and how far back the event stream reaches.
+
+**Payments & invoices** (`/admin/billing/payments`) — the ledger: payments filterable by status with collected / refunded / **net kept** / failed totals that always describe the whole ledger rather than the filtered slice, plus invoices with their serial number, period and PDF link. A refund keeps its positive amount in the database (`status = 'refunded'`) and is rendered negative so the column sums as expected; a *failed* payment shows no amount at all, since no money moved.
+
+**Audit log** (`lib/admin/audit.ts`) — a unified read over `impersonation_logs` + `account_events` + `feature_flags`, with open (never-exited) impersonation sessions called out.
+
+**Support** — one search box over accounts, users, workspaces, leads, intake sessions and imports; exact-id lookups resolve a cuid pasted from a log. Every hit deep-links to the screen that continues the investigation.
+
+**Daily AI insights** — computed action items, snapshotted daily into `AdminInsight`.
+
+## What admin deliberately does NOT show
+
+Each of these would require data that is not collected, and a plausible-looking invented number is worse than an absent one. Every affected screen states the reason inline:
+
+| Missing | Why |
+|---|---|
+| Visitor → signup rate, CAC | No page-view tracking; no ad-spend connection. |
+| LTV, NRR | Needs a retention curve over a meaningful number of churned paying accounts. (Expansion/contraction/churn ARE now shown, reconstructed from plan-change events — see Revenue history.) |
+| API request counts, latency, per-endpoint error rates | Nothing writes a request log. `rate_limits` measures limiter pressure, not traffic. |
+| Application exceptions | No error table and no APM — uncaught 500s only reach the platform console. |
+| Field-level before → after audit diffs | Event `detail` JSON stores the new value only. |
+| Experiments / A-B results | No assignment table, variant column or exposure logging exists. |
+| Research / RFC / Laws registry | No backing tables; the governance model lives in docs, not the database. |
 
 ## Impersonation ("Login as customer")
 
 SUPER_ADMIN only. Writes the `ImpersonationLog` audit row **first**, mints a one-time Supabase magic link, signs an encrypted 1h impersonation marker, and returns an app-host URL. The landing sets an httpOnly `lk_impersonation` cookie; the `ImpersonationBanner` shows a persistent "all actions are audited" bar with an Exit that stamps `ended_at`.
+
+A **reason is required** (`min(4)`, enforced server-side in the zod body schema, not just in the UI): an audit row whose reason is blank — or a constant "Support" — is not an audit trail. The Audit Log flags sessions that were never explicitly exited.
 
 ## Feature flags (`lib/feature-flags.ts`)
 
@@ -491,7 +565,7 @@ Validated at import by `lib/env.ts` (zod; throws on missing/invalid).
 
 **Optional:** `GOOGLE_CLIENT_ID`/`_SECRET`, `RAZORPAY_KEY_ID` (starts `rzp_`), `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` (a *different* value from the key secret).
 
-**Used but not in the schema:** `ENCRYPTION_KEY` (throws in prod if unset), `DEV_AUTH_BYPASS`, `PLATFORM_ADMIN_EMAILS`, `PLATFORM_MFA_REQUIRED`, `NEXT_PUBLIC_ADMIN_URL`.
+**Used but not in the schema:** `ENCRYPTION_KEY` (throws in prod if unset), `DEV_AUTH_BYPASS`, `PLATFORM_ADMIN_EMAILS`, `PLATFORM_MFA_REQUIRED`, `NEXT_PUBLIC_ADMIN_URL`, `ADMIN_SLACK_WEBHOOK_URL` (optional — mirrors new-signup alerts to Slack; read from `process.env` rather than `lib/env.ts` on purpose, since that schema throws on anything missing and a Slack webhook must never be able to break a deploy).
 
 ## Commands
 
@@ -532,7 +606,7 @@ vitest unit tests in `lib/__tests__/`: `crypto.test.ts`, `razorpay.test.ts`, `se
 10. **Unused-but-implemented routes** — `/api/leads/[id]/source` and `/api/leads/[id]/snooze` have no UI caller; `lib/scoring/nba.ts` (a richer next-best-action engine) is test-only.
 11. **`lib/scoring/grade.ts` doc comment disagrees with the code** on the C-tier pre-execution rule — trust the code.
 12. **ICP page state defaults (60/50) differ from DB defaults (55/45)** for SQL thresholds — the DB value wins once loaded.
-13. **Response-shape mismatch** in admin search — `search/route.ts` wraps in `apiSuccess(...)` while the Support page reads `res.accounts` at the top level.
+13. ~~**Response-shape mismatch** in admin search.~~ **Not a bug** — `apiSuccess(data)` is `NextResponse.json(data)`, i.e. it returns the payload *directly* rather than wrapping it, so the Support page reading `res.accounts` at the top level is correct.
 14. **Emails won't deliver until the Resend sending domain is verified.**
 
 ---
@@ -556,6 +630,16 @@ vitest unit tests in `lib/__tests__/`: `crypto.test.ts`, `razorpay.test.ts`, `se
 **Billing:** `GET,POST,DELETE /api/billing/subscription` · `POST /api/billing/verify` · `POST /api/billing/webhook`
 
 **Platform admin:** `/api/admin/platform/{feature-flags,impersonate,search,subscription}`
+
+## Mission Control route map (`app/(admin)/`)
+
+Reachable only via the `admin.*` host, which serves these as clean URLs (`/accounts`, not `/admin/accounts`).
+
+`/admin` · `/admin/business` · `/admin/accounts` · `/admin/accounts/[accountId]` · `/admin/workspaces` · `/admin/workspaces/[workspaceId]` · `/admin/users` · `/admin/leads` · `/admin/leads/[leadId]` · `/admin/scoring` · `/admin/recommendations` · `/admin/signals` · `/admin/intake` · `/admin/intake/[sessionId]` · `/admin/intake/analytics` · `/admin/growth/{activation,acquisition}` · `/admin/ops/{jobs,errors,integrations}` · `/admin/billing` · `/admin/billing/payments` · `/admin/billing/usage` · `/admin/audit` · `/admin/support` · `/admin/system` · `/admin/system/flags` · `/admin/login` · `/admin/security/mfa`
+
+Redirects: `/admin/customers[/:id]` → `/admin/accounts[/:id]` · `/admin/revenue` → `/admin/billing` · `/admin/analytics` → `/admin/growth/activation`
+
+Reads live in `lib/admin/`: `overview · business · revenue-history · notify · accounts · workspaces · users · leads · scoring · recommendations · signals · intake · growth · ops · subscriptions · audit · search · health · metrics · billing · emails · funnel · insights · system · timeline · usage`. All read-only; the only admin writes are the four `/api/admin/platform/*` routes.
 
 ## Enum reference (selected)
 

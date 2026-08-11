@@ -8,6 +8,7 @@ import { missedOpportunityFn } from "@/inngest/functions/missed-opportunity"
 import { sheetsSyncFn } from "@/inngest/functions/sheets-sync"
 import { execScoreAlertFn } from "@/inngest/functions/exec-score-alert"
 import { adminDailyInsightsFn } from "@/inngest/functions/admin-daily-insights"
+import { signupAlertFn } from "@/inngest/functions/signup-alert"
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
@@ -20,5 +21,6 @@ export const { GET, POST, PUT } = serve({
     sheetsSyncFn,         // 5.6 — Google Sheets sync
     execScoreAlertFn,     // 5.7 — daily execution score alert (3pm IST)
     adminDailyInsightsFn, // Mission Control daily digest (07:30 IST)
+    signupAlertFn,        // Mission Control new-signup alert (every 15 min)
   ],
 })

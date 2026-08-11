@@ -11,7 +11,14 @@ import { z } from "zod"
 // static prerender (silences Next's DYNAMIC_SERVER_USAGE build log).
 export const dynamic = "force-dynamic"
 
-const Body = z.object({ accountId: z.string().min(1), targetUserId: z.string().optional(), reason: z.string().max(200).optional() })
+// `reason` is REQUIRED and enforced here, not just in the UI: an impersonation
+// audit row whose reason is blank (or a constant "Support") is not an audit
+// trail. Anything calling this endpoint has to say why.
+const Body = z.object({
+  accountId: z.string().min(1),
+  targetUserId: z.string().optional(),
+  reason: z.string().trim().min(4, "A reason is required — it is written to the audit log").max(200),
+})
 
 /**
  * POST /api/admin/platform/impersonate — start an audited "Login as Customer".
@@ -44,7 +51,7 @@ export async function POST(req: Request) {
         admin_email:   admin.email,
         account_id:    data.accountId,
         target_user_id: target.id,
-        reason:        data.reason ?? null,
+        reason:        data.reason,
         ip:            req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
       },
     })
@@ -53,7 +60,7 @@ export async function POST(req: Request) {
       accountId: data.accountId,
       type: "IMPERSONATED",
       summary: `Admin ${admin.email} logged in as ${target.email}`,
-      detail: { adminEmail: admin.email, targetEmail: target.email, reason: data.reason ?? null },
+      detail: { adminEmail: admin.email, targetEmail: target.email, reason: data.reason },
     })
 
     const marker = signImpersonation({
