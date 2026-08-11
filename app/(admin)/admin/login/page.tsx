@@ -23,35 +23,35 @@ export default function AdminLogin() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center px-4">
+    <div className="min-h-screen text-ink flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="flex items-center gap-2 mb-6">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-400 to-cyan-500 flex items-center justify-center shadow-[0_4px_12px_rgba(14,165,233,0.28)]">
             <ShieldCheck className="w-5 h-5 text-white" strokeWidth={2.4} />
           </div>
           <div>
-            <p className="text-[15px] font-bold tracking-tight">Mission Control</p>
-            <p className="text-[11px] text-slate-400">Leadkaun platform admin</p>
+            <p className="text-[15px] font-black tracking-tight text-ink">Mission Control</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-orange-500">Leadkaun internal</p>
           </div>
         </div>
 
-        <form onSubmit={submit} className="space-y-3 rounded-2xl border border-white/10 bg-slate-900/50 p-5">
+        <form onSubmit={submit} className="space-y-3 rounded-2xl glass-2 p-5">
           <div>
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block mb-1.5">Email</label>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-ink-muted block mb-1.5">Email</label>
             <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-              className="w-full h-10 rounded-lg bg-slate-800 border border-white/10 px-3 text-[13px] text-white outline-none focus:border-violet-400" />
+              className="w-full h-10 rounded-lg bg-white/80 border border-hairline-strong px-3 text-[13px] text-ink outline-none focus:border-sky-400" />
           </div>
           <div>
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block mb-1.5">Password</label>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-ink-muted block mb-1.5">Password</label>
             <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
-              className="w-full h-10 rounded-lg bg-slate-800 border border-white/10 px-3 text-[13px] text-white outline-none focus:border-violet-400" />
+              className="w-full h-10 rounded-lg bg-white/80 border border-hairline-strong px-3 text-[13px] text-ink outline-none focus:border-sky-400" />
           </div>
-          {err && <p className="text-[12px] text-rose-400">{err}</p>}
+          {err && <p className="text-[12px] text-red-600">{err}</p>}
           <button type="submit" disabled={loading}
-            className="w-full h-10 rounded-lg bg-gradient-to-b from-violet-500 to-fuchsia-600 hover:from-violet-400 hover:to-fuchsia-500 text-white text-[13px] font-semibold disabled:opacity-50 transition-all">
+            className="btn-primary w-full h-10 text-[13px] disabled:opacity-50">
             {loading ? "Signing in…" : "Sign in"}
           </button>
-          <p className="text-[11px] text-slate-500 text-center pt-1">Access requires an allowlisted admin account + MFA.</p>
+          <p className="text-[11px] text-ink-muted text-center pt-1">Access requires an allowlisted admin account + MFA.</p>
         </form>
       </div>
     </div>

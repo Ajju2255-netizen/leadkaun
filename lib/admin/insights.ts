@@ -33,10 +33,10 @@ export async function computeDailyInsights(): Promise<Insight[]> {
 
   const plural = (n: number) => (n > 1 ? "s" : "")
   const out: Insight[] = []
-  if (newWeek > 0) out.push({ label: `${newWeek} new customer${plural(newWeek)} this week`, count: newWeek, severity: "info", href: "/admin/customers" })
-  if (churnRisk > 0) out.push({ label: `${churnRisk} paying account${plural(churnRisk)} inactive 14d — churn risk`, count: churnRisk, severity: "critical", href: "/admin/customers" })
-  if (inactiveTrials > 0) out.push({ label: `${inactiveTrials} inactive trial${plural(inactiveTrials)}`, count: inactiveTrials, severity: "warn", href: "/admin/customers" })
-  if (notOnboarded > 0) out.push({ label: `${notOnboarded} account${plural(notOnboarded)} haven't imported yet`, count: notOnboarded, severity: "warn", href: "/admin/customers" })
+  if (newWeek > 0) out.push({ label: `${newWeek} new customer${plural(newWeek)} this week`, count: newWeek, severity: "info", href: "/admin/accounts" })
+  if (churnRisk > 0) out.push({ label: `${churnRisk} paying account${plural(churnRisk)} inactive 14d — churn risk`, count: churnRisk, severity: "critical", href: "/admin/accounts" })
+  if (inactiveTrials > 0) out.push({ label: `${inactiveTrials} inactive trial${plural(inactiveTrials)}`, count: inactiveTrials, severity: "warn", href: "/admin/accounts" })
+  if (notOnboarded > 0) out.push({ label: `${notOnboarded} account${plural(notOnboarded)} haven't imported yet`, count: notOnboarded, severity: "warn", href: "/admin/accounts" })
   if (out.length === 0) out.push({ label: "All quiet — no action items today", count: 0, severity: "info" })
   return out
 }

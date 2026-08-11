@@ -10,14 +10,14 @@ export function GlobalSearch() {
   return (
     <form
       onSubmit={(e) => { e.preventDefault(); if (q.trim().length >= 2) router.push(`/admin/support?q=${encodeURIComponent(q.trim())}`) }}
-      className="relative w-full max-w-md"
+      className="relative w-full max-w-lg"
     >
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-ink-muted" />
       <input
         value={q}
         onChange={(e) => setQ(e.target.value)}
-        placeholder="Search companies, users, leads…"
-        className="w-full h-9 rounded-lg bg-slate-900/60 border border-white/10 pl-9 pr-3 text-[13px] text-white placeholder:text-slate-500 outline-none focus:border-violet-400"
+        placeholder="Search accounts, users, leads, phone, workspaces, imports…"
+        className="w-full h-9 rounded-xl bg-white/80 border border-hairline-strong pl-9 pr-3 text-[12.5px] text-ink placeholder:text-ink-muted outline-none focus:border-sky-400"
       />
     </form>
   )
