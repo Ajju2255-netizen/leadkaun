@@ -6,6 +6,7 @@ import Link from "next/link"
 import { LeadkaunMark } from "@/components/shared/LeadkaunMark"
 import { Target, ListChecks, AlertCircle } from "lucide-react"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { trackCompleteRegistration } from "@/lib/analytics/meta-pixel"
 import { registerAction } from "./actions"
 
 const inputCls =
@@ -59,6 +60,12 @@ export default function RegisterPage() {
       setLoading(false)
       return
     }
+
+    // The account exists from here on, so this is the real "registration
+    // completed" moment. Fired before the auto sign-in deliberately: if that
+    // step fails the registration still happened, and Meta should still be
+    // told. Never throws — see trackCompleteRegistration.
+    trackCompleteRegistration({ orgName: form.orgName })
 
     const supabase = getSupabaseBrowserClient()
     const { error: signInError } = await supabase.auth.signInWithPassword({
