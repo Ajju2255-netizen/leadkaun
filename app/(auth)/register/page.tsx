@@ -65,7 +65,7 @@ export default function RegisterPage() {
     // completed" moment. Fired before the auto sign-in deliberately: if that
     // step fails the registration still happened, and Meta should still be
     // told. Never throws — see trackCompleteRegistration.
-    trackCompleteRegistration({ orgName: form.orgName })
+    trackCompleteRegistration()
 
     const supabase = getSupabaseBrowserClient()
     const { error: signInError } = await supabase.auth.signInWithPassword({

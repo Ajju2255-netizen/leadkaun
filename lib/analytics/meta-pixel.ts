@@ -26,22 +26,30 @@ declare global {
 /**
  * Fire the standard `CompleteRegistration` event.
  *
- * The live Meta campaign optimises for Completed Registration, so this must be
- * `CompleteRegistration` — a custom name such as `SignUp` is not a standard
- * event and the campaign would never receive it.
+ * Meta's spec for this event is exactly:
+ *
+ *     fbq('track', 'CompleteRegistration');
+ *
+ * — and that is all we send. No parameters.
+ *
+ * `CompleteRegistration` specifically (not `SignUp`, which is not a standard
+ * event at all) because the live campaign optimises for Completed
+ * Registration; a non-standard name would never reach it.
+ *
+ * Nothing about the account is passed. An earlier version put the customer's
+ * organisation name in `content_category` — wrong field, and it shipped a
+ * customer's business identity to Meta for no benefit. The event alone is what
+ * the campaign needs; the pixel already matches the conversion to the ad click
+ * through the `_fbc` / `_fbp` cookies.
  *
  * Safe to call when the pixel has not loaded (ad blocker, pixel disabled):
  * `fbq` is simply absent and this no-ops rather than throwing inside the
  * signup path.
  */
-export function trackCompleteRegistration(params?: { orgName?: string }) {
+export function trackCompleteRegistration() {
   if (typeof window === "undefined" || typeof window.fbq !== "function") return
   try {
-    window.fbq("track", "CompleteRegistration", {
-      content_name: "Leadkaun trial signup",
-      status: true,
-      ...(params?.orgName ? { content_category: params.orgName } : {}),
-    })
+    window.fbq("track", "CompleteRegistration")
   } catch {
     // Never let analytics break account creation.
   }
