@@ -3,6 +3,7 @@ import localFont from "next/font/local"
 import "./globals.css"
 import { QueryProvider } from "@/components/providers/QueryProvider"
 import { Toaster } from "@/components/ui/sonner"
+import { MetaPixel } from "@/components/analytics/MetaPixel"
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -27,6 +28,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        {/* Meta Pixel — must sit in <head>; see components/analytics/MetaPixel.tsx */}
+        <MetaPixel />
+      </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <QueryProvider>{children}</QueryProvider>
         {/* sonner toast renderer — was never mounted, so every toast() in the

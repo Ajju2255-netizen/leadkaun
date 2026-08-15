@@ -1,18 +1,24 @@
 import { META_PIXEL_ID } from "@/lib/analytics/meta-pixel"
 
 /**
- * Meta Pixel base code, mounted only on the `(auth)` routes.
+ * Meta Pixel base code. Rendered inside <head> from the root layout.
  *
- * Deliberately a plain inline <script>, NOT next/script.
+ * Two hard-won constraints, both discovered by Meta refusing to detect it:
  *
- * `next/script` with `strategy="afterInteractive"` injects the tag from the
- * client after hydration, so it never appears in the server-rendered HTML.
- * The pixel still worked in a real browser, but Meta's pixel-detection crawler
- * reads the raw HTML response — it found no `fbq('init')` and reported
- * "a pixel wasn't detected on this website". A server-rendered inline script
- * is what the detector (and leadkaun.com, which has always passed) uses.
+ * 1. It must be a plain inline <script>, not next/script. `afterInteractive`
+ *    injects the tag from the client after hydration, so it never reaches the
+ *    server-rendered HTML that Meta's detector reads.
  *
- * This is a server component: it emits markup only and ships no JS of its own.
+ * 2. It must be in <head>. Mounted from a nested (auth) layout it landed in
+ *    <body>, and detection failed even though the snippet was present and the
+ *    pixel fired correctly in a browser. Meta's own install instructions say
+ *    head, and leadkaun.com — which has always passed — has it there.
+ *
+ * Because <head> lives in the root layout, the snippet is now present on every
+ * page of the app. PageView is therefore gated at RUNTIME to the auth routes:
+ * the signed-in product should not be reporting URLs like /leads/<id> to Meta.
+ * The gate is deliberately written so the literal `fbq('track', 'PageView')`
+ * still appears in the served HTML for detectors to find.
  */
 export function MetaPixel() {
   if (!META_PIXEL_ID) return null
@@ -31,7 +37,9 @@ t.src=v;s=b.getElementsByTagName(e)[0];
 s.parentNode.insertBefore(t,s)}(window, document,'script',
 'https://connect.facebook.net/en_US/fbevents.js');
 fbq('init', '${META_PIXEL_ID}');
-fbq('track', 'PageView');`,
+if (/^\\/(login|register|forgot-password|set-password)(\\/|$)/.test(location.pathname)) {
+  fbq('track', 'PageView');
+}`,
         }}
       />
       <noscript>
