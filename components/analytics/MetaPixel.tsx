@@ -1,24 +1,26 @@
-"use client"
-
-import Script from "next/script"
-
 import { META_PIXEL_ID } from "@/lib/analytics/meta-pixel"
 
 /**
  * Meta Pixel base code, mounted only on the `(auth)` routes.
  *
- * Loads after the page is interactive so it never sits in front of the signup
- * form, and fires the initial PageView. The conversion event itself is fired
- * from the register page via `trackCompleteRegistration()`.
+ * Deliberately a plain inline <script>, NOT next/script.
+ *
+ * `next/script` with `strategy="afterInteractive"` injects the tag from the
+ * client after hydration, so it never appears in the server-rendered HTML.
+ * The pixel still worked in a real browser, but Meta's pixel-detection crawler
+ * reads the raw HTML response — it found no `fbq('init')` and reported
+ * "a pixel wasn't detected on this website". A server-rendered inline script
+ * is what the detector (and leadkaun.com, which has always passed) uses.
+ *
+ * This is a server component: it emits markup only and ships no JS of its own.
  */
 export function MetaPixel() {
   if (!META_PIXEL_ID) return null
 
   return (
     <>
-      <Script
+      <script
         id="meta-pixel-init"
-        strategy="afterInteractive"
         dangerouslySetInnerHTML={{
           __html: `!function(f,b,e,v,n,t,s)
 {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
