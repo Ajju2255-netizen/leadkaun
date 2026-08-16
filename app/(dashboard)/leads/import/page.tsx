@@ -19,6 +19,7 @@ import { ThemedSelect } from "@/components/shared/ThemedSelect"
 import { sourceAgeToDate, SOURCE_AGE_OPTIONS } from "@/lib/scoring/freshness"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
 import { IntakeReport } from "@/components/intake/IntakeReport"
+import { trackFunnel } from "@/lib/analytics/funnel"
 import type { IntakeReport as IntakeReportData } from "@/lib/intake/types"
 import { patchIntakeSession } from "@/lib/intake/client"
 
@@ -390,6 +391,18 @@ export default function ImportPage() {
 
   // Form state
   const [sources,     setSources]     = useState<LeadSource[]>([])
+  // Onboarding hands the user here rather than reimplementing import. When it
+  // does, the completion CTA returns them to the ICP step instead of dropping
+  // them at the queue mid-wizard.
+  const [fromOnboarding, setFromOnboarding] = useState(false)
+  useEffect(() => {
+    try {
+      setFromOnboarding(new URLSearchParams(window.location.search).get("from") === "onboarding")
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
   const [stages,      setStages]      = useState<PipelineStage[]>([])
   const [sourceId,    setSourceId]    = useState<string>("")
   const [stageId,     setStageId]     = useState<string>("")
@@ -553,6 +566,11 @@ export default function ImportPage() {
       const analyseElapsed = ((typeof performance !== "undefined" ? performance.now() : Date.now()) - analyseT0) / 1000
       setAnalysing(false)
       if (aRes.ok && aData?.report) {
+        // Funnel: the analysis landed and the report is about to be shown. These
+        // are the two steps that were invisible before — onboarding used to skip
+        // this screen entirely.
+        trackFunnel("analysis_completed", { seconds: Math.round(analyseElapsed * 10) / 10 })
+        trackFunnel("report_viewed")
         setReport(aData.report as IntakeReportData)
         setSessionId(typeof aData.session_id === "string" ? aData.session_id : null)
         setAnalysisSeconds(Math.round(analyseElapsed * 10) / 10)
@@ -570,6 +588,7 @@ export default function ImportPage() {
 
   // Run the actual chunked import (after the customer approves, or as a fallback).
   async function runImport(rows: Record<string, string>[], sid: string | null) {
+    trackFunnel("import_approved", { rows: rows.length })
     setReport(null)
     setUploading(true)
     setProgress(0)
@@ -992,10 +1011,17 @@ export default function ImportPage() {
               View this batch
             </Link>
             <button
-              onClick={() => router.push("/queue")}
+              onClick={() => {
+                if (fromOnboarding) {
+                  router.push("/onboarding?step=icp&imported=1")
+                } else {
+                  trackFunnel("first_priority_viewed", { via: "import" })
+                  router.push("/queue")
+                }
+              }}
               className="inline-flex items-center gap-1.5 h-10 px-4 rounded-lg text-[13px] font-semibold text-white bg-sky-600 hover:bg-sky-700 transition-colors active:scale-[0.98]"
             >
-              Start executing <ArrowRight className="w-3.5 h-3.5" />
+              {fromOnboarding ? "Next: make it yours" : "Start executing"} <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>

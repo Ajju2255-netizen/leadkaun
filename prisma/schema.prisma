@@ -264,6 +264,13 @@ model Account {
 
   // ICP Configuration
   icp_configured     Boolean    @default(false)
+  // Three separate concepts, deliberately:
+  //   onboarding_completed_at — the user finished the wizard
+  //   icp_configured          — an ICP was actually saved
+  //   activated               — DERIVED, not stored: an IMPORT_COMPLETED event exists
+  // onboarding-complete used to set icp_configured, which conflated the first two
+  // and made activation unmeasurable.
+  onboarding_completed_at DateTime?
   icp_industries     String[]   @default([])
   icp_states         String[]   @default([])
   icp_business_types String[]   @default([])
@@ -958,6 +965,15 @@ model ImpersonationLog {
 // points (never blocks the core path). Read by the admin panel only.
 enum AccountEventType {
   SIGNUP
+  // Activation funnel (Slice 1). Ordered as the user experiences them:
+  // onboarding_started -> import_started -> analysis_completed -> report_viewed
+  // -> import_approved -> IMPORT_COMPLETED -> first_priority_viewed.
+  ONBOARDING_STARTED
+  IMPORT_STARTED
+  ANALYSIS_COMPLETED
+  REPORT_VIEWED
+  IMPORT_APPROVED
+  FIRST_PRIORITY_VIEWED
   ICP_CONFIGURED
   WORKSPACE_CREATED
   WORKSPACE_ARCHIVED

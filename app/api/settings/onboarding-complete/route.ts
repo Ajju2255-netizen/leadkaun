@@ -9,8 +9,15 @@ export const dynamic = "force-dynamic"
 
 /**
  * POST /api/settings/onboarding-complete
- * Marks ICP as configured (used as onboarding completion signal).
- * Only called once during the onboarding flow — safe to call multiple times.
+ * Marks the onboarding wizard as finished. Safe to call more than once.
+ *
+ * This used to set `icp_configured: true`, which conflated three different
+ * things and made activation impossible to measure — an account that skipped
+ * the ICP step still looked configured. They are now distinct:
+ *
+ *   onboarding_completed_at — the user finished the wizard (set here)
+ *   icp_configured          — an ICP was actually saved (set by /api/settings/icp)
+ *   activated               — derived: an IMPORT_COMPLETED event exists
  */
 export async function POST() {
   try {
@@ -21,7 +28,7 @@ export async function POST() {
 
     await prisma.account.update({
       where: { id: session.account.id },
-      data:  { icp_configured: true },
+      data:  { onboarding_completed_at: new Date() },
     })
 
     return apiSuccess({ ok: true })
