@@ -46,10 +46,43 @@ declare global {
  * `fbq` is simply absent and this no-ops rather than throwing inside the
  * signup path.
  */
-export function trackCompleteRegistration() {
+export function trackCompleteRegistration(eventId?: string) {
   if (typeof window === "undefined" || typeof window.fbq !== "function") return
   try {
-    window.fbq("track", "CompleteRegistration")
+    // The eventID pairs this with the Conversions API copy of the same event so
+    // Meta counts one conversion, not two, when both arrive.
+    window.fbq("track", "CompleteRegistration", {}, eventId ? { eventID: eventId } : undefined)
+  } catch {
+    // Never let analytics break account creation.
+  }
+}
+
+/**
+ * Server-side copy of the same conversion, via our own first-party API route.
+ *
+ * The browser pixel above is blocked for a meaningful share of users (uBlock,
+ * Brave, Firefox strict, Safari ITP), and those signups are silently lost.
+ * This request goes to app.leadkaun.com, which blockers do not touch, and the
+ * server forwards it to Meta. Shares `eventId` with the pixel call so the two
+ * deduplicate.
+ *
+ * Fire-and-forget: a failure here must never affect the signup.
+ */
+export function sendCompleteRegistrationServerSide(params: { eventId: string; email: string }) {
+  if (typeof window === "undefined") return
+  try {
+    const body = JSON.stringify({
+      eventId: params.eventId,
+      email: params.email,
+      sourceUrl: window.location.href,
+    })
+    // keepalive so the request survives the redirect to /onboarding.
+    void fetch("/api/analytics/meta-capi", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+      keepalive: true,
+    }).catch(() => {})
   } catch {
     // Never let analytics break account creation.
   }
