@@ -1015,7 +1015,9 @@ export default function ImportPage() {
                 if (fromOnboarding) {
                   router.push("/onboarding?step=icp&imported=1")
                 } else {
-                  trackFunnel("first_priority_viewed", { via: "import" })
+                  // first_priority_viewed is emitted by /queue itself — the event
+                  // should mean "reached the prioritisation experience", not
+                  // "clicked a particular button".
                   router.push("/queue")
                 }
               }}

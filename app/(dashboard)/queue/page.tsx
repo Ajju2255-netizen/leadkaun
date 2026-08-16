@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode, type ComponentProps } from "react"
 import { cn } from "@/lib/utils"
 import { useQuery } from "@tanstack/react-query"
+
+import { trackFunnel } from "@/lib/analytics/funnel"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { useQueue } from "@/hooks/useQueue"
 import { useQueueRealtime } from "@/hooks/useQueueRealtime"
@@ -164,6 +166,23 @@ export default function QueuePage() {
   useQueueRealtime(session?.account?.id)
 
   const leads = useMemo<QueueLead[]>(() => data?.leads ?? [], [data?.leads])
+
+  /**
+   * Activation funnel: the user has actually reached the prioritisation
+   * experience with leads in it.
+   *
+   * This deliberately reads the UNFILTERED list. A user who lands here with
+   * leads but an active grade/source filter that matches none of them has
+   * still reached the product; the filter is their choice, not a failure to
+   * activate. Fired once per mount (the server also dedupes per account), so
+   * re-renders and pagination cannot inflate it.
+   */
+  const firedPriorityView = useRef(false)
+  useEffect(() => {
+    if (firedPriorityView.current || leads.length === 0) return
+    firedPriorityView.current = true
+    trackFunnel("first_priority_viewed", { leads: leads.length })
+  }, [leads.length])
   const kpis  = data?.kpis
 
   // Filter by search + source + advanced filters (server-side already ai_score sorted)
