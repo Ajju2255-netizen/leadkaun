@@ -198,9 +198,20 @@ function StepMakeItYours({
   const [budgetMin,  setBudgetMin]  = useState("")
   const [budgetMax,  setBudgetMax]  = useState("")
   const [saving,     setSaving]     = useState(false)
-  const [saved,      setSaved]      = useState(false)
 
-  async function save() {
+  const hasAnyInput = Boolean(
+    industries.trim() || states.trim() || budgetMin.trim() || budgetMax.trim(),
+  )
+
+  /**
+   * Save only when something was actually entered.
+   *
+   * Sending icp_configured: true for an empty form would recreate the exact
+   * conflation this slice removed — an account looking configured when no ICP
+   * exists. Empty means skip, and the flag stays false.
+   */
+  async function saveAndContinue() {
+    if (!hasAnyInput) { onFinish(); return }
     setSaving(true)
     try {
       await fetch("/api/settings/icp", {
@@ -215,12 +226,12 @@ function StepMakeItYours({
           icp_configured: true,
         }),
       })
-      setSaved(true)
       toast.success("Saved — prioritisation now uses this")
     } catch {
       toast.error("Could not save. You can set this later in Settings → ICP.")
     }
     setSaving(false)
+    onFinish()
   }
 
   return (
@@ -237,47 +248,44 @@ function StepMakeItYours({
       </div>
 
       <div className="space-y-3">
-        <Field label="Target industries (comma-separated)">
+        <Field label="Which industries do you sell to?">
           <input className={inputCls} placeholder="e.g. Real Estate, Construction, IT Services"
             value={industries} onChange={(e) => setIndustries(e.target.value)} />
         </Field>
-        <Field label="Target states (comma-separated)">
+        <Field label="Which states do you sell in?">
           <input className={inputCls} placeholder="e.g. Maharashtra, Karnataka, Delhi"
             value={states} onChange={(e) => setStates(e.target.value)} />
         </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Min budget (₹)">
+          <Field label="Smallest deal worth your time (₹)">
             <input type="number" className={inputCls} placeholder="e.g. 50000"
               value={budgetMin} onChange={(e) => setBudgetMin(e.target.value)} />
           </Field>
-          <Field label="Max budget (₹)">
+          <Field label="Largest you typically close (₹)">
             <input type="number" className={inputCls} placeholder="e.g. 500000"
               value={budgetMax} onChange={(e) => setBudgetMax(e.target.value)} />
           </Field>
         </div>
       </div>
 
-      <div className="flex items-center gap-3 pt-1">
+      {/* One forward action. Two competing buttons made saving look mandatory
+          straight after the aha moment, which is the last place to add friction. */}
+      <div className="pt-1">
         <button
-          onClick={save} disabled={saving}
-          className="h-9 px-4 rounded-full bg-slate-900 hover:bg-slate-700 disabled:opacity-50
-                     text-white text-[12px] font-semibold transition-all"
-        >
-          {saving ? "Saving…" : saved ? "Saved ✓" : "Save"}
-        </button>
-        <button
-          onClick={onFinish}
-          disabled={finishing}
-          className="inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-gradient-to-b from-sky-400 to-sky-500
+          onClick={saveAndContinue}
+          disabled={saving || finishing}
+          className="inline-flex items-center gap-1.5 h-10 px-5 rounded-full bg-gradient-to-b from-sky-400 to-sky-500
                      hover:from-sky-500 hover:to-sky-600 disabled:opacity-50
-                     text-white text-[12px] font-semibold transition-all"
+                     text-white text-[13px] font-semibold transition-all active:scale-[0.97]"
         >
-          {finishing ? "Opening…" : "Go to my queue"} <ArrowRight className="w-3.5 h-3.5" />
+          {saving ? "Saving…" : finishing ? "Opening…" : hasAnyInput ? "Save and open my queue" : "Open my queue"}
+          <ArrowRight className="w-3.5 h-3.5" />
         </button>
       </div>
 
       <p className="text-[11.5px] text-slate-400">
-        Thresholds and team invites live in Settings — nothing else is needed to start.
+        All optional — change it any time in Settings → ICP. Thresholds and team invites live
+        there too; nothing else is needed to start.
       </p>
     </div>
   )
