@@ -81,13 +81,14 @@ export async function PATCH(req: Request) {
       const owner = await prisma.user.findFirst({
         where: { account_id: session.account.id, role: "ADMIN", is_active: true },
         orderBy: { created_at: "asc" },
-        select: { first_name: true, last_name: true, email: true },
+        select: { first_name: true, last_name: true, email: true, phone: true },
       })
       await announceProfileCompletedToSlack({
         accountId: session.account.id,
         name: data.name.trim(),
         ownerName: owner ? `${owner.first_name} ${owner.last_name ?? ""}`.trim() : null,
         ownerEmail: owner?.email ?? null,
+        ownerPhone: owner?.phone ?? null,
         industry: data.industry.trim(),
         city: data.city.trim(),
         state: data.state.trim(),

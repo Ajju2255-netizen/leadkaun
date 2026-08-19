@@ -140,6 +140,7 @@ export async function registerAction(input: RegisterInput): Promise<RegisterResu
       name: orgName,
       ownerName: `${firstName} ${lastName}`.trim(),
       ownerEmail: email,
+      ownerPhone: normalisePhone(phone) || phone,
       source: attribution.signup_utm_source,
       campaign: attribution.signup_utm_campaign,
       country: attribution.signup_country,
