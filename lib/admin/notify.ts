@@ -78,3 +78,108 @@ export async function postToSlack(text: string, blocks?: SlackBlock[]): Promise<
 }
 
 export const slackConfigured = () => !!process.env.ADMIN_SLACK_WEBHOOK_URL
+
+// ── New-signup alert ──────────────────────────────────────────────────────────
+//
+// Two paths announce a signup, and they deliberately do NOT overlap:
+//
+//   · Slack fires INSTANTLY from the register action — that is the phone buzz.
+//   · Email fires from the 15-minute `signup-alert` job — that is the channel of
+//     record, with the watermark that guarantees at-least-once delivery.
+//
+// The job used to post to Slack as well. It no longer does: with the instant
+// path in place that would double-notify on every single signup, which is a
+// different failure from the "rare duplicate" the job's watermark tolerates.
+// If the instant post fails, the email still arrives within 15 minutes.
+
+export type SignupAlertItem = {
+  accountId: string
+  name: string
+  ownerName?: string | null
+  ownerEmail?: string | null
+  /** Not collected at registration — see the note on `phone` below. */
+  ownerPhone?: string | null
+  industry?: string | null
+  city?: string | null
+  state?: string | null
+  teamSize?: string | null
+  leadVolume?: string | null
+  source?: string | null
+  campaign?: string | null
+  country?: string | null
+  signedUpAt?: Date | string | null
+}
+
+const IST = (d: Date | string) =>
+  new Date(d).toLocaleString("en-IN", {
+    day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata",
+  }) + " IST"
+
+/** Title-case a SCREAMING_SNAKE enum for humans: BETWEEN_50_200 → "50–200". */
+const prettyEnum = (v: string) =>
+  v.replace(/^BETWEEN_/, "").replace(/^UNDER_/, "under ").replace(/^OVER_/, "over ")
+   .replace(/_/g, "–").toLowerCase()
+
+/**
+ * One signup, rendered as its own small block rather than a single cramped
+ * line. Every field is optional and omitted when absent — an instant alert
+ * fires before onboarding, so industry/city/team size genuinely do not exist
+ * yet, and rendering them as blanks would read as "not provided" rather than
+ * "not asked yet".
+ */
+function signupLines(s: SignupAlertItem): string {
+  const out = [`*${s.name}*`]
+
+  const who = [s.ownerName, s.ownerEmail, s.ownerPhone].filter(Boolean).join(" · ")
+  if (who) out.push(`👤 ${who}`)
+
+  const biz = [
+    [s.industry, s.city, s.state].filter(Boolean).join(" · "),
+    s.teamSize && `team ${prettyEnum(s.teamSize)}`,
+    s.leadVolume && `${prettyEnum(s.leadVolume)} leads/mo`,
+  ].filter(Boolean).join(" · ")
+  if (biz) out.push(`🏢 ${biz}`)
+
+  const attr = [
+    s.source ? `via ${s.source}` : "direct / unattributed",
+    s.campaign, s.country,
+  ].filter(Boolean).join(" · ")
+  out.push(`🌐 ${attr}`)
+
+  if (s.signedUpAt) out.push(`🕐 ${IST(s.signedUpAt)}`)
+  out.push(`<${adminUrl(`/accounts/${s.accountId}`)}|Open in Mission Control →>`)
+
+  return out.join("\n")
+}
+
+/**
+ * Post new signups to Slack. Safe to await anywhere: it resolves false rather
+ * than throwing when Slack is unconfigured or the post fails, so a notification
+ * channel can never fail a registration.
+ */
+export async function announceSignupsToSlack(items: SignupAlertItem[]): Promise<boolean> {
+  if (items.length === 0 || !slackConfigured()) return false
+  const header = items.length === 1 ? "🎉 New Leadkaun signup" : `🎉 ${items.length} new Leadkaun signups`
+  try {
+    return await postToSlack(`${header}\n\n${items.map(signupLines).join("\n\n")}`)
+  } catch (e) {
+    console.error("[admin-notify] signup slack failed", e)
+    return false
+  }
+}
+
+/**
+ * The second half of the story. Fired once, from PATCH /api/profile/account,
+ * the first time an account fills in the details that registration never asks
+ * for — industry, city, state, team size, monthly lead volume. Same guarantees
+ * as the signup post: never throws, no-ops without a webhook.
+ */
+export async function announceProfileCompletedToSlack(item: SignupAlertItem): Promise<boolean> {
+  if (!slackConfigured()) return false
+  try {
+    return await postToSlack(`✅ Onboarding profile completed\n\n${signupLines(item)}`)
+  } catch (e) {
+    console.error("[admin-notify] profile-completed slack failed", e)
+    return false
+  }
+}

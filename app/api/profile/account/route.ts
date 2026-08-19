@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { requireAuth, requireRole, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError, parseBody } from "@/lib/api/response"
 import { rateLimited, LIMITS } from "@/lib/rate-limit"
+import { announceProfileCompletedToSlack } from "@/lib/admin/notify"
 
 // Reads the session cookie, so this route is always dynamic — opt out of
 // static prerender (silences Next's DYNAMIC_SERVER_USAGE build log).
@@ -52,6 +53,15 @@ export async function PATCH(req: Request) {
     const { data, error } = await parseBody(req, UpdateSchema)
     if (error) return error
 
+    // Read first, so we can tell "finished onboarding" from "edited the profile
+    // later". Registration seeds industry="Other" and empty city/state, so an
+    // account that still has those has never completed its profile.
+    const before = await prisma.account.findUnique({
+      where: { id: session.account.id },
+      select: { industry: true, city: true, created_at: true },
+    })
+    const wasIncomplete = !before || before.industry === "Other" || before.city.trim() === ""
+
     await prisma.account.update({
       where: { id: session.account.id },
       data: {
@@ -63,6 +73,29 @@ export async function PATCH(req: Request) {
         monthly_lead_vol: data.monthly_lead_vol,
       },
     })
+
+    // The signup alert fires before any of this exists. Send the completed
+    // picture once, the first time it becomes available — not on every later
+    // profile edit, which would just be noise.
+    if (wasIncomplete) {
+      const owner = await prisma.user.findFirst({
+        where: { account_id: session.account.id, role: "ADMIN", is_active: true },
+        orderBy: { created_at: "asc" },
+        select: { first_name: true, last_name: true, email: true },
+      })
+      await announceProfileCompletedToSlack({
+        accountId: session.account.id,
+        name: data.name.trim(),
+        ownerName: owner ? `${owner.first_name} ${owner.last_name ?? ""}`.trim() : null,
+        ownerEmail: owner?.email ?? null,
+        industry: data.industry.trim(),
+        city: data.city.trim(),
+        state: data.state.trim(),
+        teamSize: data.team_size,
+        leadVolume: data.monthly_lead_vol,
+        signedUpAt: before?.created_at ?? null,
+      })
+    }
 
     return apiSuccess({ ok: true })
   } catch (err) {

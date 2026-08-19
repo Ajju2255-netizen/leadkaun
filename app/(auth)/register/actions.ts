@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma"
 import { sendWelcomeAdminEmail } from "@/lib/email/lead-alerts"
 import { provisionWorkspaceDefaults } from "@/lib/workspace/provision"
 import { recordAccountEvent } from "@/lib/events/account-events"
+import { announceSignupsToSlack } from "@/lib/admin/notify"
 
 type RegisterInput = {
   orgName: string
@@ -109,6 +110,29 @@ export async function registerAction(input: RegisterInput): Promise<RegisterResu
       summary: `${orgName} signed up`,
       detail: { email, source: attribution.signup_utm_source, country: attribution.signup_country },
     })
+  }
+
+  // Buzz the platform admins' phones now, rather than waiting up to 15 minutes
+  // for the signup-alert job. Awaited rather than fire-and-forget because a
+  // serverless function is not guaranteed to finish work started after the
+  // response; announceSignupsToSlack resolves false instead of throwing, and
+  // no-ops entirely when ADMIN_SLACK_WEBHOOK_URL is unset.
+  //
+  // Everything known at this instant. industry / city / state / team size /
+  // lead volume are NOT here because they are collected during onboarding —
+  // the follow-up alert in PATCH /api/profile/account carries those. There is
+  // no phone number anywhere in the schema, so it cannot be included.
+  if (created) {
+    await announceSignupsToSlack([{
+      accountId: created.accountId,
+      name: orgName,
+      ownerName: `${firstName} ${lastName}`.trim(),
+      ownerEmail: email,
+      source: attribution.signup_utm_source,
+      campaign: attribution.signup_utm_campaign,
+      country: attribution.signup_country,
+      signedUpAt: new Date(),
+    }])
   }
 
   // Send the admin welcome email (audit B8). Guarded — never blocks/fails signup.
