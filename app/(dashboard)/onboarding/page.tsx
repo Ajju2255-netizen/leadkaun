@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
 import { CheckCircle2, Upload, ArrowRight } from "lucide-react"
 import { trackFunnel } from "@/lib/analytics/funnel"
+import { SAMPLE_WORKSPACE_SLUG } from "@/lib/workspace/provision"
 
 /**
  * Activation-first onboarding (Slice 1).
@@ -131,6 +132,27 @@ export default function OnboardingPage() {
 
 function StepBringLeads({ firstName, onSkip }: { firstName?: string; onSkip: () => void }) {
   const router = useRouter()
+  const { data: session } = useCurrentUser()
+  const sampleWs = session?.workspaces?.find((w) => w.slug === SAMPLE_WORKSPACE_SLUG)
+
+  /**
+   * Secondary path for someone who signed up on their phone, or simply doesn't
+   * have a CSV to hand. Without it they hit an empty product and leave.
+   *
+   * Deliberately NOT the primary action: real-data import stays the activation
+   * path, and exploring the sample never counts as activation.
+   */
+  async function exploreSample() {
+    if (!sampleWs) return
+    await fetch("/api/workspaces/switch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ workspace_id: sampleWs.id }),
+    }).catch(() => {})
+    router.push("/queue")
+    router.refresh()
+  }
 
   function upload() {
     trackFunnel("import_started", { from: "onboarding" })
@@ -176,12 +198,20 @@ function StepBringLeads({ firstName, onSkip }: { firstName?: string; onSkip: () 
         ))}
       </div>
 
-      <div className="pt-2 border-t border-slate-100">
+      <div className="pt-2 border-t border-slate-100 space-y-2.5">
+        {sampleWs && (
+          <button
+            onClick={exploreSample}
+            className="block text-[12.5px] font-medium text-sky-700 hover:text-sky-600 transition-colors"
+          >
+            Don&apos;t have your leads ready? Explore 24 example leads →
+          </button>
+        )}
         <button
           onClick={onSkip}
-          className="text-[12.5px] text-slate-400 hover:text-slate-600 transition-colors"
+          className="block text-[12.5px] text-slate-400 hover:text-slate-600 transition-colors"
         >
-          I don&apos;t have my leads to hand — set up later →
+          Skip for now — set up later →
         </button>
       </div>
     </div>

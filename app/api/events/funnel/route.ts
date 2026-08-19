@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { requireAuth, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
 import { recordAccountEvent } from "@/lib/events/account-events"
+import { isSampleWorkspace } from "@/lib/workspace/sample"
 
 export const dynamic = "force-dynamic"
 
@@ -55,6 +56,18 @@ export async function POST(req: Request) {
     const step = body.step as Step | undefined
     if (!step || !(step in STEPS)) {
       return apiError("Unknown funnel step", "BAD_REQUEST", 400)
+    }
+
+    /**
+     * Activation isolation — the Sample workspace demonstrates the product, it
+     * does not activate an account. Exploring 24 example leads must never make
+     * the funnel report that a user reached prioritisation with real data.
+     *
+     * Enforced here rather than only at the call site so no client path, and no
+     * future caller, can bypass it.
+     */
+    if (isSampleWorkspace(session.workspace?.slug)) {
+      return apiSuccess({ ok: true, skipped: "sample-workspace" })
     }
 
     /**

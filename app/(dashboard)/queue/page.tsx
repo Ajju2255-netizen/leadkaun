@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils"
 import { useQuery } from "@tanstack/react-query"
 
 import { trackFunnel } from "@/lib/analytics/funnel"
+import { SAMPLE_WORKSPACE_SLUG } from "@/lib/workspace/provision"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { useQueue } from "@/hooks/useQueue"
 import { useQueueRealtime } from "@/hooks/useQueueRealtime"
@@ -178,11 +179,16 @@ export default function QueuePage() {
    * re-renders and pagination cannot inflate it.
    */
   const firedPriorityView = useRef(false)
+  const inSampleWorkspace = session?.workspace?.slug === SAMPLE_WORKSPACE_SLUG
   useEffect(() => {
     if (firedPriorityView.current || leads.length === 0) return
+    // Activation isolation: the Sample workspace always has leads, so without
+    // this every visitor who merely explored the demo would look activated.
+    // The server enforces the same rule; this just avoids a pointless request.
+    if (inSampleWorkspace) return
     firedPriorityView.current = true
     trackFunnel("first_priority_viewed", { leads: leads.length })
-  }, [leads.length])
+  }, [leads.length, inSampleWorkspace])
   const kpis  = data?.kpis
 
   // Filter by search + source + advanced filters (server-side already ai_score sorted)

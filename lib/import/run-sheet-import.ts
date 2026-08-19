@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma"
 import { processImportRows } from "@/lib/import/process-rows"
 import { leadsRemaining } from "@/lib/billing/lead-usage"
 import { recordAccountEvent } from "@/lib/events/account-events"
+import { prisma as prismaForSample } from "@/lib/prisma"
+import { isSampleWorkspace, removeSampleWorkspace } from "@/lib/workspace/sample"
 
 /**
  * Shared "import parsed rows under a fresh import job" runner — used by both the
@@ -103,12 +105,23 @@ export async function runSheetImport(opts: RunSheetImportOpts): Promise<RunSheet
     },
   })
 
-  await recordAccountEvent({
+  // Same activation isolation as the CSV path: a Sheets import into the Sample
+  // workspace demonstrates the product, it does not activate an account.
+  const sampleWs = await prismaForSample.workspace.findUnique({
+    where: { id: workspaceId }, select: { slug: true },
+  })
+  const intoSample = isSampleWorkspace(sampleWs?.slug)
+
+  if (!intoSample) await recordAccountEvent({
     accountId, workspaceId, actorUserId: userId,
     type: "IMPORT_COMPLETED",
     summary: `Imported ${inserted} leads from Google Sheets${duplicates ? `, ${duplicates} duplicates` : ""}`,
     detail: { inserted, duplicates, errors, source: eventSource },
   })
+
+  if (!intoSample) {
+    try { await removeSampleWorkspace(accountId) } catch { /* never fail an import on cleanup */ }
+  }
 
   return { jobId: job.id, inserted, duplicates, errors, highIntentCount, totalValue, errorReasons, limitReached, processedRows: processed }
 }

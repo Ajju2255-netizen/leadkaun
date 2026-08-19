@@ -4,6 +4,7 @@ import { apiSuccess, apiError } from "@/lib/api/response"
 import { rateLimited, LIMITS } from "@/lib/rate-limit"
 import { MAX_STORED_ERRORS } from "@/lib/import/process-rows"
 import { recordAccountEvent } from "@/lib/events/account-events"
+import { isSampleWorkspace, removeSampleWorkspace } from "@/lib/workspace/sample"
 
 // Reads the session cookie, so this route is always dynamic — opt out of
 // static prerender (silences Next's DYNAMIC_SERVER_USAGE build log).
@@ -61,7 +62,12 @@ export async function POST(req: Request) {
       },
     })
 
-    await recordAccountEvent({
+    // Activation isolation: an import into the Sample workspace is a demo, not
+    // an activation. IMPORT_COMPLETED *is* the activation definition, so this
+    // guard matters more than any other in the funnel.
+    const intoSample = isSampleWorkspace(session.workspace.slug)
+
+    if (!intoSample) await recordAccountEvent({
       accountId: session.account.id,
       workspaceId: session.workspace.id,
       actorUserId: session.user.id,
@@ -71,6 +77,12 @@ export async function POST(req: Request) {
         : `Imported ${updated.inserted} leads${updated.duplicates ? `, ${updated.duplicates} duplicates` : ""}`,
       detail: { inserted: updated.inserted, duplicates: updated.duplicates, errors: errCount, fileName: updated.file_name },
     })
+
+    // The demo has served its purpose now that real leads are in. Leaving
+    // example leads behind only risks the user mistaking them for their own.
+    if (!intoSample && !aborted) {
+      try { await removeSampleWorkspace(session.account.id) } catch { /* never fail an import on cleanup */ }
+    }
 
     return apiSuccess(updated)
   } catch (err) {
