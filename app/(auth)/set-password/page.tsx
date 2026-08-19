@@ -55,8 +55,10 @@ export default function SetPasswordPage() {
       setLoading(false)
       return
     }
-    // Hard redirect so the dashboard loads with the fresh session.
-    window.location.href = "/dashboard"
+    // Hard redirect through the API route, which clears the recovery gate and
+    // redirects in the same request. Navigating straight to /dashboard would
+    // leave the gate set and bounce the user back here.
+    window.location.href = "/api/auth/password-set?next=/dashboard"
   }
 
   if (checking) {

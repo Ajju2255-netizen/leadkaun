@@ -4,9 +4,12 @@
  * Forgot-password page — Coastal Sunrise.
  *
  * Mirrors the login surface (mesh background + floating glass-3 plate).
- * Sends a Supabase recovery email; the link routes through the existing
- * /api/auth/callback handler (exchanges the code for a session) and lands
- * the user on /settings/security, where they set a new password.
+ * Sends a Supabase recovery email. The link routes through /api/auth/callback
+ * with `flow=recovery`, which lands the user on /set-password and marks the
+ * session as recovery-only until they save a new password.
+ *
+ * It used to send them to /settings/security instead — signed in, unrestricted,
+ * and deep inside the product. A reset link is not a login link.
  */
 
 import { useState } from "react"
@@ -27,7 +30,7 @@ export default function ForgotPasswordPage() {
     setLoading(true)
 
     const supabase = getSupabaseBrowserClient()
-    const redirectTo = `${window.location.origin}/api/auth/callback?next=/settings/security`
+    const redirectTo = `${window.location.origin}/api/auth/callback?flow=recovery`
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, { redirectTo })
 
     if (resetError) {
