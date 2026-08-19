@@ -22,6 +22,7 @@ export default function RegisterPage() {
     firstName: "",
     lastName:  "",
     email:     "",
+    phone:     "",
     password:  "",
   })
   const [error,   setError]   = useState<string | null>(null)
@@ -35,6 +36,7 @@ export default function RegisterPage() {
       setForm((prev) => ({
         ...prev,
         email:     p.get("email")     ?? prev.email,
+        phone:     p.get("phone")     ?? prev.phone,
         firstName: p.get("firstName") ?? prev.firstName,
         lastName:  p.get("lastName")  ?? prev.lastName,
         orgName:   p.get("org")       ?? prev.orgName,
@@ -201,6 +203,29 @@ export default function RegisterPage() {
               value={form.email} onChange={handleChange}
               className={inputCls}
             />
+          </div>
+
+          {/* Phone — collected, not verified. India-first: the product is built for
+              Indian B2B teams, so default the country code rather than asking. */}
+          <div className="space-y-1.5">
+            <label htmlFor="phone" className="text-[12px] font-semibold text-ink-soft block">
+              Mobile number
+            </label>
+            <div className="flex items-center gap-2">
+              <span className="h-10 px-3 inline-flex items-center rounded-xl glass-1 gloss-edge border border-white/70 text-[13px] text-ink-soft shrink-0">
+                +91
+              </span>
+              <input
+                id="phone" name="phone" required
+                type="tel" inputMode="numeric" autoComplete="tel-national"
+                pattern="[0-9]{10}" maxLength={10}
+                placeholder="98765 43210"
+                value={form.phone}
+                onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value.replace(/\D/g, "").slice(0, 10) }))}
+                className={inputCls}
+              />
+            </div>
+            <p className="text-[11px] text-ink-faint">So we can reach you about your account. We don&apos;t call to sell.</p>
           </div>
 
           {/* Password */}

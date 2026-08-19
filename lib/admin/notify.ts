@@ -97,7 +97,7 @@ export type SignupAlertItem = {
   name: string
   ownerName?: string | null
   ownerEmail?: string | null
-  /** Not collected at registration — see the note on `phone` below. */
+  /** Collected at registration since 2026-08-19. Unverified — no OTP is sent. */
   ownerPhone?: string | null
   industry?: string | null
   city?: string | null

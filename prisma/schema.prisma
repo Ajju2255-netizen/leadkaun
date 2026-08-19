@@ -368,6 +368,12 @@ model User {
   email      String
   first_name String
   last_name  String
+  // Collected at signup so the team is reachable. Normalised to +91XXXXXXXXXX by
+  // lib/import/phone-normalise (the same normaliser leads go through), with the
+  // original kept for support. NOT verified — no OTP is sent, so treat this as
+  // self-declared, not as proof of ownership.
+  phone      String?
+  phone_raw  String?
   role       UserRole
   is_active  Boolean   @default(true)
   invited_by String?

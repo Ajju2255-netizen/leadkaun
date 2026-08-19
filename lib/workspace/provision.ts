@@ -1,5 +1,7 @@
 import type { Prisma } from "@prisma/client"
 
+import { SAMPLE_LEADS, samplePhone } from "./sample-data"
+
 /**
  * Default pipeline stages + lead sources seeded into EVERY new workspace, so
  * pipeline + import work immediately. A workspace is a self-contained
@@ -55,4 +57,86 @@ export async function provisionWorkspaceDefaults(
     data: DEFAULT_LEAD_SOURCES.map((s) => ({ ...s, account_id: accountId, workspace_id: workspaceId })),
     skipDuplicates: true,
   })
+}
+
+/* ── Sample workspace ────────────────────────────────────────────────────────
+   A new account has nothing in it, so every screen reads as broken rather than
+   empty. This seeds a second workspace with a realistic, already-graded pipeline
+   so the product can be understood before the user has imported anything.
+
+   Kept in its own workspace rather than in "Main" so it can be removed in one
+   operation and can never mix with real leads. Everything customer-facing is
+   workspace-scoped, so sample data stays where it is put. */
+
+export const SAMPLE_WORKSPACE_SLUG = "sample"
+
+/** Seed the Sample workspace: default stages + sources, then the demo leads. */
+export async function provisionSampleWorkspace(
+  tx: Prisma.TransactionClient,
+  { accountId, userId }: { accountId: string; userId: string },
+): Promise<string> {
+  const ws = await tx.workspace.create({
+    data: {
+      account_id:  accountId,
+      name:        "Sample",
+      slug:        SAMPLE_WORKSPACE_SLUG,
+      is_default:  false,
+      description: "Example leads so you can see how Leadkaun works. Remove this any time.",
+    },
+  })
+  await tx.workspaceMember.create({ data: { workspace_id: ws.id, user_id: userId } })
+  await provisionWorkspaceDefaults(tx, { accountId, workspaceId: ws.id })
+
+  const stages  = await tx.pipelineStage.findMany({ where: { workspace_id: ws.id }, orderBy: { display_order: "asc" } })
+  const sources = await tx.leadSource.findMany({ where: { workspace_id: ws.id } })
+  const stageBy = (key: string) => stages.find((s) => s.key === key) ?? stages[0]
+  const sourceBy = (key: string) => sources.find((s) => s.key === key) ?? sources[0]
+  if (!stages.length || !sources.length) return ws.id
+
+  const now = Date.now()
+  const daysAgo = (n: number) => new Date(now - n * 86_400_000)
+
+  await tx.lead.createMany({
+    data: SAMPLE_LEADS.map((l, i) => {
+      // Dates are relative to signup, so the sample never looks stale.
+      const base = {
+        account_id:   accountId,
+        workspace_id: ws.id,
+        first_name:   l.first_name,
+        last_name:    l.last_name,
+        company_name: l.company_name === "—" ? null : l.company_name,
+        city:         l.city,
+        phone:        samplePhone(i),
+        phone_raw:    samplePhone(i),
+        source_id:    sourceBy(l.kind === "cold" ? "other" : l.kind === "won" ? "referral" : "website_contact_form").id,
+        grade:        l.grade,
+        fit_score:    l.fit,
+        intent_score: l.intent,
+        quality_score: l.quality,
+        // Marker of last resort — workspace scoping is the real isolation.
+        custom_values: { sample: true, note: l.note },
+      }
+
+      switch (l.kind) {
+        case "won":
+          return { ...base, stage_id: stageBy("won").id, won_at: daysAgo(3 + i), won_value: l.value ?? 0,
+                   first_contact_at: daysAgo(10 + i), speed_to_lead_hours: 1.5 + (i % 4) }
+        case "missed":
+          return { ...base, stage_id: stageBy("contacted").id, is_missed: true,
+                   missed_at: daysAgo(4 + (i % 5)), last_action_at: daysAgo(9 + (i % 6)),
+                   first_contact_at: daysAgo(12 + i) }
+        case "hot":
+          return { ...base, stage_id: stageBy("new_inquiry").id, last_action_at: daysAgo(0) }
+        case "working":
+          return { ...base, stage_id: stageBy(i % 2 ? "qualified" : "proposal_sent").id,
+                   first_contact_at: daysAgo(2 + (i % 5)), last_action_at: daysAgo(1 + (i % 3)),
+                   speed_to_lead_hours: 2 + (i % 6) }
+        default:
+          return { ...base, stage_id: stageBy("new_inquiry").id }
+      }
+    }),
+    skipDuplicates: true,
+  })
+
+  return ws.id
 }

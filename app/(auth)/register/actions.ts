@@ -4,13 +4,15 @@ import { headers, cookies } from "next/headers"
 import { createSupabaseAdminClient } from "@/lib/supabase/admin"
 import { prisma } from "@/lib/prisma"
 import { sendWelcomeAdminEmail } from "@/lib/email/lead-alerts"
-import { provisionWorkspaceDefaults } from "@/lib/workspace/provision"
+import { provisionWorkspaceDefaults, provisionSampleWorkspace } from "@/lib/workspace/provision"
 import { recordAccountEvent } from "@/lib/events/account-events"
+import { normalisePhone } from "@/lib/import/phone-normalise"
 import { announceSignupsToSlack } from "@/lib/admin/notify"
 
 type RegisterInput = {
   orgName: string
   email: string
+  phone: string
   password: string
   firstName: string
   lastName: string
@@ -21,7 +23,7 @@ type RegisterResult =
   | { success: false; error: string }
 
 export async function registerAction(input: RegisterInput): Promise<RegisterResult> {
-  const { orgName, email, password, firstName, lastName } = input
+  const { orgName, email, password, firstName, lastName, phone } = input
 
   const admin = createSupabaseAdminClient()
 
@@ -71,6 +73,10 @@ export async function registerAction(input: RegisterInput): Promise<RegisterResu
           email,
           first_name: firstName,
           last_name: lastName,
+          // Same normaliser the lead pipeline uses, so an owner's number and a
+          // lead's number are stored identically. Unverified — see schema note.
+          phone:     normalisePhone(phone) || null,
+          phone_raw: phone || null,
           role: "ADMIN",            // first user of an account is always ADMIN
         },
       })
@@ -91,6 +97,11 @@ export async function registerAction(input: RegisterInput): Promise<RegisterResu
         data: { workspace_id: workspace.id, user_id: user.id },
       })
       await provisionWorkspaceDefaults(tx, { accountId: account.id, workspaceId: workspace.id })
+
+      // A second workspace of example leads, so the product can be understood
+      // before anything is imported. Removed on first real import, or on demand.
+      await provisionSampleWorkspace(tx, { accountId: account.id, userId: user.id })
+
       return { accountId: account.id, workspaceId: workspace.id, userId: user.id }
     })
   } catch (dbError) {
@@ -120,8 +131,9 @@ export async function registerAction(input: RegisterInput): Promise<RegisterResu
   //
   // Everything known at this instant. industry / city / state / team size /
   // lead volume are NOT here because they are collected during onboarding —
-  // the follow-up alert in PATCH /api/profile/account carries those. There is
-  // no phone number anywhere in the schema, so it cannot be included.
+  // the follow-up alert in PATCH /api/profile/account carries those. The phone
+  // IS included now that signup collects it, but it is unverified: no OTP is
+  // sent, so treat it as self-declared contact data.
   if (created) {
     await announceSignupsToSlack([{
       accountId: created.accountId,
