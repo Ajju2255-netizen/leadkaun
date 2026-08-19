@@ -8,6 +8,8 @@ import {
 } from "../_components/ui"
 import type { SignalType } from "@prisma/client"
 
+export const metadata = { title: "Signals" }
+
 export const dynamic = "force-dynamic"
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) || undefined
@@ -48,9 +50,9 @@ export default async function SignalsPage({ searchParams }: { searchParams: Reco
       {f.leadId && (
         <p className="text-[12px] text-ink-soft">
           Filtered to a single lead.{" "}
-          <Link href={`/admin/leads/${f.leadId}`} className="text-sky-600 font-semibold hover:text-sky-700">Open the inspector</Link>
+          <Link href={`/leads/${f.leadId}`} className="text-sky-600 font-semibold hover:text-sky-700">Open the inspector</Link>
           {" · "}
-          <Link href="/admin/signals" className="text-sky-600 font-semibold hover:text-sky-700">show all</Link>
+          <Link href="/signals" className="text-sky-600 font-semibold hover:text-sky-700">show all</Link>
         </p>
       )}
 
@@ -141,12 +143,12 @@ export default async function SignalsPage({ searchParams }: { searchParams: Reco
                     </Td>
                     <Td><Grade grade={s.gradeAt} /></Td>
                     <Td>
-                      <Link href={`/admin/leads/${s.leadId}`} className="font-semibold text-ink hover:text-sky-600">
+                      <Link href={`/leads/${s.leadId}`} className="font-semibold text-ink hover:text-sky-600">
                         {s.leadName || "(no name)"}
                       </Link>
                     </Td>
                     <Td>
-                      <Link href={`/admin/accounts/${s.accountId}`} className="text-sky-600 font-semibold hover:text-sky-700">
+                      <Link href={`/accounts/${s.accountId}`} className="text-sky-600 font-semibold hover:text-sky-700">
                         {s.accountName}
                       </Link>
                     </Td>

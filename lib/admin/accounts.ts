@@ -110,10 +110,10 @@ export async function listAccounts(f: AccountFilters = {}): Promise<{ rows: Acco
       }),
       prisma.subscription.findMany({ include: { plan: { select: { key: true, name: true } } } }),
       prisma.importJobStatus
-        .findMany({ where: { status: ImportStatus.COMPLETE }, distinct: ["account_id"], select: { account_id: true } })
+        .groupBy({ by: ["account_id"], where: { status: ImportStatus.COMPLETE } })
         .then((r) => new Set(r.map((x) => x.account_id))),
       prisma.signal
-        .findMany({ where: { signal_type: { not: "SOURCE_BASELINE" } }, distinct: ["account_id"], select: { account_id: true } })
+        .groupBy({ by: ["account_id"], where: { signal_type: { not: "SOURCE_BASELINE" } } })
         .then((r) => new Set(r.map((x) => x.account_id))),
       prisma.plan.findMany({ where: { is_active: true }, orderBy: { price_inr: "asc" }, select: { key: true, name: true } }),
       prisma.workspace.groupBy({ by: ["account_id"], where: { archived_at: null }, _count: { _all: true } }),

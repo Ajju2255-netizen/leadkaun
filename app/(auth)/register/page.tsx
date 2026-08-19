@@ -7,6 +7,7 @@ import { LeadkaunMark } from "@/components/shared/LeadkaunMark"
 import { Target, ListChecks, AlertCircle } from "lucide-react"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { trackCompleteRegistration, sendCompleteRegistrationServerSide } from "@/lib/analytics/meta-pixel"
+import { trackSignUp } from "@/lib/analytics/ga4"
 import { registerAction } from "./actions"
 
 const inputCls =
@@ -73,6 +74,11 @@ export default function RegisterPage() {
     const eventId = crypto.randomUUID()
     trackCompleteRegistration(eventId)
     sendCompleteRegistrationServerSide({ eventId, email: form.email })
+
+    // GA4's own recommended `sign_up` event. Separate vendor, separate schema —
+    // this is what makes signups answerable by default channel grouping, i.e.
+    // "how many of these came from organic search". Carries no PII.
+    trackSignUp("email")
 
     const supabase = getSupabaseBrowserClient()
     const { error: signInError } = await supabase.auth.signInWithPassword({

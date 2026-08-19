@@ -233,7 +233,7 @@ async function buildAttention(input: {
   if (churnRisk > 0) {
     out.push({
       label: `${churnRisk} paying account${churnRisk === 1 ? "" : "s"} with no rep activity in 14 days`,
-      count: churnRisk, severity: "critical", href: "/admin/accounts?health=critical",
+      count: churnRisk, severity: "critical", href: "/accounts?health=critical",
       why: "Active subscription, zero non-import signals in the last 14 days.",
     })
   }
@@ -246,7 +246,7 @@ async function buildAttention(input: {
       label: over > 0
         ? `${over} account${over === 1 ? "" : "s"} at their lead limit, ${nearLimit.length - over} approaching`
         : `${nearLimit.length} account${nearLimit.length === 1 ? "" : "s"} approaching their lead limit`,
-      count: nearLimit.length, severity: over > 0 ? "critical" : "warn", href: "/admin/billing/usage",
+      count: nearLimit.length, severity: over > 0 ? "critical" : "warn", href: "/billing/usage",
       why: "Active (open) leads at or above 80% of the plan's active_lead_limit. New leads are blocked at 100%.",
     })
   }
@@ -255,7 +255,7 @@ async function buildAttention(input: {
   if (seatFull > 0) {
     out.push({
       label: `${seatFull} account${seatFull === 1 ? "" : "s"} out of seats`,
-      count: seatFull, severity: "warn", href: "/admin/billing/usage",
+      count: seatFull, severity: "warn", href: "/billing/usage",
       why: "Occupied seats (active users + pending invites) have reached the plan's max_seats — invites will 409.",
     })
   }
@@ -263,7 +263,7 @@ async function buildAttention(input: {
   if (input.failedImports7d > 0) {
     out.push({
       label: `${input.failedImports7d} import${input.failedImports7d === 1 ? "" : "s"} failed this week`,
-      count: input.failedImports7d, severity: "critical", href: "/admin/ops/errors",
+      count: input.failedImports7d, severity: "critical", href: "/ops/errors",
       why: "import_job_status rows with status=FAILED in the last 7 days. Row-level skips are counted separately.",
     })
   }
@@ -271,7 +271,7 @@ async function buildAttention(input: {
   if (input.intake.stalled > 0) {
     out.push({
       label: `${input.intake.stalled} intake session${input.intake.stalled === 1 ? "" : "s"} stuck mid-machine`,
-      count: input.intake.stalled, severity: "warn", href: "/admin/intake",
+      count: input.intake.stalled, severity: "warn", href: "/intake",
       why: "Still in CREATED / ANALYSING / IMPORTING with no update for over 2 hours.",
     })
   }
@@ -279,7 +279,7 @@ async function buildAttention(input: {
   if (input.intake.failedWindow > 0) {
     out.push({
       label: `${input.intake.failedWindow} intake session${input.intake.failedWindow === 1 ? "" : "s"} failed`,
-      count: input.intake.failedWindow, severity: "warn", href: "/admin/intake?state=FAILED",
+      count: input.intake.failedWindow, severity: "warn", href: "/intake?state=FAILED",
       why: `Sessions in state FAILED over the last ${input.intake.windowDays} days.`,
     })
   }
@@ -287,7 +287,7 @@ async function buildAttention(input: {
   if (input.notOnboardedCount > 0) {
     out.push({
       label: `${input.notOnboardedCount} account${input.notOnboardedCount === 1 ? "" : "s"} haven't completed an import`,
-      count: input.notOnboardedCount, severity: "warn", href: "/admin/growth/activation",
+      count: input.notOnboardedCount, severity: "warn", href: "/growth/activation",
       why: "No import_job_status row with status=COMPLETE — they have never got leads into the product.",
     })
   }
@@ -295,7 +295,7 @@ async function buildAttention(input: {
   if (input.rarDeltaPts != null && input.rarDeltaPts <= -2) {
     out.push({
       label: `Recommendation acceptance down ${Math.abs(input.rarDeltaPts)} pts`,
-      count: 1, severity: "critical", href: "/admin/recommendations",
+      count: 1, severity: "critical", href: "/recommendations",
       why: "RAR (ACCEPTED / SHOWN) over the last 30 days vs the 30 days before it.",
     })
   }
@@ -303,7 +303,7 @@ async function buildAttention(input: {
   if (input.jobsDelayed > 0) {
     out.push({
       label: `${input.jobsDelayed} background job${input.jobsDelayed === 1 ? "" : "s"} delayed or failing`,
-      count: input.jobsDelayed, severity: "critical", href: "/admin/ops/jobs",
+      count: input.jobsDelayed, severity: "critical", href: "/ops/jobs",
       why: "Last run failed, or the gap since the last run exceeds that function's own schedule.",
     })
   }
@@ -311,7 +311,7 @@ async function buildAttention(input: {
   if (input.emailsFailedToday > 0) {
     out.push({
       label: `${input.emailsFailedToday} email${input.emailsFailedToday === 1 ? "" : "s"} failed today`,
-      count: input.emailsFailedToday, severity: "warn", href: "/admin/system",
+      count: input.emailsFailedToday, severity: "warn", href: "/system",
       why: "email_logs with status=failed since 00:00 IST — usually an unverified sending domain or a bounce.",
     })
   }
@@ -322,7 +322,7 @@ async function buildAttention(input: {
   if (sheetsFailing > 0) {
     out.push({
       label: `${sheetsFailing} Google Sheets connection${sheetsFailing === 1 ? "" : "s"} erroring`,
-      count: sheetsFailing, severity: "warn", href: "/admin/ops/integrations",
+      count: sheetsFailing, severity: "warn", href: "/ops/integrations",
       why: "sheet_syncs rows that are active but whose last_status is not 'ok' — usually revoked sharing.",
     })
   }
@@ -396,16 +396,16 @@ function buildActivationFunnel(n: {
   recommended: number; acted: number; activated: number; retained: number; paid: number
 }): FunnelRow[] {
   const steps: { label: string; count: number; href?: string; hint: string }[] = [
-    { label: "Signed up",            count: n.accounts,    href: "/admin/accounts", hint: "Account rows." },
+    { label: "Signed up",            count: n.accounts,    href: "/accounts", hint: "Account rows." },
     { label: "Configured ICP",       count: n.icp,         hint: "accounts.icp_configured = true — the scoring brain is set." },
-    { label: "Started an intake",    count: n.intake,      href: "/admin/intake", hint: "≥1 intake_session — they uploaded a dataset." },
+    { label: "Started an intake",    count: n.intake,      href: "/intake", hint: "≥1 intake_session — they uploaded a dataset." },
     { label: "Completed an import",  count: n.imported,    hint: "≥1 import_job_status with status = COMPLETE." },
     { label: "Has scored leads",     count: n.scored,      hint: "≥1 lead row (every lead is scored on create)." },
-    { label: "Saw a recommendation", count: n.recommended, href: "/admin/recommendations", hint: "≥1 SHOWN recommendation_event." },
+    { label: "Saw a recommendation", count: n.recommended, href: "/recommendations", hint: "≥1 SHOWN recommendation_event." },
     { label: "Took a first action",  count: n.acted,       hint: "≥1 signal that isn't SOURCE_BASELINE — a real call/WhatsApp/override." },
     { label: "Activated",            count: n.activated,   hint: "Completed an import AND took a real action. This is the activation event." },
     { label: "Retained (14d)",       count: n.retained,    hint: "A real action in the last 14 days." },
-    { label: "Paid",                 count: n.paid,        href: "/admin/billing", hint: "Subscription with status = active." },
+    { label: "Paid",                 count: n.paid,        href: "/billing", hint: "Subscription with status = active." },
   ]
 
   const top = steps[0].count || 1

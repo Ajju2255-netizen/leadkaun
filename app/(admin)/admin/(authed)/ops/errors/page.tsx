@@ -3,8 +3,10 @@ import { getErrorCenter, SKIP_REASON_LABELS } from "@/lib/admin/ops"
 import { FilterBar, type SelectFilter } from "../../_components/FilterBar"
 import {
   PageHeader, Card, Stat, SectionLabel, BarRow, Pill,
-  num, dateTime, pctOrDash,
+  num, dateTime, pctOrDash, NotWired,
 } from "../../_components/ui"
+
+export const metadata = { title: "Errors" }
 
 export const dynamic = "force-dynamic"
 
@@ -26,7 +28,7 @@ const KIND_TONE = { import: "amber", email: "red", "sheet-sync": "amber", job: "
 function ErrorList({ rows, empty }: { rows: Awaited<ReturnType<typeof getErrorCenter>>["systemFailures"]; empty: string }) {
   if (rows.length === 0) return <Card><p className="text-[13px] text-emerald-700 font-semibold">{empty}</p></Card>
   return (
-    <div className="rounded-2xl glass-2 divide-y divide-hairline overflow-hidden">
+    <div className="rounded-2xl border border-slate-200/70 bg-white divide-y divide-hairline overflow-hidden">
       {rows.map((e) => (
         <div key={`${e.kind}-${e.id}`} className="px-4 py-2.5 flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -38,7 +40,7 @@ function ErrorList({ rows, empty }: { rows: Awaited<ReturnType<typeof getErrorCe
           </div>
           <div className="flex items-center gap-3 shrink-0">
             {e.accountId && (
-              <Link href={`/admin/accounts/${e.accountId}`} className="text-[11px] font-semibold text-sky-600 hover:text-sky-700">
+              <Link href={`/accounts/${e.accountId}`} className="text-[11px] font-semibold text-sky-600 hover:text-sky-700">
                 account
               </Link>
             )}
@@ -122,7 +124,7 @@ export default async function ErrorsPage({ searchParams }: { searchParams: Recor
             {e.expectedSkips.length === 0 ? (
               <Card><p className="text-[13px] text-ink-muted">Every import in this window took all its rows.</p></Card>
             ) : (
-              <div className="rounded-2xl glass-2 divide-y divide-hairline overflow-hidden max-h-[420px] overflow-y-auto">
+              <div className="rounded-2xl border border-slate-200/70 bg-white divide-y divide-hairline overflow-hidden max-h-[420px] overflow-y-auto">
                 {e.expectedSkips.map((s) => (
                   <div key={s.id} className="px-4 py-2.5 flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -131,7 +133,7 @@ export default async function ErrorsPage({ searchParams }: { searchParams: Recor
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
                       {s.accountId && (
-                        <Link href={`/admin/accounts/${s.accountId}`} className="text-[11px] font-semibold text-sky-600 hover:text-sky-700">account</Link>
+                        <Link href={`/accounts/${s.accountId}`} className="text-[11px] font-semibold text-sky-600 hover:text-sky-700">account</Link>
                       )}
                       <span className="text-[11px] text-ink-muted tabular-nums whitespace-nowrap">{dateTime(s.at)}</span>
                     </div>
@@ -149,7 +151,7 @@ export default async function ErrorsPage({ searchParams }: { searchParams: Recor
         <Stat label="Job failures" value={num(e.jobFailures)} tone={e.jobFailures > 0 ? "red" : "slate"} />
       </div>
 
-      <div className="rounded-2xl border border-dashed border-slate-300 bg-white/50 px-5 py-3.5">
+      <NotWired>
         <p className="text-[12px] text-ink-soft leading-relaxed">
           <span className="font-bold text-ink">Application exceptions are not listed here.</span> There is no error
           table and no APM in this codebase — a 500 from a route handler is logged to the platform console and never
@@ -157,7 +159,7 @@ export default async function ErrorsPage({ searchParams }: { searchParams: Recor
           <code>import_job_status</code>, <code>email_logs</code>, <code>sheet_syncs</code> and <code>job_runs</code>.
           Vercel&rsquo;s runtime logs remain the place to look for uncaught errors.
         </p>
-      </div>
+      </NotWired>
     </div>
   )
 }

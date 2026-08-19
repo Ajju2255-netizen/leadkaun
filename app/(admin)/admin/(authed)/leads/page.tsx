@@ -4,9 +4,11 @@ import { getScopeOptions } from "@/lib/admin/scoring"
 import { FilterBar, type SelectFilter } from "../_components/FilterBar"
 import {
   PageHeader, TableWrap, THead, TBody, Th, Td, Tr, Grade, Pill, EmptyState,
-  num, ago, dateOnly,
+  num, ago, dateOnly, RowLink,
 } from "../_components/ui"
 import type { LeadGrade } from "@prisma/client"
+
+export const metadata = { title: "Leads" }
 
 export const dynamic = "force-dynamic"
 
@@ -85,18 +87,18 @@ export default async function LeadsPage({ searchParams }: { searchParams: Record
             {rows.length === 0 ? (
               <tr><td colSpan={12}><EmptyState>No leads match. Try a phone number or company name.</EmptyState></td></tr>
             ) : rows.map((l) => (
-              <Tr key={l.id}>
+              <Tr key={l.id} href={`/leads/${l.id}`}>
                 <Td><Grade grade={l.grade} /></Td>
                 <Td>
-                  <Link href={`/admin/leads/${l.id}`} className="block group">
+                  <RowLink href={`/leads/${l.id}`}>
                     <p className="text-[13px] font-bold text-ink group-hover:text-sky-600 transition-colors">{l.name || "(no name)"}</p>
                     <p className="text-[11px] text-ink-muted">
                       {[l.company, l.phone].filter(Boolean).join(" · ")}
                     </p>
-                  </Link>
+                  </RowLink>
                 </Td>
                 <Td>
-                  <Link href={`/admin/accounts/${l.accountId}`} className="text-sky-600 font-semibold hover:text-sky-700">
+                  <Link href={`/accounts/${l.accountId}`} className="text-sky-600 font-semibold hover:text-sky-700">
                     {l.accountName}
                   </Link>
                 </Td>

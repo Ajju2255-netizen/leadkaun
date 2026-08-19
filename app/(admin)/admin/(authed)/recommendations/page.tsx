@@ -6,6 +6,8 @@ import {
   TableWrap, THead, TBody, Th, Td, Tr, num, pctOrDash,
 } from "../_components/ui"
 
+export const metadata = { title: "Recommendations" }
+
 export const dynamic = "force-dynamic"
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) || undefined
@@ -73,7 +75,7 @@ export default async function RecommendationsPage({ searchParams }: { searchPara
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
             <Card className="col-span-2 lg:col-span-1">
               <p className="text-[10.5px] font-bold uppercase tracking-wider text-ink-muted">RAR</p>
-              <p className="text-[30px] font-black tabular-nums text-sky-600 leading-none mt-1">{pctOrDash(r.rates.rar)}</p>
+              <p className="text-[30px] font-semibold tabular-nums text-sky-600 leading-none mt-1">{pctOrDash(r.rates.rar)}</p>
               {r.rarDeltaPts != null && (
                 <p className={`text-[11.5px] font-bold mt-1 ${r.rarDeltaPts > 0 ? "text-emerald-600" : r.rarDeltaPts < 0 ? "text-red-600" : "text-ink-muted"}`}>
                   {r.rarDeltaPts > 0 ? "↑" : r.rarDeltaPts < 0 ? "↓" : "→"} {Math.abs(r.rarDeltaPts)} pts vs previous {days}d
@@ -140,7 +142,7 @@ export default async function RecommendationsPage({ searchParams }: { searchPara
                           <p className="text-[12px] font-semibold text-ink-soft mb-1">{f.label} <span className="text-ink-faint font-normal">· {f.total}</span></p>
                           <div className="flex items-center gap-1.5 flex-wrap">
                             {Object.entries(f.grades).sort(([a], [b]) => a.localeCompare(b)).map(([g, n]) => (
-                              <span key={g} className="inline-flex items-center gap-1 rounded-lg glass-1 px-2 py-1">
+                              <span key={g} className="inline-flex items-center gap-1 rounded-lg border border-slate-200/70 bg-slate-50 px-2 py-1">
                                 <Grade grade={g} />
                                 <span className="text-[11.5px] tabular-nums font-semibold text-ink-soft">{n}</span>
                               </span>
@@ -223,7 +225,7 @@ export default async function RecommendationsPage({ searchParams }: { searchPara
                   ) : r.accounts.map((a) => (
                     <Tr key={a.accountId}>
                       <Td>
-                        <Link href={`/admin/accounts/${a.accountId}`} className="text-[13px] font-bold text-ink hover:text-sky-600">
+                        <Link href={`/accounts/${a.accountId}`} className="text-[13px] font-bold text-ink hover:text-sky-600">
                           {a.accountName}
                         </Link>
                         {a.shown < 10 && <span className="text-[10.5px] text-ink-faint ml-2">low volume</span>}

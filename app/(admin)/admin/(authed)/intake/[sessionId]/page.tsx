@@ -1,15 +1,17 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { ChevronLeft, Check, Circle, AlertTriangle } from "lucide-react"
+import { Check, Circle, AlertTriangle } from "lucide-react"
 import {
   getIntakeSessionDetail, STATE_LABELS, ABANDON_LABELS, STATE_ORDER, isTerminal,
 } from "@/lib/admin/intake"
 import type { EvidenceFinding } from "@/lib/intake/types"
 import {
   Card, Stat, SectionLabel, Bar, Pill, EmptyState, Dot,
-  num, dateTime, clockIst, duration, type Tone,
+  num, dateTime, clockIst, duration, type Tone, BackLink,
 } from "../../_components/ui"
 import { IntakeState } from "@prisma/client"
+
+export const metadata = { title: "Intake session" }
 
 export const dynamic = "force-dynamic"
 
@@ -61,17 +63,15 @@ export default async function IntakeSessionPage({ params }: { params: { sessionI
 
   return (
     <div className="space-y-8">
-      <Link href="/admin/intake" className="inline-flex items-center gap-1 text-[12px] font-semibold text-ink-muted hover:text-sky-600">
-        <ChevronLeft className="w-4 h-4" /> Intake sessions
-      </Link>
+      <BackLink href="/intake">Intake sessions</BackLink>
 
       {/* ── Header ── */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-[22px] font-black tracking-tight text-ink font-mono">{s.id}</h1>
+          <h1 className="text-[24px] font-semibold tracking-[-0.02em] text-ink font-mono">{s.id}</h1>
           <div className="flex items-center gap-2 flex-wrap text-[12px] text-ink-soft mt-1.5">
             {s.account && (
-              <Link href={`/admin/accounts/${s.account.id}`}><Pill tone="sky">{s.account.name}</Pill></Link>
+              <Link href={`/accounts/${s.account.id}`}><Pill tone="sky">{s.account.name}</Pill></Link>
             )}
             {s.workspaceName && <Pill tone="slate">{s.workspaceName}</Pill>}
             {s.user && <span>· {s.user.name} ({s.user.email})</span>}
@@ -140,7 +140,7 @@ export default async function IntakeSessionPage({ params }: { params: { sessionI
           <Stat label="Total TTT" value={duration(clock.totalTttMs)} tone="emerald" sub="upload → approved" />
           <Stat label="Import duration" value={duration(clock.approvalToImportDoneMs)} sub="approved → done" />
         </div>
-        <div className="mt-3 rounded-2xl glass-2 px-5 py-4">
+        <div className="mt-3 rounded-2xl border border-slate-200/70 bg-white px-5 py-4">
           <table className="w-full text-[12px]">
             <tbody className="divide-y divide-hairline">
               {[
@@ -208,7 +208,7 @@ export default async function IntakeSessionPage({ params }: { params: { sessionI
               <>
                 <div className="flex items-baseline justify-between mb-1.5">
                   <span className="text-[12px] font-semibold text-ink-soft">Import Intelligence Score</span>
-                  <span className="text-[20px] font-black tabular-nums text-ink">{s.scores.importIntelligenceScore}</span>
+                  <span className="text-[20px] font-semibold tabular-nums text-ink">{s.scores.importIntelligenceScore}</span>
                 </div>
                 <Bar
                   pct={s.scores.importIntelligenceScore}
@@ -255,7 +255,7 @@ export default async function IntakeSessionPage({ params }: { params: { sessionI
               <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
                   <p className="text-[10.5px] font-bold uppercase tracking-wider text-ink-muted">Readiness shown</p>
-                  <p className="text-[18px] font-black text-ink mt-0.5">{r.readiness?.label ?? "—"}</p>
+                  <p className="text-[18px] font-semibold text-ink mt-0.5">{r.readiness?.label ?? "—"}</p>
                   <p className="text-[12.5px] text-ink-soft mt-0.5 max-w-xl">{r.readiness?.message}</p>
                 </div>
                 <div className="text-right">

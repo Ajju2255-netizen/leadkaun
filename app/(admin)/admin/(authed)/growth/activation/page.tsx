@@ -3,8 +3,10 @@ import { getActivationFunnel, getSignupCohorts } from "@/lib/admin/growth"
 import { getFeatureUsage } from "@/lib/admin/usage"
 import {
   PageHeader, Card, Stat, SectionLabel, Bar, BarRow, EmptyState,
-  TableWrap, THead, TBody, Th, Td, Tr, num, dateOnly,
+  TableWrap, THead, TBody, Th, Td, Tr, num, dateOnly, NotWired,
 } from "../../_components/ui"
+
+export const metadata = { title: "Activation" }
 
 export const dynamic = "force-dynamic"
 
@@ -30,13 +32,13 @@ export default async function ActivationPage() {
         <Stat label="Cohorts tracked" value={num(cohorts.length)} sub="last 12 weeks" />
       </div>
 
-      <div className="rounded-2xl border border-dashed border-slate-300 bg-white/50 px-5 py-3.5">
+      <NotWired>
         <p className="text-[12px] text-ink-soft leading-relaxed">
           <span className="font-bold text-ink">The funnel starts at signup, not at visit.</span> There is no page-view
           or visitor tracking in this product, so a visitor→signup rate would be invented rather than measured. It is
           left out on purpose.
         </p>
-      </div>
+      </NotWired>
 
       {/* ── Funnel with drop-off drill-down ── */}
       <section>
@@ -66,8 +68,8 @@ export default async function ActivationPage() {
                     {s.stuck.map((a) => (
                       <Link
                         key={a.id}
-                        href={`/admin/accounts/${a.id}`}
-                        className="inline-flex items-center gap-1.5 rounded-lg glass-1 px-2.5 py-1 text-[11.5px] font-semibold text-ink-soft hover:text-sky-600 transition-colors"
+                        href={`/accounts/${a.id}`}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200/70 bg-slate-50 px-2.5 py-1 text-[11.5px] font-semibold text-ink-soft hover:text-sky-600 transition-colors"
                       >
                         {a.name}
                         <span className="text-ink-faint font-normal">{dateOnly(a.createdAt)}</span>

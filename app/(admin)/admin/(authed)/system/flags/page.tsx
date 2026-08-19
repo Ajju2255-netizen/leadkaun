@@ -7,6 +7,8 @@ import {
   TableWrap, THead, TBody, Th, Td, Tr, num, ago,
 } from "../../_components/ui"
 
+export const metadata = { title: "Feature flags" }
+
 export const dynamic = "force-dynamic"
 
 /** ON (explicit) · OFF (explicit) · default (no row → treated as ON). */
@@ -76,7 +78,7 @@ export default async function FlagsPage() {
               ) : rows.map((r) => (
                 <Tr key={r.accountId}>
                   <Td>
-                    <Link href={`/admin/accounts/${r.accountId}`} className="text-[13px] font-bold text-ink hover:text-sky-600">
+                    <Link href={`/accounts/${r.accountId}`} className="text-[13px] font-bold text-ink hover:text-sky-600">
                       {r.accountName}
                     </Link>
                   </Td>

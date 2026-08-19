@@ -221,7 +221,7 @@ export async function getPaymentLedger(
     prisma.payment.aggregate({ where: { ...totalsWhere, status: "refunded" }, _count: { _all: true }, _sum: { amount_inr: true } }),
     prisma.payment.count({ where: { ...totalsWhere, status: "failed" } }),
     prisma.payment
-      .findMany({ where: { status: "succeeded" }, distinct: ["account_id"], select: { account_id: true } })
+      .groupBy({ by: ["account_id"], where: { status: "succeeded" } })
       .then((r) => r.length),
     prisma.payment.count(),
   ])

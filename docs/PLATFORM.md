@@ -63,12 +63,12 @@ The two are joined only by env-driven links (`APP_URLS` in the marketing repo �
 
 - **`app/(dashboard)/`** — the customer product (~23 pages). Layout gates on `getServerSession()` → redirects to `/login`, wraps children in `OfflineProvider`, `ImpersonationBanner`, `AlertListener` (realtime toasts), and `DashboardShell` (sidebar).
 - **`app/(auth)/`** — `login`, `register`, `forgot-password`, `set-password`.
-- **`app/(admin)/`** — Mission Control (platform admin), physically under `/admin/*`, reachable only via the `admin.*` host. Self-gated per page.
+- **`app/(admin)/`** — Mission Control (platform admin), physically under `/admin/*`, reachable only via the `admin.*` host. Gated by the `(authed)` group layout — **not** per page. `login` and `security/mfa` sit outside that group deliberately, since both must be reachable before a session is elevated. Anything else added under `app/(admin)/` **must** go inside `(authed)/` or it inherits no protection at all; nothing in CI enforces that.
 - **`app/api/`** — ~80 route handlers.
 
 ### Host routing (`middleware.ts`)
 
-- The `admin.leadkaun.com` host rewrites clean URLs onto the `(admin)` group's `/admin/*` paths and keeps the Supabase session alive; pages self-gate.
+- The `admin.leadkaun.com` host rewrites clean URLs onto the `(admin)` group's `/admin/*` paths and keeps the Supabase session alive. Middleware makes **no** authorization decision on the admin host; the `(authed)` layout does.
 - On the customer host, `/admin` and `/admin/*` are **hard-404'd** — the admin surface is never reachable from `app.*`.
 - Unauthenticated hits on protected paths redirect to `/login?redirectTo=…`; authenticated hits on auth pages redirect to `/queue`.
 - The middleware matcher **excludes `/api/*`** — every API route self-guards.

@@ -49,6 +49,19 @@ export async function registerAction(input: RegisterInput): Promise<RegisterResu
     signup_utm_campaign: c.get("utm_campaign")?.value ?? null,
   }
 
+  // Richer first-touch context, written by the marketing site's proxy.ts.
+  // Account has only the four columns above, so the rest is kept on the
+  // SIGNUP AccountEvent's `detail` JSON — which answers the question the
+  // four columns cannot: WHICH PAGE earned this signup, and was it organic
+  // search, an AI answer engine, or a referral. Adding columns for these
+  // would need a migration, and prod migrations here are run by hand.
+  const firstTouch = {
+    medium:    c.get("lk_medium")?.value ?? null,
+    landing:   c.get("lk_landing")?.value ?? null,
+    referrer:  c.get("lk_referrer")?.value ?? null,
+    firstSeen: c.get("lk_first_seen")?.value ?? null,
+  }
+
   let created: { accountId: string; workspaceId: string; userId: string } | null = null
   try {
     // 2. Create Account + User + default pipeline stages + lead sources in one transaction
@@ -119,7 +132,13 @@ export async function registerAction(input: RegisterInput): Promise<RegisterResu
       actorUserId: created.userId,
       type: "SIGNUP",
       summary: `${orgName} signed up`,
-      detail: { email, source: attribution.signup_utm_source, country: attribution.signup_country },
+      detail: {
+        email,
+        source:   attribution.signup_utm_source,
+        campaign: attribution.signup_utm_campaign,
+        country:  attribution.signup_country,
+        ...firstTouch,
+      },
     })
   }
 

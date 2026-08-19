@@ -1,11 +1,12 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { ChevronLeft } from "lucide-react"
 import { getWorkspaceDetail } from "@/lib/admin/workspaces"
 import {
   Card, Stat, SectionLabel, Bar, BarRow, Grade, Pill, EmptyState,
-  num, ago, dateOnly,
+  num, ago, dateOnly, BackLink,
 } from "../../_components/ui"
+
+export const metadata = { title: "Workspace" }
 
 export const dynamic = "force-dynamic"
 
@@ -17,16 +18,14 @@ export default async function WorkspaceDetailPage({ params }: { params: { worksp
 
   return (
     <div className="space-y-8">
-      <Link href="/admin/workspaces" className="inline-flex items-center gap-1 text-[12px] font-semibold text-ink-muted hover:text-sky-600">
-        <ChevronLeft className="w-4 h-4" /> Workspaces
-      </Link>
+      <BackLink href="/workspaces">Workspaces</BackLink>
 
       <div>
-        <h1 className="text-[24px] font-black tracking-tight text-ink">
+        <h1 className="text-[24px] font-semibold tracking-[-0.02em] text-ink">
           {w.name} {w.isDefault && <Pill tone="sky">default</Pill>} {w.archivedAt && <Pill tone="amber">archived</Pill>}
         </h1>
         <p className="text-[12.5px] text-ink-soft mt-1.5">
-          <Link href={`/admin/accounts/${w.accountId}`} className="text-sky-600 font-semibold hover:text-sky-700">{w.accountName}</Link>
+          <Link href={`/accounts/${w.accountId}`} className="text-sky-600 font-semibold hover:text-sky-700">{w.accountName}</Link>
           {" · "}<span className="font-mono text-ink-muted">{w.slug}</span>
           {" · created "}{dateOnly(w.createdAt)}
           {" · last activity "}{ago(w.lastActiveAt)}
@@ -84,7 +83,7 @@ export default async function WorkspaceDetailPage({ params }: { params: { worksp
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <section>
           <SectionLabel right="intent baseline seeds the lead's starting intent">Lead sources in use</SectionLabel>
-          <div className="rounded-2xl glass-2 divide-y divide-hairline overflow-hidden">
+          <div className="rounded-2xl border border-slate-200/70 bg-white divide-y divide-hairline overflow-hidden">
             {d.sources.length === 0 ? <EmptyState>No leads have a source with volume yet.</EmptyState> : d.sources.map((s) => (
               <div key={s.name} className="px-4 py-2.5 flex items-center justify-between gap-3">
                 <div className="min-w-0">
@@ -101,7 +100,7 @@ export default async function WorkspaceDetailPage({ params }: { params: { worksp
 
         <section>
           <SectionLabel>Members · {d.members.length}</SectionLabel>
-          <div className="rounded-2xl glass-2 divide-y divide-hairline overflow-hidden">
+          <div className="rounded-2xl border border-slate-200/70 bg-white divide-y divide-hairline overflow-hidden">
             {d.members.length === 0 ? (
               <EmptyState>No membership rows — account ADMINs still see this workspace.</EmptyState>
             ) : d.members.map((m) => (

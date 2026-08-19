@@ -26,6 +26,7 @@ import { ThemedSelect } from "@/components/shared/ThemedSelect"
 import { useQuery } from "@tanstack/react-query"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { LeadkaunMark } from "@/components/shared/LeadkaunMark"
+import { LeadkaunLogo } from "@/components/shared/LeadkaunLogo"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { LeadLimitBanner } from "@/components/billing/LeadLimitBanner"
 import { PlanUsageCard } from "@/components/billing/PlanUsageCard"
@@ -264,10 +265,7 @@ export function DashboardShell({
           className="flex items-center gap-2.5 px-4 h-14 shrink-0 group"
           style={{ borderBottom: "1px solid var(--hairline)" }}
         >
-          <LeadkaunMark size={26} gloss className="transition-transform group-hover:scale-[1.06]" />
-          <span className="text-[16px] font-semibold text-ink tracking-[-0.025em] leading-none">
-            Leadkaun
-          </span>
+          <LeadkaunLogo height={28} className="transition-transform group-hover:scale-[1.04]" />
         </Link>
 
         {/* Workspace switcher — the active lead-intelligence environment */}

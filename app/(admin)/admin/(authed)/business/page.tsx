@@ -7,6 +7,8 @@ import {
   TableWrap, THead, TBody, Th, Td, Tr, num, inr, ago, dateOnly, dateTime, pctOrDash,
 } from "../_components/ui"
 
+export const metadata = { title: "Business" }
+
 export const dynamic = "force-dynamic"
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) || undefined
@@ -86,13 +88,13 @@ export default async function BusinessPage({ searchParams }: { searchParams: Rec
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Card>
           <p className="text-[10.5px] font-bold uppercase tracking-wider text-ink-muted">Signups · {period.label.toLowerCase()}</p>
-          <p className="text-[28px] font-black tabular-nums text-sky-600 leading-none mt-1">{num(signups.inPeriod)}</p>
+          <p className="text-[28px] font-semibold tabular-nums text-sky-600 leading-none mt-1">{num(signups.inPeriod)}</p>
           <p className="mt-1"><Delta pct={signups.deltaPct} prev={signups.prevPeriod} label="signups" /></p>
           <p className="text-[10.5px] text-ink-faint mt-1">{num(signups.total)} accounts all time</p>
         </Card>
         <Card>
           <p className="text-[10.5px] font-bold uppercase tracking-wider text-ink-muted">New users · {period.label.toLowerCase()}</p>
-          <p className="text-[28px] font-black tabular-nums text-sky-600 leading-none mt-1">{num(users.inPeriod)}</p>
+          <p className="text-[28px] font-semibold tabular-nums text-sky-600 leading-none mt-1">{num(users.inPeriod)}</p>
           <p className="mt-1"><Delta pct={users.deltaPct} prev={users.prevPeriod} label="users" /></p>
           <p className="text-[10.5px] text-ink-faint mt-1">{num(users.total)} users all time</p>
         </Card>
@@ -136,7 +138,7 @@ export default async function BusinessPage({ searchParams }: { searchParams: Rec
                 {b.newSignups.map((s) => (
                   <Tr key={s.id}>
                     <Td>
-                      <Link href={`/admin/accounts/${s.id}`} className="block group">
+                      <Link href={`/accounts/${s.id}`} className="block group">
                         <p className="text-[13px] font-bold text-ink group-hover:text-sky-600 transition-colors">{s.name}</p>
                         <p className="text-[11px] text-ink-muted">{[s.industry, s.city].filter(Boolean).join(" · ")}</p>
                       </Link>
@@ -234,7 +236,7 @@ export default async function BusinessPage({ searchParams }: { searchParams: Rec
 
       {/* ── Users ── */}
       <section>
-        <SectionLabel right={<Link href="/admin/users" className="text-sky-600 font-semibold hover:text-sky-700">all users →</Link>}>
+        <SectionLabel right={<Link href="/users" className="text-sky-600 font-semibold hover:text-sky-700">all users →</Link>}>
           Users
         </SectionLabel>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -263,7 +265,7 @@ export default async function BusinessPage({ searchParams }: { searchParams: Rec
 
       {/* ── Revenue ── */}
       <section>
-        <SectionLabel right={<Link href="/admin/billing" className="text-sky-600 font-semibold hover:text-sky-700">subscriptions →</Link>}>
+        <SectionLabel right={<Link href="/billing" className="text-sky-600 font-semibold hover:text-sky-700">subscriptions →</Link>}>
           Revenue
         </SectionLabel>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -282,9 +284,9 @@ export default async function BusinessPage({ searchParams }: { searchParams: Rec
           <p className="text-[11px] font-bold uppercase tracking-wider text-ink-muted mb-1.5">Last payment</p>
           {rev.lastPayment ? (
             <p className="text-[13px] text-ink">
-              <span className="font-black tabular-nums text-emerald-600">{inr(rev.lastPayment.amountInr)}</span>
+              <span className="font-semibold tabular-nums text-emerald-600">{inr(rev.lastPayment.amountInr)}</span>
               {" from "}
-              <Link href={`/admin/accounts/${rev.lastPayment.accountId}`} className="font-bold text-sky-600 hover:text-sky-700">
+              <Link href={`/accounts/${rev.lastPayment.accountId}`} className="font-bold text-sky-600 hover:text-sky-700">
                 {rev.lastPayment.accountName}
               </Link>
               {" · "}<span className="text-ink-soft">{dateTime(rev.lastPayment.at)}</span>

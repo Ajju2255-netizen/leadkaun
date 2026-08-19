@@ -9,6 +9,8 @@ import {
   num, inr, pctOrDash, duration, ago, dateOnly, type Tone,
 } from "./_components/ui"
 
+export const metadata = { title: "Overview" }
+
 export const dynamic = "force-dynamic"
 
 const SEV_TONE: Record<string, Tone> = { info: "sky", warn: "amber", critical: "red" }
@@ -50,7 +52,7 @@ export default async function AdminOverview() {
     <div className="space-y-9">
       {/* ── Opening line: the state of the business in one sentence ── */}
       <div>
-        <h1 className="text-[26px] font-black tracking-tight text-ink">{greeting()}.</h1>
+        <h1 className="text-[24px] font-semibold tracking-[-0.02em] text-ink">{greeting()}.</h1>
         <p className="text-[14px] text-ink-soft mt-1.5">
           {systemsOk && criticals === 0
             ? "Leadkaun is healthy."
@@ -69,22 +71,22 @@ export default async function AdminOverview() {
       {/* ── Three columns: customers / product / intelligence ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Kpi
-          label="Accounts" value={num(k.accounts)} tone="sky" href="/admin/accounts"
+          label="Accounts" value={num(k.accounts)} tone="sky" href="/accounts"
           sub={`${num(k.newSignups7d)} new this week`}
           hint="Every Account row, regardless of plan or activity."
         />
         <Kpi
-          label="Activated" value={num(k.activated)} tone="emerald" href="/admin/growth/activation"
+          label="Activated" value={num(k.activated)} tone="emerald" href="/growth/activation"
           sub={k.accounts > 0 ? `${Math.round((k.activated / k.accounts) * 100)}% of accounts` : undefined}
           hint="Completed an import AND logged a real (non-import) rep action."
         />
         <Kpi
-          label="Active leads" value={num(k.activeLeads)} tone="sky" href="/admin/leads"
+          label="Active leads" value={num(k.activeLeads)} tone="sky" href="/leads"
           sub={`${num(k.totalLeads)} all time`}
           hint="Open leads — not won, lost, or junked. This is what plan limits meter."
         />
         <Kpi
-          label="MRR" value={inr(k.mrrInr)} tone="emerald" href="/admin/billing"
+          label="MRR" value={inr(k.mrrInr)} tone="emerald" href="/billing"
           sub="active subscriptions only"
           hint="Σ subscriptions.mrr_inr where status = active, converted from paise."
         />
@@ -93,7 +95,7 @@ export default async function AdminOverview() {
       {/* ── Latest signups: a new customer should never be just a number ── */}
       <section>
         <SectionLabel
-          right={<Link href="/admin/business" className="text-sky-600 font-semibold hover:text-sky-700">business scorecard →</Link>}
+          right={<Link href="/business" className="text-sky-600 font-semibold hover:text-sky-700">business scorecard →</Link>}
         >
           Latest signups
           {freshCount > 0 && <span className="text-sky-600"> · {freshCount} this week</span>}
@@ -101,13 +103,13 @@ export default async function AdminOverview() {
         {latestSignups.length === 0 ? (
           <Card><p className="text-[13px] text-ink-muted">No accounts yet.</p></Card>
         ) : (
-          <div className="rounded-2xl glass-2 divide-y divide-hairline overflow-hidden">
+          <div className="rounded-2xl border border-slate-200/70 bg-white divide-y divide-hairline overflow-hidden">
             {latestSignups.map((s) => {
               const fresh = s.createdAt.getTime() >= d7
               return (
                 <Link
                   key={s.id}
-                  href={`/admin/accounts/${s.id}`}
+                  href={`/accounts/${s.id}`}
                   className="px-5 py-3 flex items-center justify-between gap-3 hover:bg-sky-50/60 transition-colors"
                 >
                   <div className="flex items-center gap-3 min-w-0">
@@ -159,7 +161,7 @@ export default async function AdminOverview() {
             </p>
           </Card>
         ) : (
-          <div className="rounded-2xl glass-2 divide-y divide-hairline overflow-hidden">
+          <div className="rounded-2xl border border-slate-200/70 bg-white divide-y divide-hairline overflow-hidden">
             {o.attention.map((a, i) => {
               const inner = (
                 <div className="px-5 py-3 flex items-start gap-3 hover:bg-sky-50/60 transition-colors">
@@ -215,7 +217,7 @@ export default async function AdminOverview() {
       {/* ── Intelligence + Intake side by side ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <section>
-          <SectionLabel right={<Link href="/admin/recommendations" className="text-sky-600 font-semibold hover:text-sky-700">details →</Link>}>
+          <SectionLabel right={<Link href="/recommendations" className="text-sky-600 font-semibold hover:text-sky-700">details →</Link>}>
             Intelligence · last 30 days
           </SectionLabel>
           <Card>
@@ -227,7 +229,7 @@ export default async function AdminOverview() {
               <div className="space-y-3">
                 <div className="flex items-baseline justify-between">
                   <span className="text-[12px] text-ink-soft">RAR <span className="text-ink-faint">(accepted / shown)</span></span>
-                  <span className="text-[20px] font-black tabular-nums text-sky-600">
+                  <span className="text-[20px] font-semibold tabular-nums text-sky-600">
                     {pctOrDash(intel.rates.rar)}<Delta pts={intel.rarDeltaPts} />
                   </span>
                 </div>
@@ -247,7 +249,7 @@ export default async function AdminOverview() {
         </section>
 
         <section>
-          <SectionLabel right={<Link href="/admin/intake/analytics" className="text-sky-600 font-semibold hover:text-sky-700">details →</Link>}>
+          <SectionLabel right={<Link href="/intake/analytics" className="text-sky-600 font-semibold hover:text-sky-700">details →</Link>}>
             Intake · last {intake.windowDays} days
           </SectionLabel>
           <Card>

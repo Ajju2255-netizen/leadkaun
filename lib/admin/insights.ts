@@ -19,10 +19,12 @@ export async function computeDailyInsights(): Promise<Insight[]> {
   const [totalAccounts, newWeek, active14, trialing, activeSubs, importedAccts] = await Promise.all([
     prisma.account.count(),
     prisma.account.count({ where: { created_at: { gte: d7 } } }),
-    prisma.signal.findMany({ where: { created_at: { gte: d14 } }, distinct: ["account_id"], select: { account_id: true } }),
+    // groupBy, not findMany({distinct}) — Prisma dedupes client-side, which
+    // would stream every signal row into Node just to build this set.
+    prisma.signal.groupBy({ by: ["account_id"], where: { created_at: { gte: d14 } } }),
     prisma.subscription.findMany({ where: { status: "trialing" }, select: { account_id: true } }),
     prisma.subscription.findMany({ where: { status: "active" }, select: { account_id: true } }),
-    prisma.importJobStatus.findMany({ distinct: ["account_id"], select: { account_id: true } }),
+    prisma.importJobStatus.groupBy({ by: ["account_id"] }),
   ])
 
   const active = new Set(active14.map((s) => s.account_id))
@@ -33,10 +35,10 @@ export async function computeDailyInsights(): Promise<Insight[]> {
 
   const plural = (n: number) => (n > 1 ? "s" : "")
   const out: Insight[] = []
-  if (newWeek > 0) out.push({ label: `${newWeek} new customer${plural(newWeek)} this week`, count: newWeek, severity: "info", href: "/admin/accounts" })
-  if (churnRisk > 0) out.push({ label: `${churnRisk} paying account${plural(churnRisk)} inactive 14d — churn risk`, count: churnRisk, severity: "critical", href: "/admin/accounts" })
-  if (inactiveTrials > 0) out.push({ label: `${inactiveTrials} inactive trial${plural(inactiveTrials)}`, count: inactiveTrials, severity: "warn", href: "/admin/accounts" })
-  if (notOnboarded > 0) out.push({ label: `${notOnboarded} account${plural(notOnboarded)} haven't imported yet`, count: notOnboarded, severity: "warn", href: "/admin/accounts" })
+  if (newWeek > 0) out.push({ label: `${newWeek} new customer${plural(newWeek)} this week`, count: newWeek, severity: "info", href: "/accounts" })
+  if (churnRisk > 0) out.push({ label: `${churnRisk} paying account${plural(churnRisk)} inactive 14d — churn risk`, count: churnRisk, severity: "critical", href: "/accounts" })
+  if (inactiveTrials > 0) out.push({ label: `${inactiveTrials} inactive trial${plural(inactiveTrials)}`, count: inactiveTrials, severity: "warn", href: "/accounts" })
+  if (notOnboarded > 0) out.push({ label: `${notOnboarded} account${plural(notOnboarded)} haven't imported yet`, count: notOnboarded, severity: "warn", href: "/accounts" })
   if (out.length === 0) out.push({ label: "All quiet — no action items today", count: 0, severity: "info" })
   return out
 }

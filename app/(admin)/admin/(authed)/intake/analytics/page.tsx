@@ -1,10 +1,11 @@
-import Link from "next/link"
 import { getIntakeAnalytics, REPORT_SCAN_CAP } from "@/lib/admin/intake"
 import { FilterBar, type SelectFilter } from "../../_components/FilterBar"
 import {
   PageHeader, Card, Stat, SectionLabel, BarRow, FunnelStep, EmptyState,
-  num, duration, pctOrDash,
+  num, duration, pctOrDash, BackLink,
 } from "../../_components/ui"
+
+export const metadata = { title: "Intake analytics" }
 
 export const dynamic = "force-dynamic"
 
@@ -41,9 +42,7 @@ export default async function IntakeAnalyticsPage({ searchParams }: { searchPara
         title="Intake analytics"
         subtitle="What the first twenty to fifty datasets are telling us. Time-to-Trust, where customers stop, and what real Indian SMB lead lists actually contain."
         right={
-          <Link href="/admin/intake" className="text-[12px] font-semibold text-sky-600 hover:text-sky-700">
-            ← All sessions
-          </Link>
+          <BackLink href="/intake">All sessions</BackLink>
         }
       />
 

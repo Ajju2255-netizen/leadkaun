@@ -231,7 +231,7 @@ export async function getBusinessScorecard(periodKey?: string): Promise<Business
     }),
     prisma.payment.aggregate({ where: { status: "succeeded" }, _sum: { amount_inr: true } }),
     prisma.payment
-      .findMany({ where: { status: "succeeded" }, distinct: ["account_id"], select: { account_id: true } })
+      .groupBy({ by: ["account_id"], where: { status: "succeeded" } })
       .then((r) => r.length),
     prisma.payment.findFirst({ orderBy: { created_at: "desc" } }),
 
@@ -437,16 +437,10 @@ async function listNewSignups(since: Date | null, take = 25): Promise<SignupRow[
     }),
     prisma.lead.groupBy({ by: ["account_id"], where: { account_id: { in: ids } }, _count: { _all: true } }),
     prisma.importJobStatus
-      .findMany({
-        where: { account_id: { in: ids }, status: ImportStatus.COMPLETE },
-        distinct: ["account_id"], select: { account_id: true },
-      })
+      .groupBy({ by: ["account_id"], where: { account_id: { in: ids }, status: ImportStatus.COMPLETE } })
       .then((r) => new Set(r.map((x) => x.account_id))),
     prisma.signal
-      .findMany({
-        where: { account_id: { in: ids }, signal_type: { not: "SOURCE_BASELINE" } },
-        distinct: ["account_id"], select: { account_id: true },
-      })
+      .groupBy({ by: ["account_id"], where: { account_id: { in: ids }, signal_type: { not: "SOURCE_BASELINE" } } })
       .then((r) => new Set(r.map((x) => x.account_id))),
   ])
 

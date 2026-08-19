@@ -29,7 +29,7 @@ export async function getPlatformDashboard(): Promise<PlatformDashboard> {
   const [companies, signupsToday, activeAccts, importsToday, importedToday, totalLeads, dbOk, emailsToday, emailFailToday, recentJobs, payingCount, trialCount, mrrAgg] = await Promise.all([
     prisma.account.count(),
     prisma.account.count({ where: { created_at: { gte: dayStart } } }),
-    prisma.signal.findMany({ where: { created_at: { gte: dayStart } }, distinct: ["account_id"], select: { account_id: true } }),
+    prisma.signal.groupBy({ by: ["account_id"], where: { created_at: { gte: dayStart } } }),
     prisma.importJobStatus.count({ where: { created_at: { gte: dayStart } } }),
     prisma.importJobStatus.aggregate({ where: { created_at: { gte: dayStart } }, _sum: { inserted: true } }),
     prisma.lead.count(),

@@ -7,6 +7,8 @@ import {
 } from "../_components/ui"
 import type { UserRole } from "@prisma/client"
 
+export const metadata = { title: "Users" }
+
 export const dynamic = "force-dynamic"
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) || undefined
@@ -69,7 +71,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Record
       {f.accountId && (
         <p className="text-[12px] text-ink-soft">
           Filtered to one account.{" "}
-          <Link href="/admin/users" className="text-sky-600 font-semibold hover:text-sky-700">Show all</Link>
+          <Link href="/users" className="text-sky-600 font-semibold hover:text-sky-700">Show all</Link>
         </p>
       )}
 
@@ -100,7 +102,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Record
                   <p className="text-[11px] text-ink-muted">{u.email}</p>
                 </Td>
                 <Td>
-                  <Link href={`/admin/accounts/${u.accountId}`} className="text-sky-600 font-semibold hover:text-sky-700">
+                  <Link href={`/accounts/${u.accountId}`} className="text-sky-600 font-semibold hover:text-sky-700">
                     {u.accountName}
                   </Link>
                 </Td>

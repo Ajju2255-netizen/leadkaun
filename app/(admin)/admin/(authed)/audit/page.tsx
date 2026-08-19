@@ -7,6 +7,8 @@ import {
   TableWrap, THead, TBody, Th, Td, Tr, num, ago, dateTime, duration, type Tone,
 } from "../_components/ui"
 
+export const metadata = { title: "Audit log" }
+
 export const dynamic = "force-dynamic"
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) || undefined
@@ -103,7 +105,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Record
       {accountId && (
         <p className="text-[12px] text-ink-soft">
           Filtered to one account.{" "}
-          <Link href="/admin/audit" className="text-sky-600 font-semibold hover:text-sky-700">Show all</Link>
+          <Link href="/audit" className="text-sky-600 font-semibold hover:text-sky-700">Show all</Link>
         </p>
       )}
 
@@ -139,7 +141,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Record
                     : <span className="text-ink-faint">system / not recorded</span>}
                 </Td>
                 <Td>
-                  <Link href={`/admin/accounts/${e.accountId}`} className="text-sky-600 font-semibold hover:text-sky-700">
+                  <Link href={`/accounts/${e.accountId}`} className="text-sky-600 font-semibold hover:text-sky-700">
                     {e.accountName}
                   </Link>
                 </Td>

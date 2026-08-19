@@ -135,11 +135,14 @@
    ============================================================================ */
 
 @layer base {
+  /* No border-radius here. It used to force 6px, which visibly reshaped any
+     focusable element that had no radius utility of its own the moment it was
+     keyboard-focused — pills squared off, square inputs rounded. The outline
+     follows the element's real shape instead. */
   :focus-visible {
     outline: 2px solid var(--sky-500);
     outline-offset: 2px;
     box-shadow: 0 0 0 4px var(--sky-100);
-    border-radius: 6px;
   }
   ::selection {
     background: var(--sky-200);
@@ -611,6 +614,23 @@
    pills to the gradient-glossy recipe so settings/legacy spots match the
    engine pages. Targets only <button>, <a>, and <select> so decorative
    non-interactive uses (icon-pill backgrounds, dots) keep their flat fill.
+
+   ⚠ TRAP: this block sits OUTSIDE any @layer, so it beats every Tailwind
+   utility. `<button className="bg-sky-600 rounded-lg">` silently gets a
+   gradient and a glow you did not ask for, and you cannot override the
+   background without another !important. The `:disabled` branch below only
+   neutralises filter/transform/box-shadow — never the background — so a
+   disabled sky-600 button still looks enabled.
+
+   If you want a plain flat button, do NOT use `bg-sky-600` on a <button> or
+   <a>. Use `.btn-primary` for the intended glossy recipe, or any other sky
+   shade (`bg-sky-500`, `bg-sky-700`) to opt out entirely. Mission Control
+   uses neither — see the Button primitive in the admin UI kit.
+
+   Moving this into @layer components and dropping the !important would let
+   utilities win again, which is the correct end state, but it would also
+   restyle every existing sky-600 button across the product app. That is a
+   deliberate visual change and belongs in its own pass.
    ──────────────────────────────────────────────────────────────────────── */
 button.bg-sky-600,
 a.bg-sky-600 {

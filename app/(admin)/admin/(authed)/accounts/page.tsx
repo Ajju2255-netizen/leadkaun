@@ -1,10 +1,11 @@
-import Link from "next/link"
 import { listAccounts, type AccountFilters } from "@/lib/admin/accounts"
 import { FilterBar, type SelectFilter } from "../_components/FilterBar"
 import {
   PageHeader, TableWrap, THead, TBody, Th, Td, Tr, Dot, Pill, EmptyState,
-  num, inr, ago, dateOnly, healthTone,
+  num, inr, ago, dateOnly, healthTone, RowLink,
 } from "../_components/ui"
+
+export const metadata = { title: "Accounts" }
 
 export const dynamic = "force-dynamic"
 
@@ -90,7 +91,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Rec
       <TableWrap>
         <table className="w-full text-left min-w-[1020px]">
           <THead>
-            <Th className="w-8" />
+            <Th className="w-8"><span className="sr-only">Health</span></Th>
             <Th>Company</Th>
             <Th>Plan</Th>
             <Th className="text-right">MRR</Th>
@@ -107,16 +108,16 @@ export default async function AccountsPage({ searchParams }: { searchParams: Rec
             {rows.length === 0 ? (
               <tr><td colSpan={12}><EmptyState>No accounts match these filters.</EmptyState></td></tr>
             ) : rows.map((r) => (
-              <Tr key={r.id}>
+              <Tr key={r.id} href={`/accounts/${r.id}`}>
                 <Td><Dot tone={healthTone(r.healthBand)} /></Td>
                 <Td>
-                  <Link href={`/admin/accounts/${r.id}`} className="block group">
+                  <RowLink href={`/accounts/${r.id}`}>
                     <p className="text-[13px] font-bold text-ink group-hover:text-sky-600 transition-colors">{r.name}</p>
                     <p className="text-[11px] text-ink-muted">
                       {r.industry}
                       {(r.city || r.state) && ` · ${[r.city, r.state].filter(Boolean).join(", ")}`}
                     </p>
-                  </Link>
+                  </RowLink>
                 </Td>
                 <Td>
                   {r.planName ? (

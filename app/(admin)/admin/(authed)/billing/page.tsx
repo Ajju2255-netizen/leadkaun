@@ -4,8 +4,10 @@ import { listSubscriptions, listPlansWithUptake, listPayments } from "@/lib/admi
 import { getMrrMovement } from "@/lib/admin/revenue-history"
 import {
   PageHeader, Card, Stat, SectionLabel, Pill, EmptyState,
-  TableWrap, THead, TBody, Th, Td, Tr, num, inr, dateOnly, dateTime, pctOrDash,
+  TableWrap, THead, TBody, Th, Td, Tr, num, inr, dateOnly, dateTime, pctOrDash, NotWired,
 } from "../_components/ui"
+
+export const metadata = { title: "Subscriptions" }
 
 export const dynamic = "force-dynamic"
 
@@ -28,7 +30,7 @@ export default async function BillingPage() {
         title="Subscriptions"
         subtitle="Razorpay webhooks are the source of truth for status, payments and invoices; the Account 360 plan editor writes the same rows manually for the cases a provider can't cover."
         right={
-          <Link href="/admin/billing/usage" className="text-[12px] font-semibold text-sky-600 hover:text-sky-700">
+          <Link href="/billing/usage" className="text-[12px] font-semibold text-sky-600 hover:text-sky-700">
             Usage &amp; limits →
           </Link>
         }
@@ -122,7 +124,7 @@ export default async function BillingPage() {
               ) : subs.map((s) => (
                 <Tr key={s.accountId}>
                   <Td>
-                    <Link href={`/admin/accounts/${s.accountId}`} className="text-[13px] font-bold text-ink hover:text-sky-600">
+                    <Link href={`/accounts/${s.accountId}`} className="text-[13px] font-bold text-ink hover:text-sky-600">
                       {s.accountName}
                     </Link>
                   </Td>
@@ -224,7 +226,7 @@ export default async function BillingPage() {
       {/* ── Payments ── */}
       <section>
         <SectionLabel
-          right={<Link href="/admin/billing/payments" className="text-sky-600 font-semibold hover:text-sky-700">payments &amp; invoices →</Link>}
+          right={<Link href="/billing/payments" className="text-sky-600 font-semibold hover:text-sky-700">payments &amp; invoices →</Link>}
         >
           Recent payments
         </SectionLabel>
@@ -252,7 +254,7 @@ export default async function BillingPage() {
                 {payments.map((p) => (
                   <Tr key={p.id}>
                     <Td>
-                      <Link href={`/admin/accounts/${p.accountId}`} className="font-bold text-ink hover:text-sky-600">
+                      <Link href={`/accounts/${p.accountId}`} className="font-bold text-ink hover:text-sky-600">
                         {p.accountName}
                       </Link>
                     </Td>
@@ -269,14 +271,14 @@ export default async function BillingPage() {
         )}
       </section>
 
-      <div className="rounded-2xl border border-dashed border-slate-300 bg-white/50 px-5 py-3.5">
+      <NotWired>
         <p className="text-[12px] text-ink-soft leading-relaxed">
           <span className="font-bold text-ink">Expansion, contraction and net-revenue-retention are not shown.</span>{" "}
           Each needs a history of MRR per account over time, and <code>subscriptions.mrr_inr</code> is a single
           current value that is overwritten on every plan change — the history was never kept. Computing them from
           what exists would produce a number that looks right and isn&rsquo;t.
         </p>
-      </div>
+      </NotWired>
     </div>
   )
 }

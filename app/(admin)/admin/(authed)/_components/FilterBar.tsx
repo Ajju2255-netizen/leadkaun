@@ -3,6 +3,7 @@
 import { useCallback, useState, useTransition, useEffect } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Search, X } from "lucide-react"
+import { Button, Input, Select } from "./ui"
 
 export type SelectFilter = {
   param: string
@@ -57,44 +58,53 @@ export function FilterBar({
 
   const active = filters.filter((f) => sp.get(f.param)).length + (sp.get(searchParam) ? 1 : 0)
 
-  const sel =
-    "h-8 rounded-lg bg-white/80 border border-hairline-strong px-2 text-[12px] text-ink outline-none focus:border-sky-400 cursor-pointer"
-
   return (
-    <div className={`flex items-center gap-2 flex-wrap ${pending ? "opacity-60" : ""} transition-opacity`}>
+    <div
+      role="search"
+      aria-busy={pending}
+      className={`flex items-center gap-2 flex-wrap ${pending ? "opacity-60" : ""} transition-opacity`}
+    >
       {showSearch && (
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-ink-muted" />
-          <input
+          <Input
+            size="sm"
+            type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
+            aria-label={searchPlaceholder}
             placeholder={searchPlaceholder}
-            className="h-8 w-56 rounded-lg bg-white/80 border border-hairline-strong pl-8 pr-2 text-[12px] text-ink placeholder:text-ink-muted outline-none focus:border-sky-400"
+            className="w-56 pl-8"
           />
         </div>
       )}
 
       {filters.map((f) => (
-        <select
+        <Select
           key={f.param}
+          size="sm"
           value={sp.get(f.param) ?? ""}
           onChange={(e) => push(f.param, e.target.value)}
-          className={`${sel} ${sp.get(f.param) ? "border-sky-400 text-sky-700 font-semibold" : ""}`}
+          // The visible "label" is only the placeholder <option>, so once a
+          // filter is applied the control has no accessible name at all.
+          aria-label={`Filter by ${f.label}`}
+          className={sp.get(f.param) ? "border-sky-400 text-sky-700 font-semibold" : ""}
         >
           <option value="">{f.label}</option>
           {f.options.map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
-        </select>
+        </Select>
       ))}
 
       {active > 0 && (
-        <button
+        <Button
+          size="sm"
           onClick={() => startTransition(() => router.replace(pathname, { scroll: false }))}
-          className="h-8 inline-flex items-center gap-1 rounded-lg border border-hairline-strong bg-white/80 px-2.5 text-[11.5px] font-semibold text-ink-soft hover:text-ink hover:border-slate-300"
+          aria-label={`Clear ${active} active ${active === 1 ? "filter" : "filters"}`}
         >
           <X className="w-3 h-3" /> Clear {active}
-        </button>
+        </Button>
       )}
     </div>
   )

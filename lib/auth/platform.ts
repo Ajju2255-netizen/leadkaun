@@ -11,8 +11,22 @@ import { createServerClient } from "@/lib/supabase/server"
 import { AuthError } from "@/lib/auth/middleware"
 import type { PlatformRole } from "@prisma/client"
 
-const DEV_BYPASS =
+// Dev convenience: act as the first active platform admin with no password.
+// Two guards, and both must hold.
+//   1. never in a production build
+//   2. never against a hosted database. `scripts/use-db.sh prod` copies
+//      .env.local.prod onto .env.local; while that file carried
+//      DEV_AUTH_BYPASS=true, `npm run dev` handed out an unauthenticated
+//      SUPER_ADMIN session — impersonate-any-tenant — on live customer data.
+//      NODE_ENV alone does not catch that, so the bypass is pinned to a local DB.
+const BYPASS_REQUESTED =
   process.env.NODE_ENV !== "production" && process.env.DEV_AUTH_BYPASS === "true"
+
+const DB_IS_LOCAL = /@localhost[:/]|@127\.0\.0\.1[:/]|host=(\/|%2F)tmp/.test(
+  process.env.DATABASE_URL ?? "",
+)
+
+const DEV_BYPASS = BYPASS_REQUESTED && DB_IS_LOCAL
 
 // MFA (Supabase TOTP / AAL2) enforcement. Disabled for now; re-enable by setting
 // PLATFORM_MFA_REQUIRED="true" in the env (then redeploy). Strongly recommended
@@ -28,10 +42,23 @@ export type PlatformSession = {
 }
 
 function allowlist(): string[] {
-  return (process.env.PLATFORM_ADMIN_EMAILS ?? "")
+  const list = (process.env.PLATFORM_ADMIN_EMAILS ?? "")
     .split(",")
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean)
+
+  // An empty allowlist fails closed: every admin is rejected at the check below
+  // and bounced back to /admin/login with no explanation. That is the right
+  // behaviour but an awful diagnostic — it reads as "wrong password" rather than
+  // "unset env var" — so say so out loud. (lib/env.ts is imported by nothing, so
+  // it cannot catch this at boot.)
+  if (list.length === 0) {
+    console.error(
+      "[platform-auth] PLATFORM_ADMIN_EMAILS is empty — every Mission Control login " +
+        "will be rejected. Set it to a comma-separated list of admin emails.",
+    )
+  }
+  return list
 }
 
 /**
@@ -40,7 +67,17 @@ function allowlist(): string[] {
  * enforced here) so the layout can route to enrolment/challenge.
  */
 export async function getPlatformSession(): Promise<PlatformSession | null> {
-  // Dev/staging convenience: act as the first active platform admin, MFA waived.
+  // Fail loudly rather than silently falling through to the real auth path —
+  // a refused bypass otherwise looks like an ordinary "you're not an admin" bug.
+  if (BYPASS_REQUESTED && !DB_IS_LOCAL) {
+    throw new Error(
+      "DEV_AUTH_BYPASS is set but DATABASE_URL is not local. Refusing to grant a " +
+        "platform-admin session against a hosted database. Run `bash scripts/use-db.sh staging` " +
+        "to point at the local DB, or unset DEV_AUTH_BYPASS.",
+    )
+  }
+
+  // Dev convenience: act as the first active platform admin, MFA waived.
   if (DEV_BYPASS) {
     const admin = await prisma.platformAdmin.findFirst({ where: { is_active: true } })
     if (!admin) return null

@@ -29,6 +29,14 @@ bash scripts/use-db.sh prod      # the live Supabase prod DB — careful!
 
 Two gitignored env files hold the full configs: `.env.local.staging` (local
 socket DB) and `.env.local.prod` (**real prod credentials — never commit**).
+
+> **Never put `DEV_AUTH_BYPASS` in `.env.local.prod`.** `use-db.sh prod` copies
+> that file straight onto `.env.local`, so the bypass would turn `npm run dev`
+> into an unauthenticated **SUPER_ADMIN** session on live customer data, with
+> impersonate-any-tenant. `NODE_ENV` does not save you here — a dev server is
+> not a production build. `lib/auth/platform.ts` now also refuses the bypass
+> unless `DATABASE_URL` points at a local Postgres, and throws a named error
+> rather than silently failing the login, but keep the file clean regardless.
 `.env.local` is whichever is currently active.
 
 ## Rebuilding staging from scratch

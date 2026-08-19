@@ -1,5 +1,7 @@
 import { getIntegrations } from "@/lib/admin/ops"
-import { PageHeader, Card, Dot, Pill, ago, type Tone } from "../../_components/ui"
+import { PageHeader, Card, Dot, Pill, NotWired, ago, type Tone } from "../../_components/ui"
+
+export const metadata = { title: "Integrations" }
 
 export const dynamic = "force-dynamic"
 
@@ -35,7 +37,7 @@ export default async function IntegrationsPage() {
                 <div className="flex items-center gap-2.5">
                   <Dot tone={s.tone} glow />
                   <div>
-                    <p className="text-[14px] font-black text-ink">{i.name}</p>
+                    <p className="text-[14px] font-semibold text-ink">{i.name}</p>
                     <p className="text-[10.5px] font-bold uppercase tracking-wider" style={{ color: "var(--ink-muted)" }}>{s.label}</p>
                   </div>
                 </div>
@@ -61,14 +63,14 @@ export default async function IntegrationsPage() {
         })}
       </div>
 
-      <div className="rounded-2xl border border-dashed border-slate-300 bg-white/50 px-5 py-3.5">
+      <NotWired>
         <p className="text-[12px] text-ink-soft leading-relaxed">
           <span className="font-bold text-ink">Not listed, because nothing exists to monitor:</span> CRM connectors
           (HubSpot / Zoho / Salesforce), outbound webhooks, and a public API. The <code>IntakeSource</code> enum
           already reserves <code>API</code>, so intake sessions from those connectors will appear here for free once
           they are built — this page reads the same tables.
         </p>
-      </div>
+      </NotWired>
     </div>
   )
 }

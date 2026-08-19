@@ -6,6 +6,8 @@ import {
   TableWrap, THead, TBody, Th, Td, Tr, num, ago, dateTime, duration,
 } from "../../_components/ui"
 
+export const metadata = { title: "Jobs" }
+
 export const dynamic = "force-dynamic"
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) || undefined
@@ -42,7 +44,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Record<
 
       <section>
         <SectionLabel right="heartbeat written once per run, inside a memoized Inngest step">Health</SectionLabel>
-        <div className="rounded-2xl glass-2 divide-y divide-hairline overflow-hidden">
+        <div className="rounded-2xl border border-slate-200/70 bg-white divide-y divide-hairline overflow-hidden">
           {health.map((j) => (
             <div key={j.name} className="px-4 py-3 flex items-center gap-3">
               <Dot tone={j.healthy === true ? "emerald" : j.healthy === false ? "red" : "slate"} glow />
@@ -109,7 +111,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Record<
                     <Td className="text-right tabular-nums text-ink-muted">{duration(r.durationMs)}</Td>
                     <Td>
                       {r.accountId
-                        ? <Link href={`/admin/accounts/${r.accountId}`} className="text-sky-600 font-semibold hover:text-sky-700">view</Link>
+                        ? <Link href={`/accounts/${r.accountId}`} className="text-sky-600 font-semibold hover:text-sky-700">view</Link>
                         : <span className="text-ink-faint">all</span>}
                     </Td>
                     <Td className="max-w-[240px]">

@@ -15,6 +15,7 @@
 // ─────────────────────────────────────────────
 
 import Link from "next/link"
+import { ChevronLeft } from "lucide-react"
 import type { ReactNode } from "react"
 
 export type Tone = "sky" | "emerald" | "amber" | "red" | "slate" | "violet"
@@ -122,7 +123,7 @@ export function PageHeader({ title, subtitle, right }: { title: string; subtitle
   return (
     <div className="flex items-start justify-between gap-4 flex-wrap">
       <div>
-        <h1 className="text-[24px] font-black tracking-tight text-ink">{title}</h1>
+        <h1 className="text-[24px] font-semibold tracking-[-0.02em] text-ink">{title}</h1>
         {subtitle && <p className="text-[13px] text-ink-soft mt-1 max-w-2xl">{subtitle}</p>}
       </div>
       {right && <div className="shrink-0">{right}</div>}
@@ -141,7 +142,7 @@ export function SectionLabel({ children, right }: { children: ReactNode; right?:
 
 export function Card({ children, className = "", pad = true }: { children: ReactNode; className?: string; pad?: boolean }) {
   return (
-    <div className={`rounded-2xl glass-2 ${pad ? "px-5 py-4" : ""} ${className}`}>{children}</div>
+    <div className={`rounded-2xl border border-slate-200/70 bg-white ${pad ? "px-5 py-4" : ""} ${className}`}>{children}</div>
   )
 }
 
@@ -179,9 +180,9 @@ export function Kpi({
   hint?: string
 }) {
   const body = (
-    <div className="rounded-2xl glass-2 px-5 py-4 h-full">
+    <div className="rounded-2xl border border-slate-200/70 bg-white px-5 py-4 h-full">
       <p className="text-[10.5px] font-bold uppercase tracking-wider text-ink-muted">{label}</p>
-      <p className={`text-[26px] font-black tabular-nums leading-tight mt-1 ${value === "—" ? "text-ink-faint" : TONE_TEXT[tone]}`}>
+      <p className={`text-[26px] font-semibold tabular-nums tracking-[-0.02em] leading-tight mt-1 ${value === "—" ? "text-ink-faint" : TONE_TEXT[tone]}`}>
         {value}
       </p>
       {sub && <p className="text-[11px] text-ink-muted mt-0.5">{sub}</p>}
@@ -196,9 +197,9 @@ export function Kpi({
 /** Compact figure for dense grids (Company 360, usage rows). */
 export function Stat({ label, value, tone = "slate", sub }: { label: string; value: string; tone?: Tone; sub?: string }) {
   return (
-    <div className="rounded-xl glass-1 px-4 py-3">
+    <div className="rounded-xl border border-slate-200/70 bg-white px-4 py-3">
       <p className="text-[10px] font-bold uppercase tracking-wider text-ink-muted">{label}</p>
-      <p className={`text-[17px] font-black tabular-nums mt-0.5 ${value === "—" ? "text-ink-faint" : tone === "slate" ? "text-ink" : TONE_TEXT[tone]}`}>
+      <p className={`text-[17px] font-semibold tabular-nums mt-0.5 ${value === "—" ? "text-ink-faint" : tone === "slate" ? "text-ink" : TONE_TEXT[tone]}`}>
         {value}
       </p>
       {sub && <p className="text-[10.5px] text-ink-muted mt-0.5">{sub}</p>}
@@ -259,12 +260,178 @@ export function EmptyState({ children }: { children: ReactNode }) {
   return <p className="px-4 py-8 text-center text-[13px] text-ink-muted">{children}</p>
 }
 
-/** Explains why a panel is empty because a dependency isn't wired, not because nothing happened. */
-export function NotWired({ what, why }: { what: string; why: string }) {
+// ── Controls ──────────────────────────────────────────────────────────────────
+// The kit shipped without these, so every page hand-rolled its own: six button
+// recipes (two of them different orange gradients) and six input recipes, all
+// copy-pasted. That is where the drift came from. Deliberately NOT built on
+// `bg-sky-600` — globals.css promotes that to a gradient with !important.
+
+const BTN_BASE =
+  "inline-flex items-center justify-center gap-1.5 rounded-lg font-semibold whitespace-nowrap " +
+  "transition-all active:scale-[0.97] disabled:opacity-50 disabled:pointer-events-none " +
+  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
+
+const BTN_VARIANT = {
+  primary: "bg-sky-500 text-white hover:bg-sky-600",
+  secondary: "border border-slate-200 bg-white text-ink-soft hover:bg-slate-50",
+  danger: "bg-red-500 text-white hover:bg-red-600",
+  warn: "bg-orange-500 text-white hover:bg-orange-600",
+} as const
+
+const BTN_SIZE = { sm: "h-8 px-3 text-[12px]", md: "h-9 px-4 text-[13px]" } as const
+
+export function Button({
+  variant = "secondary", size = "md", className = "", type = "button", ...rest
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: keyof typeof BTN_VARIANT
+  size?: keyof typeof BTN_SIZE
+}) {
   return (
-    <div className="rounded-2xl border border-dashed border-slate-300 bg-white/50 px-5 py-6 text-center">
-      <p className="text-[13px] font-semibold text-ink-soft">{what}</p>
-      <p className="text-[12px] text-ink-muted mt-1 max-w-md mx-auto leading-relaxed">{why}</p>
+    <button
+      type={type}
+      className={`${BTN_BASE} ${BTN_VARIANT[variant]} ${BTN_SIZE[size]} ${className}`}
+      {...rest}
+    />
+  )
+}
+
+// `outline-none` alone left a 1px border colour change as the only focus cue,
+// which is well under WCAG 2.4.11 — so every field pairs it with a real ring.
+// No `w-full` here: the filter bar lays its controls out inline, and a base
+// width would fight every caller. Full-width fields opt in via className.
+const FIELD_BASE =
+  "rounded-lg border border-hairline-strong bg-white px-3 text-ink outline-none " +
+  "transition-colors placeholder:text-ink-faint focus:border-sky-400 " +
+  "focus-visible:ring-2 focus-visible:ring-sky-400/60 disabled:opacity-50"
+
+const FIELD_SIZE = { sm: "h-8 text-[12px]", md: "h-9 text-[13px]" } as const
+
+export function Input({
+  size = "md", className = "", ...rest
+}: Omit<React.InputHTMLAttributes<HTMLInputElement>, "size"> & { size?: keyof typeof FIELD_SIZE }) {
+  return <input className={`${FIELD_BASE} ${FIELD_SIZE[size]} ${className}`} {...rest} />
+}
+
+export function Select({
+  size = "md", className = "", ...rest
+}: Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "size"> & { size?: keyof typeof FIELD_SIZE }) {
+  return <select className={`${FIELD_BASE} ${FIELD_SIZE[size]} pr-7 cursor-pointer ${className}`} {...rest} />
+}
+
+/** Switch. `label` is the accessible name — the visible text is a sibling, so
+ *  without it a screen reader announces an unnamed toggle. */
+export function Toggle({
+  on, label, onClick, disabled,
+}: { on: boolean; label: string; onClick?: () => void; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      disabled={disabled}
+      onClick={onClick}
+      className={`relative w-9 h-5 rounded-full shrink-0 transition-colors disabled:opacity-50
+                  disabled:cursor-not-allowed ${on ? "bg-emerald-500" : "bg-slate-300"}`}
+    >
+      <span
+        className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-all
+                    ${on ? "left-[18px]" : "left-0.5"}`}
+      />
+    </button>
+  )
+}
+
+/** The "← back to the index" link on every detail page. Was three different
+ *  treatments: two literal "←" strings and a ChevronLeft. */
+export function BackLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex items-center gap-1 text-[12px] font-semibold text-ink-muted
+                 hover:text-sky-600 transition-colors"
+    >
+      <ChevronLeft className="w-4 h-4" />
+      {children}
+    </Link>
+  )
+}
+
+/**
+ * Explains why a panel is empty because a dependency isn't wired, not because
+ * nothing happened. This is the house alternative to inventing a number —
+ * "a plausible-looking invented metric is worse than an absent one".
+ *
+ * Takes either the {what, why} pair or free prose as children, because the
+ * five screens that need it were already hand-rolling this exact dashed box
+ * with their own inline emphasis (and three different paddings).
+ */
+export function NotWired({
+  what, why, children,
+}: { what?: string; why?: string; children?: ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-3.5">
+      {children ?? (
+        <p className="text-[12px] text-ink-soft leading-relaxed">
+          <span className="font-semibold text-ink">{what}</span> {why}
+        </p>
+      )}
+    </div>
+  )
+}
+
+// ── Loading ───────────────────────────────────────────────────────────────────
+// Every admin page is force-dynamic and awaits 3–13 parallel Prisma queries, so
+// without a boundary the route just hangs on a blank screen. These give the
+// shell something to paint. Shapes deliberately match the real primitives —
+// Skeleton block sizes mirror Kpi/Stat, TableSkeleton mirrors TableWrap — so the
+// swap on load doesn't shift the layout.
+
+export function Skeleton({ className = "" }: { className?: string }) {
+  return <div className={`animate-pulse rounded-lg bg-slate-900/[0.06] ${className}`} />
+}
+
+export function CardSkeleton({ lines = 3 }: { lines?: number }) {
+  return (
+    <div className="rounded-2xl border border-slate-200/70 bg-white px-5 py-4 space-y-2.5">
+      <Skeleton className="h-3 w-24" />
+      {Array.from({ length: lines }).map((_, i) => (
+        <Skeleton key={i} className="h-4" />
+      ))}
+    </div>
+  )
+}
+
+export function KpiSkeleton({ count = 4 }: { count?: number }) {
+  return (
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="rounded-2xl border border-slate-200/70 bg-white px-5 py-4 space-y-2">
+          <Skeleton className="h-2.5 w-20" />
+          <Skeleton className="h-6 w-16" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export function TableSkeleton({ rows = 6, cols = 5 }: { rows?: number; cols?: number }) {
+  return (
+    <div className="rounded-2xl border border-slate-200/70 bg-white overflow-hidden">
+      <div className="bg-slate-900/[0.03] border-b border-hairline px-4 py-2.5 flex gap-4">
+        {Array.from({ length: cols }).map((_, i) => (
+          <Skeleton key={i} className="h-2.5 flex-1" />
+        ))}
+      </div>
+      <div className="divide-y divide-hairline">
+        {Array.from({ length: rows }).map((_, r) => (
+          <div key={r} className="px-4 py-3 flex gap-4">
+            {Array.from({ length: cols }).map((_, c) => (
+              <Skeleton key={c} className="h-3.5 flex-1" />
+            ))}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -273,22 +440,50 @@ export function NotWired({ what, why }: { what: string; why: string }) {
 
 export function TableWrap({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-2xl glass-2 overflow-hidden">
+    <div className="rounded-2xl border border-slate-200/70 bg-white overflow-hidden">
       <div className="overflow-x-auto">{children}</div>
     </div>
   )
 }
 
 export function Th({ children, className = "" }: { children?: ReactNode; className?: string }) {
-  return <th className={`px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-ink-muted whitespace-nowrap ${className}`}>{children}</th>
+  return <th scope="col" className={`px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-ink-muted whitespace-nowrap ${className}`}>{children}</th>
 }
 
 export function Td({ children, className = "" }: { children?: ReactNode; className?: string }) {
   return <td className={`px-4 py-2.5 text-[12.5px] text-ink-soft align-middle ${className}`}>{children}</td>
 }
 
-export function Tr({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <tr className={`hover:bg-sky-50/60 transition-colors ${className}`}>{children}</tr>
+/**
+ * A table row. The whole row highlights on hover, which reads as "this is
+ * clickable" — so where that is true, pass `href` and it becomes true for the
+ * whole row instead of just the one cell holding the link.
+ *
+ * `RowLink` is the partner: it stretches over the row via `::after`, so there is
+ * still exactly ONE link and one tab stop per row (a link per cell would make
+ * every table a tab-stop maze), and middle-click / open-in-new-tab still work.
+ */
+export function Tr({
+  children, className = "", href,
+}: { children: ReactNode; className?: string; href?: string }) {
+  return (
+    <tr className={`hover:bg-sky-50/60 transition-colors ${href ? "relative cursor-pointer" : ""} ${className}`}>
+      {children}
+    </tr>
+  )
+}
+
+export function RowLink({
+  href, children, className = "",
+}: { href: string; children: ReactNode; className?: string }) {
+  return (
+    <Link
+      href={href}
+      className={`block group after:absolute after:inset-0 after:content-[''] ${className}`}
+    >
+      {children}
+    </Link>
+  )
 }
 
 export function THead({ children }: { children: ReactNode }) {
@@ -312,7 +507,7 @@ const GRADE_STYLE: Record<string, string> = {
 
 export function Grade({ grade }: { grade: string }) {
   return (
-    <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg text-[12px] font-black ${GRADE_STYLE[grade] ?? "bg-slate-300 text-white"}`}>
+    <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg text-[12px] font-bold ${GRADE_STYLE[grade] ?? "bg-slate-300 text-white"}`}>
       {grade}
     </span>
   )
@@ -328,7 +523,7 @@ export const riskTone = (risk: string): Tone =>
 export function HealthPill({ label, state, note }: { label: string; state: boolean | null; note?: string }) {
   const tone: Tone = state === true ? "emerald" : state === false ? "red" : "slate"
   return (
-    <div className="flex items-center gap-2.5 rounded-xl glass-1 px-3.5 py-2.5">
+    <div className="flex items-center gap-2.5 rounded-xl border border-slate-200/70 bg-white px-3.5 py-2.5">
       <Dot tone={tone} glow />
       <span className="text-[12.5px] font-semibold text-ink-soft">{label}</span>
       <span className="ml-auto text-[10.5px] text-ink-faint shrink-0">

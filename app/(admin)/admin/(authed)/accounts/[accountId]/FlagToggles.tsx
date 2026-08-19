@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { Toggle } from "../../_components/ui"
 
 type Item = { key: string; label: string; enabled: boolean }
 
@@ -30,26 +31,27 @@ export function FlagToggles({
 
   return (
     <div>
-      <div className="rounded-2xl glass-2 divide-y divide-hairline overflow-hidden">
+      <div className="rounded-2xl border border-slate-200/70 bg-white divide-y divide-hairline overflow-hidden">
         {items.map((i) => {
           const on = flags[i.key]
           return (
             <div key={i.key} className="px-4 py-2.5 flex items-center justify-between">
               <span className="text-[12.5px] text-ink-soft font-medium">{i.label}</span>
-              <button
-                onClick={() => toggle(i.key)}
-                disabled={busy === i.key || !canWrite}
-                title={canWrite ? undefined : "Requires the SUPER_ADMIN role"}
-                aria-pressed={on}
-                className={`relative w-10 h-5 rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${on ? "bg-emerald-500" : "bg-slate-300"}`}
-              >
-                <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${on ? "translate-x-5" : "translate-x-0.5"}`} />
-              </button>
+              <span title={canWrite ? undefined : "Requires the SUPER_ADMIN role"}>
+                <Toggle
+                  on={on}
+                  label={`${i.label} — ${on ? "enabled" : "disabled"}`}
+                  onClick={() => toggle(i.key)}
+                  disabled={busy === i.key || !canWrite}
+                />
+              </span>
             </div>
           )
         })}
       </div>
-      {err && <p className="text-[11px] text-red-600 mt-1.5">{err}</p>}
+      {/* role=alert so the revert is announced — an optimistic toggle that
+          silently snaps back is otherwise invisible to a screen reader. */}
+      {err && <p role="alert" className="text-[11px] text-red-600 mt-1.5">{err}</p>}
     </div>
   )
 }

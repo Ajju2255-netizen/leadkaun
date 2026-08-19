@@ -39,16 +39,16 @@ export async function getActivationFunnel(): Promise<{ rows: FunnelRow[]; totalA
   const [accounts, icpIds, intakeIds, importIds, leadIds, recoIds, actionIds, paidIds] = await Promise.all([
     prisma.account.findMany({ select: { id: true, name: true, created_at: true }, orderBy: { created_at: "desc" } }),
     prisma.account.findMany({ where: { icp_configured: true }, select: { id: true } }).then(ids),
-    prisma.intakeSession.findMany({ distinct: ["account_id"], select: { account_id: true } }).then(acctIds),
+    prisma.intakeSession.groupBy({ by: ["account_id"] }).then(acctIds),
     prisma.importJobStatus
-      .findMany({ where: { status: ImportStatus.COMPLETE }, distinct: ["account_id"], select: { account_id: true } })
+      .groupBy({ by: ["account_id"], where: { status: ImportStatus.COMPLETE } })
       .then(acctIds),
-    prisma.lead.findMany({ distinct: ["account_id"], select: { account_id: true } }).then(acctIds),
+    prisma.lead.groupBy({ by: ["account_id"] }).then(acctIds),
     prisma.recommendationEvent
-      .findMany({ where: { event: "SHOWN" }, distinct: ["account_id"], select: { account_id: true } })
+      .groupBy({ by: ["account_id"], where: { event: "SHOWN" } })
       .then(acctIds),
     prisma.signal
-      .findMany({ where: { signal_type: { not: "SOURCE_BASELINE" } }, distinct: ["account_id"], select: { account_id: true } })
+      .groupBy({ by: ["account_id"], where: { signal_type: { not: "SOURCE_BASELINE" } } })
       .then(acctIds),
     prisma.subscription.findMany({ where: { status: "active" }, select: { account_id: true } }).then(acctIds),
   ])
@@ -141,10 +141,7 @@ export async function getSignupCohorts(weeks = 12): Promise<CohortRow[]> {
     }),
     prisma.subscription.findMany({ where: { status: "active" }, select: { account_id: true } }).then(acctIds),
     prisma.signal
-      .findMany({
-        where: { signal_type: { not: "SOURCE_BASELINE" }, created_at: { gte: d14 } },
-        distinct: ["account_id"], select: { account_id: true },
-      })
+      .groupBy({ by: ["account_id"], where: { signal_type: { not: "SOURCE_BASELINE" }, created_at: { gte: d14 } } })
       .then(acctIds),
   ])
 
@@ -216,10 +213,10 @@ export async function getAcquisition(): Promise<Acquisition> {
       select: { id: true, signup_utm_source: true, signup_utm_campaign: true, signup_country: true },
     }),
     prisma.importJobStatus
-      .findMany({ where: { status: ImportStatus.COMPLETE }, distinct: ["account_id"], select: { account_id: true } })
+      .groupBy({ by: ["account_id"], where: { status: ImportStatus.COMPLETE } })
       .then(acctIds),
     prisma.signal
-      .findMany({ where: { signal_type: { not: "SOURCE_BASELINE" } }, distinct: ["account_id"], select: { account_id: true } })
+      .groupBy({ by: ["account_id"], where: { signal_type: { not: "SOURCE_BASELINE" } } })
       .then(acctIds),
     prisma.subscription.findMany({ where: { status: "active" }, select: { account_id: true, mrr_inr: true } }),
   ])

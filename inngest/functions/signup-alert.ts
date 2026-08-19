@@ -3,7 +3,7 @@ import { recordJobRun } from "@/lib/events/job-run"
 import { prisma } from "@/lib/prisma"
 import { sendEmail } from "@/lib/email/send"
 import { AdminNewSignup, type NewSignupItem } from "@/emails/AdminNewSignup"
-import { getAdminRecipients, adminUrl, postToSlack, slackConfigured } from "@/lib/admin/notify"
+import { getAdminRecipients, adminUrl } from "@/lib/admin/notify"
 import * as React from "react"
 
 const FUNCTION = "signup-alert"
@@ -23,8 +23,12 @@ const COLD_START_WINDOW_MS = 60 * 60 * 1000
  *     duplicate is strictly better than a silent miss.
  *   · A hard crash writes nothing at all, which self-heals the same way.
  *
- * Runs every 15 minutes. Email is required; Slack is posted too when
- * ADMIN_SLACK_WEBHOOK_URL is set.
+ * Runs every 15 minutes and sends EMAIL ONLY. Slack is handled instantly by the
+ * register action (lib/admin/notify.ts → announceSignupsToSlack) — posting here
+ * as well would double-notify on every signup, which is a different thing from
+ * the rare watermark-replay duplicate described above. This job stays the
+ * guaranteed channel: if the instant Slack post fails, the email still lands
+ * within 15 minutes.
  */
 export const signupAlertFn = inngest.createFunction(
   { id: FUNCTION, name: "New Signup Alert", triggers: [{ cron: "*/15 * * * *" }] },
@@ -118,17 +122,6 @@ export const signupAlertFn = inngest.createFunction(
         accountId: null,
       }),
     )
-
-    await step.run("post-slack", async () => {
-      if (!slackConfigured()) return { skipped: true }
-      const lines = items.map(
-        (s) => `• *${s.name}* — ${[s.industry, s.city].filter(Boolean).join(" · ")}${s.ownerEmail ? ` — ${s.ownerEmail}` : ""} <${s.adminUrl}|open>`,
-      )
-      const ok = await postToSlack(
-        `${items.length === 1 ? "New Leadkaun signup" : `${items.length} new Leadkaun signups`}\n${lines.join("\n")}`,
-      )
-      return { posted: ok }
-    })
 
     // Email is the channel of record. If it did not go out, fail the run so the
     // watermark stays put and the next tick retries this exact window.

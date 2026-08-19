@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ShieldCheck } from "lucide-react"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { Button, Input } from "../../(authed)/_components/ui"
 
 type Mode = "loading" | "enroll" | "challenge" | "done"
 
@@ -21,10 +22,21 @@ export default function AdminMfa() {
   useEffect(() => {
     (async () => {
       const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
-      if (aal?.currentLevel === "aal2") { router.push("/admin"); return }
+      if (aal?.currentLevel === "aal2") { router.push("/"); return }
       const { data: factors } = await supabase.auth.mfa.listFactors()
-      const totp = factors?.totp?.find((f) => f.status === "verified")
-      if (totp) { setFactorId(totp.id); setMode("challenge"); return }
+      // `factors.totp` is verified-only by definition; abandoned enrolments show
+      // up solely in `factors.all`.
+      const verified = factors?.totp?.[0]
+      if (verified) { setFactorId(verified.id); setMode("challenge"); return }
+      // Clear any half-finished enrolment first. Supabase rejects a second factor
+      // sharing a friendly name, so an abandoned enrolment would otherwise wedge
+      // this page on that error — and with MFA required that locks the admin out
+      // of Mission Control entirely, since every other route redirects here.
+      await Promise.all(
+        (factors?.all ?? [])
+          .filter((f) => f.factor_type === "totp" && f.status !== "verified")
+          .map((f) => supabase.auth.mfa.unenroll({ factorId: f.id })),
+      )
       const { data: e, error } = await supabase.auth.mfa.enroll({ factorType: "totp", friendlyName: "Mission Control" })
       if (error || !e) { setErr(error?.message ?? "Could not start MFA enrolment"); return }
       setFactorId(e.id); setQr(e.totp.qr_code); setMode("enroll")
@@ -39,15 +51,18 @@ export default function AdminMfa() {
     if (chErr || !ch) { setErr(chErr?.message ?? "Challenge failed"); setBusy(false); return }
     const { error } = await supabase.auth.mfa.verify({ factorId, challengeId: ch.id, code })
     if (error) { setErr(error.message); setBusy(false); return }
-    router.push("/admin")
+    // The session is AAL2 from here, so this call passes requirePlatformAdmin.
+    // Best-effort: a failed stamp must not block a successful enrolment.
+    await fetch("/api/admin/platform/mfa-verified", { method: "POST" }).catch(() => {})
+    router.push("/")
   }
 
   return (
     <div className="min-h-screen text-ink flex items-center justify-center px-4">
-      <div className="w-full max-w-sm rounded-2xl glass-2 p-6">
+      <div className="w-full max-w-sm rounded-2xl border border-slate-200/70 bg-white p-6">
         <div className="flex items-center gap-2 mb-4">
           <ShieldCheck className="w-5 h-5 text-sky-500" />
-          <p className="text-[15px] font-black text-ink">Two-factor authentication</p>
+          <p className="text-[15px] font-semibold text-ink">Two-factor authentication</p>
         </div>
 
         {mode === "loading" && <p className="text-[13px] text-ink-soft">Checking your security factors…</p>}
@@ -66,14 +81,15 @@ export default function AdminMfa() {
 
         {(mode === "enroll" || mode === "challenge") && (
           <form onSubmit={verify} className="space-y-3">
-            <input inputMode="numeric" autoFocus required value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+            <Input inputMode="numeric" autoFocus required autoComplete="one-time-code"
+              value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              aria-label="Six-digit authenticator code"
               placeholder="000000"
-              className="w-full h-11 rounded-lg bg-white/80 border border-hairline-strong px-3 text-center text-[18px] tracking-[0.4em] text-ink outline-none focus:border-sky-400" />
-            {err && <p className="text-[12px] text-red-600">{err}</p>}
-            <button type="submit" disabled={busy || code.length !== 6}
-              className="btn-primary w-full h-10 text-[13px] disabled:opacity-50">
+              className="w-full h-11 text-center text-[18px] tracking-[0.4em]" />
+            {err && <p role="alert" className="text-[12px] text-red-600">{err}</p>}
+            <Button type="submit" variant="primary" disabled={busy || code.length !== 6} className="w-full h-10">
               {busy ? "Verifying…" : "Verify"}
-            </button>
+            </Button>
           </form>
         )}
         {err && mode === "loading" && <p className="text-[12px] text-red-600 mt-2">{err}</p>}

@@ -1,7 +1,11 @@
 // Signed marker for an impersonated customer session. Set on app.leadkaun.com
 // when a platform admin "logs in as" a customer (see the impersonation flow).
-// getServerSession reads it to attach `impersonating` and the app renders a
-// persistent banner. Encrypted with the app ENCRYPTION_KEY (lib/crypto).
+// Read ONLY by ImpersonationBanner, which renders a persistent banner. Note what
+// that means: getServerSession does not consult this marker and AuthSession has
+// no `impersonating` field, so at the API layer an impersonated session is
+// indistinguishable from the real customer — writes are attributed to the
+// customer user, and only impersonation_logs' start/end timestamps correlate
+// them back. Encrypted with the app ENCRYPTION_KEY (lib/crypto).
 
 import { encrypt, decrypt } from "@/lib/crypto"
 

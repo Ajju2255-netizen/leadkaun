@@ -7,6 +7,8 @@ import {
   TableWrap, THead, TBody, Th, Td, Tr, num,
 } from "../_components/ui"
 
+export const metadata = { title: "Scoring" }
+
 export const dynamic = "force-dynamic"
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) || undefined
@@ -186,7 +188,7 @@ export default async function ScoringPage({ searchParams }: { searchParams: Reco
                   {m.gradeChanges7d.map((c) => {
                     const down = c.from < c.to // "A" < "B" — later letter is worse
                     return (
-                      <span key={`${c.from}-${c.to}`} className="inline-flex items-center gap-1.5 rounded-xl glass-1 px-3 py-1.5">
+                      <span key={`${c.from}-${c.to}`} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200/70 bg-slate-50 px-3 py-1.5">
                         <Grade grade={c.from} />
                         <span className={down ? "text-red-500" : "text-emerald-500"}>→</span>
                         <Grade grade={c.to} />
@@ -238,7 +240,7 @@ export default async function ScoringPage({ searchParams }: { searchParams: Reco
 
           <p className="text-[11px] text-ink-faint">
             To audit a single lead&rsquo;s grade — every component, the ladder used, and a live re-computation —
-            open it from <Link href="/admin/leads" className="text-sky-600 font-semibold hover:text-sky-700">Leads</Link>.
+            open it from <Link href="/leads" className="text-sky-600 font-semibold hover:text-sky-700">Leads</Link>.
           </p>
         </>
       )}

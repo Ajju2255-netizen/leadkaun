@@ -7,6 +7,8 @@ import {
   TableWrap, THead, TBody, Th, Td, Tr, num, ago, pctOrDash,
 } from "../_components/ui"
 
+export const metadata = { title: "System health" }
+
 export const dynamic = "force-dynamic"
 
 export default async function SystemPage() {
@@ -29,10 +31,10 @@ export default async function SystemPage() {
 
       {/* ── Jobs at a glance ── */}
       <section>
-        <SectionLabel right={<Link href="/admin/ops/jobs" className="text-sky-600 font-semibold hover:text-sky-700">full history →</Link>}>
+        <SectionLabel right={<Link href="/ops/jobs" className="text-sky-600 font-semibold hover:text-sky-700">full history →</Link>}>
           Background jobs {delayed.length > 0 && <span className="text-red-600">· {delayed.length} delayed</span>}
         </SectionLabel>
-        <div className="rounded-2xl glass-2 divide-y divide-hairline overflow-hidden">
+        <div className="rounded-2xl border border-slate-200/70 bg-white divide-y divide-hairline overflow-hidden">
           {jobs.map((j) => (
             <div key={j.name} className="px-4 py-2.5 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5 min-w-0">
@@ -98,17 +100,17 @@ export default async function SystemPage() {
       </section>
 
       <section>
-        <SectionLabel right={<Link href="/admin/ops/errors" className="text-sky-600 font-semibold hover:text-sky-700">error centre →</Link>}>
+        <SectionLabel right={<Link href="/ops/errors" className="text-sky-600 font-semibold hover:text-sky-700">error centre →</Link>}>
           Where to look next
         </SectionLabel>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Link href="/admin/ops/errors" className="block lift">
+          <Link href="/ops/errors" className="block lift">
             <Card><p className="text-[13px] font-bold text-ink">Errors</p><p className="text-[11.5px] text-ink-muted mt-0.5">System failures separated from expected validation skips.</p></Card>
           </Link>
-          <Link href="/admin/ops/integrations" className="block lift">
+          <Link href="/ops/integrations" className="block lift">
             <Card><p className="text-[13px] font-bold text-ink">Integrations</p><p className="text-[11.5px] text-ink-muted mt-0.5">Sheets, Resend, Razorpay, Inngest, Supabase.</p></Card>
           </Link>
-          <Link href="/admin/ops/jobs" className="block lift">
+          <Link href="/ops/jobs" className="block lift">
             <Card><p className="text-[13px] font-bold text-ink">Jobs</p><p className="text-[11.5px] text-ink-muted mt-0.5">Run history, durations and failures per function.</p></Card>
           </Link>
         </div>

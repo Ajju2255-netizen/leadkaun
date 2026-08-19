@@ -3,8 +3,10 @@ import { listWorkspaces, type WorkspaceFilters } from "@/lib/admin/workspaces"
 import { FilterBar, type SelectFilter } from "../_components/FilterBar"
 import {
   PageHeader, TableWrap, THead, TBody, Th, Td, Tr, Pill, EmptyState, Stat,
-  num, ago, dateOnly,
+  num, ago, dateOnly, RowLink,
 } from "../_components/ui"
+
+export const metadata = { title: "Workspaces" }
 
 export const dynamic = "force-dynamic"
 
@@ -63,7 +65,7 @@ export default async function WorkspacesPage({ searchParams }: { searchParams: R
       {f.accountId && (
         <p className="text-[12px] text-ink-soft">
           Filtered to one account.{" "}
-          <Link href="/admin/workspaces" className="text-sky-600 font-semibold hover:text-sky-700">Show all</Link>
+          <Link href="/workspaces" className="text-sky-600 font-semibold hover:text-sky-700">Show all</Link>
         </p>
       )}
 
@@ -86,19 +88,19 @@ export default async function WorkspacesPage({ searchParams }: { searchParams: R
             {rows.length === 0 ? (
               <tr><td colSpan={9}><EmptyState>No workspaces match these filters.</EmptyState></td></tr>
             ) : rows.map((w) => (
-              <Tr key={w.id}>
+              <Tr key={w.id} href={`/workspaces/${w.id}`}>
                 <Td>
-                  <Link href={`/admin/workspaces/${w.id}`} className="block group">
+                  <RowLink href={`/workspaces/${w.id}`}>
                     <p className="text-[13px] font-bold text-ink group-hover:text-sky-600 transition-colors">
                       {w.name}{" "}
                       {w.isDefault && <Pill tone="sky">default</Pill>}{" "}
                       {w.archivedAt && <Pill tone="amber">archived</Pill>}
                     </p>
                     <p className="text-[11px] text-ink-muted font-mono">{w.slug}</p>
-                  </Link>
+                  </RowLink>
                 </Td>
                 <Td>
-                  <Link href={`/admin/accounts/${w.accountId}`} className="text-sky-600 font-semibold hover:text-sky-700">
+                  <Link href={`/accounts/${w.accountId}`} className="text-sky-600 font-semibold hover:text-sky-700">
                     {w.accountName}
                   </Link>
                 </Td>

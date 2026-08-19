@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { ShieldCheck } from "lucide-react"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { Button, Input } from "../(authed)/_components/ui"
 
 export default function AdminLogin() {
   const router = useRouter()
@@ -19,7 +20,7 @@ export default function AdminLogin() {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) { setErr(error.message); setLoading(false); return }
     // The (authed) layout re-checks platform-admin status + MFA and routes onward.
-    router.push("/admin")
+    router.push("/")
   }
 
   return (
@@ -30,27 +31,26 @@ export default function AdminLogin() {
             <ShieldCheck className="w-5 h-5 text-white" strokeWidth={2.4} />
           </div>
           <div>
-            <p className="text-[15px] font-black tracking-tight text-ink">Mission Control</p>
+            <p className="text-[15px] font-semibold tracking-[-0.02em] text-ink">Mission Control</p>
             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-orange-500">Leadkaun internal</p>
           </div>
         </div>
 
-        <form onSubmit={submit} className="space-y-3 rounded-2xl glass-2 p-5">
+        <form onSubmit={submit} className="space-y-3 rounded-2xl border border-slate-200/70 bg-white p-5">
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-ink-muted block mb-1.5">Email</label>
-            <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-              className="w-full h-10 rounded-lg bg-white/80 border border-hairline-strong px-3 text-[13px] text-ink outline-none focus:border-sky-400" />
+            <label htmlFor="admin-email" className="text-[10px] font-bold uppercase tracking-wider text-ink-muted block mb-1.5">Email</label>
+            <Input id="admin-email" type="email" autoComplete="username" required
+              value={email} onChange={(e) => setEmail(e.target.value)} className="w-full h-10" />
           </div>
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-ink-muted block mb-1.5">Password</label>
-            <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
-              className="w-full h-10 rounded-lg bg-white/80 border border-hairline-strong px-3 text-[13px] text-ink outline-none focus:border-sky-400" />
+            <label htmlFor="admin-password" className="text-[10px] font-bold uppercase tracking-wider text-ink-muted block mb-1.5">Password</label>
+            <Input id="admin-password" type="password" autoComplete="current-password" required
+              value={password} onChange={(e) => setPassword(e.target.value)} className="w-full h-10" />
           </div>
-          {err && <p className="text-[12px] text-red-600">{err}</p>}
-          <button type="submit" disabled={loading}
-            className="btn-primary w-full h-10 text-[13px] disabled:opacity-50">
+          {err && <p role="alert" className="text-[12px] text-red-600">{err}</p>}
+          <Button type="submit" variant="primary" disabled={loading} className="w-full h-10">
             {loading ? "Signing in…" : "Sign in"}
-          </button>
+          </Button>
           <p className="text-[11px] text-ink-muted text-center pt-1">Access requires an allowlisted admin account + MFA.</p>
         </form>
       </div>

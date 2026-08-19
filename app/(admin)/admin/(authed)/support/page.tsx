@@ -46,7 +46,7 @@ function Group({ title, hits }: { title: string; hits: Hit[] }) {
   if (hits.length === 0) return null
   return (
     <div>
-      <p className="text-[10px] font-black uppercase tracking-wider text-ink-muted px-4 py-2 bg-slate-900/[0.03]">{title}</p>
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-muted px-4 py-2 bg-slate-900/[0.03]">{title}</p>
       <div className="divide-y divide-hairline">
         {hits.map((h) => <Row key={`${h.tag}-${h.id}`} hit={h} />)}
       </div>
@@ -78,7 +78,7 @@ function SupportInner() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-[24px] font-black tracking-tight text-ink">Support</h1>
+        <h1 className="text-[24px] font-semibold tracking-[-0.02em] text-ink">Support</h1>
         <p className="text-[13px] text-ink-soft mt-1 max-w-2xl">
           One box for the whole story. Search a company, an email, a phone number, a lead, a workspace, a filename, a
           column signature — or paste any id straight out of a log. Every result opens the screen that continues the
@@ -104,7 +104,7 @@ function SupportInner() {
       )}
 
       {res && res.total > 0 && (
-        <div className="rounded-2xl glass-2 overflow-hidden divide-y divide-hairline">
+        <div className="rounded-2xl border border-slate-200/70 bg-white overflow-hidden divide-y divide-hairline">
           <Group title="Accounts" hits={res.accounts} />
           <Group title="Leads" hits={res.leads} />
           <Group title="Users" hits={res.users} />
@@ -115,7 +115,7 @@ function SupportInner() {
       )}
 
       {!res && !loading && (
-        <div className="rounded-2xl glass-2 px-5 py-4">
+        <div className="rounded-2xl border border-slate-200/70 bg-white px-5 py-4">
           <p className="text-[10.5px] font-bold uppercase tracking-wider text-ink-muted mb-2">
             Reconstructing &ldquo;Leadkaun gave this lead a bad recommendation&rdquo;
           </p>

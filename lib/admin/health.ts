@@ -23,7 +23,7 @@ export async function computeAccountHealth(accountId: string): Promise<AccountHe
 
   const [importsRecent, activeUsers, contacted, adopted, signals14, briefOpens] = await Promise.all([
     prisma.importJobStatus.count({ where: { account_id: accountId, created_at: { gte: d14 } } }),
-    prisma.signal.findMany({ where: { account_id: accountId, created_at: { gte: d14 }, user_id: { not: null } }, distinct: ["user_id"], select: { user_id: true } }),
+    prisma.signal.groupBy({ by: ["user_id"], where: { account_id: accountId, created_at: { gte: d14 }, user_id: { not: null } } }),
     prisma.lead.count({ where: { account_id: accountId, first_action_rank: { not: null } } }),
     prisma.lead.count({ where: { account_id: accountId, first_action_rank: { not: null, lte: RECOMMENDATION_TOP_N } } }),
     prisma.signal.count({ where: { account_id: accountId, created_at: { gte: d14 } } }),

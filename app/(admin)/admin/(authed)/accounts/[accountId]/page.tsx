@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { ChevronLeft, Check, Minus } from "lucide-react"
+import { Check, Minus } from "lucide-react"
 import { getCompany360 } from "@/lib/admin/metrics"
 import { getCompanyTimeline } from "@/lib/admin/timeline"
 import { computeAccountHealth } from "@/lib/admin/health"
@@ -18,8 +18,10 @@ import { PlanEditor } from "./PlanEditor"
 import {
   Card, Stat, SectionLabel, Bar, BarRow, Grade, Pill, Dot, EmptyState,
   TableWrap, THead, TBody, Th, Td, Tr,
-  num, inr, ago, dateOnly, dateTime, pctOrDash, healthTone, riskTone,
+  num, inr, ago, dateOnly, dateTime, pctOrDash, healthTone, riskTone, BackLink,
 } from "../../_components/ui"
+
+export const metadata = { title: "Account" }
 
 export const dynamic = "force-dynamic"
 
@@ -52,14 +54,12 @@ export default async function Account360({ params }: { params: { accountId: stri
 
   return (
     <div className="space-y-8">
-      <Link href="/admin/accounts" className="inline-flex items-center gap-1 text-[12px] font-semibold text-ink-muted hover:text-sky-600">
-        <ChevronLeft className="w-4 h-4" /> Accounts
-      </Link>
+      <BackLink href="/accounts">Accounts</BackLink>
 
       {/* ── Header ── */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-[26px] font-black tracking-tight text-ink">{c.account.name}</h1>
+          <h1 className="text-[24px] font-semibold tracking-[-0.02em] text-ink">{c.account.name}</h1>
           <div className="flex items-center gap-2 flex-wrap text-[12px] text-ink-soft mt-1.5">
             <span>{c.account.industry}</span>
             {(c.account.city || c.account.state) && <span>· {[c.account.city, c.account.state].filter(Boolean).join(", ")}</span>}
@@ -149,7 +149,7 @@ export default async function Account360({ params }: { params: { accountId: stri
 
       {/* ── Intelligence ── */}
       <section>
-        <SectionLabel right={<Link href={`/admin/leads?account=${id}`} className="text-sky-600 font-semibold hover:text-sky-700">inspect leads →</Link>}>
+        <SectionLabel right={<Link href={`/leads?account=${id}`} className="text-sky-600 font-semibold hover:text-sky-700">inspect leads →</Link>}>
           Intelligence
         </SectionLabel>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -183,7 +183,7 @@ export default async function Account360({ params }: { params: { accountId: stri
               <div className="space-y-2.5">
                 <div className="flex items-baseline justify-between">
                   <span className="text-[12px] text-ink-soft">RAR</span>
-                  <span className="text-[18px] font-black tabular-nums text-sky-600">{pctOrDash(reco.rates.rar)}</span>
+                  <span className="text-[18px] font-semibold tabular-nums text-sky-600">{pctOrDash(reco.rates.rar)}</span>
                 </div>
                 <Bar pct={reco.rates.rar ?? 0} tone="sky" />
                 <div className="grid grid-cols-3 gap-2">
@@ -217,7 +217,7 @@ export default async function Account360({ params }: { params: { accountId: stri
 
       {/* ── Team ── */}
       <section>
-        <SectionLabel right={<Link href={`/admin/users?account=${id}`} className="text-sky-600 font-semibold hover:text-sky-700">all users →</Link>}>
+        <SectionLabel right={<Link href={`/users?account=${id}`} className="text-sky-600 font-semibold hover:text-sky-700">all users →</Link>}>
           Team · {team.length}
         </SectionLabel>
         <TableWrap>
@@ -269,10 +269,10 @@ export default async function Account360({ params }: { params: { accountId: stri
       {/* ── Workspaces + recent intake ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <section>
-          <SectionLabel right={<Link href={`/admin/workspaces?account=${id}`} className="text-sky-600 font-semibold hover:text-sky-700">all →</Link>}>
+          <SectionLabel right={<Link href={`/workspaces?account=${id}`} className="text-sky-600 font-semibold hover:text-sky-700">all →</Link>}>
             Workspaces · {c.workspaces.length}
           </SectionLabel>
-          <div className="rounded-2xl glass-2 divide-y divide-hairline overflow-hidden">
+          <div className="rounded-2xl border border-slate-200/70 bg-white divide-y divide-hairline overflow-hidden">
             {c.workspaces.length === 0 ? <EmptyState>No workspaces.</EmptyState> : c.workspaces.map((w) => (
               <div key={w.id} className="px-4 py-2.5 flex items-center justify-between">
                 <p className="text-[13px] text-ink font-medium">
@@ -285,12 +285,12 @@ export default async function Account360({ params }: { params: { accountId: stri
         </section>
 
         <section>
-          <SectionLabel right={<Link href={`/admin/intake?account=${id}`} className="text-sky-600 font-semibold hover:text-sky-700">all →</Link>}>
+          <SectionLabel right={<Link href={`/intake?account=${id}`} className="text-sky-600 font-semibold hover:text-sky-700">all →</Link>}>
             Recent intake sessions
           </SectionLabel>
-          <div className="rounded-2xl glass-2 divide-y divide-hairline overflow-hidden">
+          <div className="rounded-2xl border border-slate-200/70 bg-white divide-y divide-hairline overflow-hidden">
             {intakeSessions.length === 0 ? <EmptyState>No intake sessions.</EmptyState> : intakeSessions.map((s) => (
-              <Link key={s.id} href={`/admin/intake/${s.id}`} className="px-4 py-2.5 flex items-center justify-between hover:bg-sky-50/60 transition-colors">
+              <Link key={s.id} href={`/intake/${s.id}`} className="px-4 py-2.5 flex items-center justify-between hover:bg-sky-50/60 transition-colors">
                 <div className="min-w-0">
                   <p className="text-[12.5px] text-ink font-medium">
                     {num(s.rows)} rows · {s.columns} cols
@@ -315,7 +315,7 @@ export default async function Account360({ params }: { params: { accountId: stri
           </SectionLabel>
           <Card>
             <div className="flex items-center gap-3 mb-3">
-              <span className="text-[28px] font-black tabular-nums text-ink">{health.score}</span>
+              <span className="text-[28px] font-semibold tabular-nums text-ink">{health.score}</span>
               <div className="flex-1"><Bar pct={health.score} tone={healthTone(health.band)} height="h-2.5" /></div>
               <Pill tone={riskTone(health.churnRisk)}>{health.churnRisk} risk</Pill>
             </div>
@@ -338,7 +338,7 @@ export default async function Account360({ params }: { params: { accountId: stri
         </section>
 
         <section>
-          <SectionLabel right={<Link href="/admin/system/flags" className="text-sky-600 font-semibold hover:text-sky-700">all accounts →</Link>}>
+          <SectionLabel right={<Link href="/system/flags" className="text-sky-600 font-semibold hover:text-sky-700">all accounts →</Link>}>
             Feature flags
           </SectionLabel>
           <FlagToggles accountId={c.account.id} items={flagItems} canWrite={canWrite} />
@@ -351,7 +351,7 @@ export default async function Account360({ params }: { params: { accountId: stri
 
       {/* ── Timeline ── */}
       <section>
-        <SectionLabel right={<Link href={`/admin/audit?account=${id}`} className="text-sky-600 font-semibold hover:text-sky-700">audit log →</Link>}>
+        <SectionLabel right={<Link href={`/audit?account=${id}`} className="text-sky-600 font-semibold hover:text-sky-700">audit log →</Link>}>
           Timeline
         </SectionLabel>
         <Card><Timeline events={timeline} /></Card>
@@ -360,7 +360,7 @@ export default async function Account360({ params }: { params: { accountId: stri
       {/* ── Revenue history ── */}
       <section>
         <SectionLabel
-          right={<Link href={`/admin/billing/payments?account=${id}`} className="text-sky-600 font-semibold hover:text-sky-700">payments &amp; invoices →</Link>}
+          right={<Link href={`/billing/payments?account=${id}`} className="text-sky-600 font-semibold hover:text-sky-700">payments &amp; invoices →</Link>}
         >
           Revenue history
         </SectionLabel>
@@ -388,7 +388,7 @@ export default async function Account360({ params }: { params: { accountId: stri
                   }`} />
                   <div className="flex items-baseline justify-between gap-3">
                     <p className="text-[12.5px] text-ink-soft min-w-0">
-                      <span className="text-[9.5px] font-black uppercase tracking-wider text-ink-muted mr-2">{e.kind}</span>
+                      <span className="text-[9.5px] font-semibold uppercase tracking-wider text-ink-muted mr-2">{e.kind}</span>
                       <span className="font-semibold text-ink">{e.summary}</span>
                       {e.mrrInr != null && (
                         <span className="text-ink-muted"> — MRR {inr(e.mrrInr)}</span>

@@ -11,11 +11,14 @@ export async function getFeatureUsage(): Promise<{ total: number; rows: UsageRow
   const pct = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0)
 
   const [imported, active, icp, wins, learningReady] = await Promise.all([
-    prisma.importJobStatus.findMany({ distinct: ["account_id"], select: { account_id: true } }).then((r) => r.length),
-    prisma.signal.findMany({ distinct: ["account_id"], select: { account_id: true } }).then((r) => r.length),
+    // groupBy, never findMany({ distinct }) — Prisma applies `distinct` in the
+    // client, so that spelling emits `SELECT id, account_id FROM leads` with no
+    // DISTINCT and no LIMIT, pulling every row into Node to produce one integer.
+    prisma.importJobStatus.groupBy({ by: ["account_id"] }).then((r) => r.length),
+    prisma.signal.groupBy({ by: ["account_id"] }).then((r) => r.length),
     prisma.account.count({ where: { icp_configured: true } }),
-    prisma.lead.findMany({ where: { won_at: { not: null } }, distinct: ["account_id"], select: { account_id: true } }).then((r) => r.length),
-    prisma.lead.findMany({ where: { first_action_rank: { not: null } }, distinct: ["account_id"], select: { account_id: true } }).then((r) => r.length),
+    prisma.lead.groupBy({ by: ["account_id"], where: { won_at: { not: null } } }).then((r) => r.length),
+    prisma.lead.groupBy({ by: ["account_id"], where: { first_action_rank: { not: null } } }).then((r) => r.length),
   ])
 
   return {

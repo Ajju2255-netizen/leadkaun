@@ -1,9 +1,10 @@
-import Link from "next/link"
 import { getUsageTable } from "@/lib/admin/subscriptions"
 import {
   PageHeader, Card, Stat, SectionLabel, Bar, Pill, EmptyState,
-  TableWrap, THead, TBody, Th, Td, Tr, num,
+  TableWrap, THead, TBody, Th, Td, Tr, num, RowLink, Dot,
 } from "../../_components/ui"
+
+export const metadata = { title: "Usage" }
 
 export const dynamic = "force-dynamic"
 
@@ -43,7 +44,7 @@ export default async function UsagePage() {
         <TableWrap>
           <table className="w-full text-left min-w-[880px]">
             <THead>
-              <Th className="w-8" />
+              <Th className="w-8"><span className="sr-only">Status</span></Th>
               <Th>Account</Th>
               <Th>Plan</Th>
               <Th>Seats</Th>
@@ -56,16 +57,14 @@ export default async function UsagePage() {
               {rows.length === 0 ? (
                 <tr><td colSpan={8}><EmptyState>No accounts.</EmptyState></td></tr>
               ) : rows.map((r) => (
-                <Tr key={r.accountId}>
+                <Tr key={r.accountId} href={`/accounts/${r.accountId}`}>
                   <Td>
-                    <span className={`block w-2.5 h-2.5 rounded-full ${
-                      r.status === "blocked" ? "bg-red-500" : r.status === "warning" ? "bg-orange-400" : "bg-emerald-500"
-                    }`} />
+                    <Dot tone={r.status === "blocked" ? "red" : r.status === "warning" ? "amber" : "emerald"} />
                   </Td>
                   <Td>
-                    <Link href={`/admin/accounts/${r.accountId}`} className="text-[13px] font-bold text-ink hover:text-sky-600">
+                    <RowLink href={`/accounts/${r.accountId}`} className="text-[13px] font-bold text-ink hover:text-sky-600">
                       {r.accountName}
-                    </Link>
+                    </RowLink>
                   </Td>
                   <Td className="text-ink-soft font-semibold">{r.planName}</Td>
                   <Td className="tabular-nums whitespace-nowrap">

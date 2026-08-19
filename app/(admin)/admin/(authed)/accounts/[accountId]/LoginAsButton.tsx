@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { LogIn } from "lucide-react"
+import { Button, Input } from "../../_components/ui"
 
 /**
  * Starts an audited impersonation: the server writes the ImpersonationLog row
@@ -36,43 +37,34 @@ export function LoginAsButton({ accountId }: { accountId: string }) {
 
   if (!open) {
     return (
-      <button
-        onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-orange-400 to-orange-500 px-4 h-10 text-[13px] font-bold text-white shadow-[0_4px_12px_rgba(249,115,22,0.3)] hover:from-orange-300 hover:to-orange-400 transition-all active:scale-[0.98]"
-      >
+      <Button variant="warn" onClick={() => setOpen(true)}>
         <LogIn className="w-4 h-4" />
         Login as customer
-      </button>
+      </Button>
     )
   }
 
   return (
-    <div className="rounded-2xl glass-2 px-4 py-3 w-[340px]">
+    <div className="rounded-2xl border border-slate-200/70 bg-white px-4 py-3 w-[340px]">
       <p className="text-[11px] font-bold uppercase tracking-wider text-orange-600">Audited impersonation</p>
       <p className="text-[11.5px] text-ink-muted mt-1 leading-snug">
         Everything you do will be recorded against your admin account, and the customer sees a banner.
       </p>
-      <input
+      <Input
         autoFocus value={reason} onChange={(e) => setReason(e.target.value)}
         onKeyDown={(e) => { if (e.key === "Enter") void go() }}
+        aria-label="Reason for impersonating this account"
+        aria-invalid={!!err}
         placeholder="Reason (e.g. ticket #142 — bad grade)"
-        className="mt-2.5 w-full h-9 rounded-lg bg-white/80 border border-hairline-strong px-2.5 text-[12.5px] text-ink outline-none focus:border-orange-400"
+        className="w-full mt-2.5"
       />
       <div className="flex items-center gap-2 mt-2.5">
-        <button
-          onClick={go} disabled={loading}
-          className="h-9 px-3.5 rounded-full bg-gradient-to-b from-orange-400 to-orange-500 text-[12.5px] font-bold text-white disabled:opacity-50"
-        >
+        <Button variant="warn" onClick={go} disabled={loading}>
           {loading ? "Starting…" : "Start session"}
-        </button>
-        <button
-          onClick={() => { setOpen(false); setErr(null) }}
-          className="h-9 px-3 rounded-full border border-hairline-strong bg-white/70 text-[12.5px] font-semibold text-ink-soft hover:text-ink"
-        >
-          Cancel
-        </button>
+        </Button>
+        <Button onClick={() => { setOpen(false); setErr(null) }}>Cancel</Button>
       </div>
-      {err && <p className="text-[11px] text-red-600 mt-1.5">{err}</p>}
+      {err && <p role="alert" className="text-[11px] text-red-600 mt-1.5">{err}</p>}
     </div>
   )
 }

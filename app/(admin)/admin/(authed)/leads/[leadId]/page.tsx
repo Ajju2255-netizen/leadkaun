@@ -1,12 +1,14 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { ChevronLeft, AlertTriangle, Check, Minus } from "lucide-react"
+import { AlertTriangle, Check, Minus } from "lucide-react"
 import { getLeadInspector, type EvidenceEntry } from "@/lib/admin/leads"
 import {
   Card, Stat, SectionLabel, Bar, Grade, Pill, EmptyState, Dot,
   TableWrap, THead, TBody, Th, Td, Tr,
-  num, inr, ago, dateTime, duration, type Tone,
+  num, inr, ago, dateTime, duration, type Tone, BackLink,
 } from "../../_components/ui"
+
+export const metadata = { title: "Lead" }
 
 export const dynamic = "force-dynamic"
 
@@ -22,7 +24,7 @@ function ScoreBar({ label, value, tone }: { label: string; value: number; tone: 
     <div>
       <div className="flex items-baseline justify-between mb-1">
         <span className="text-[11px] font-bold uppercase tracking-wider text-ink-muted">{label}</span>
-        <span className="text-[15px] font-black tabular-nums text-ink">{value}</span>
+        <span className="text-[15px] font-semibold tabular-nums text-ink">{value}</span>
       </div>
       <Bar pct={value} tone={tone} />
     </div>
@@ -36,16 +38,14 @@ export default async function LeadInspectorPage({ params }: { params: { leadId: 
 
   return (
     <div className="space-y-8">
-      <Link href="/admin/leads" className="inline-flex items-center gap-1 text-[12px] font-semibold text-ink-muted hover:text-sky-600">
-        <ChevronLeft className="w-4 h-4" /> Leads
-      </Link>
+      <BackLink href="/leads">Leads</BackLink>
 
       {/* ── Header ── */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="flex items-start gap-3">
           <div className="mt-1"><Grade grade={l.grade} /></div>
           <div>
-            <h1 className="text-[24px] font-black tracking-tight text-ink">{l.name || "(no name)"}</h1>
+            <h1 className="text-[24px] font-semibold tracking-[-0.02em] text-ink">{l.name || "(no name)"}</h1>
             <div className="flex items-center gap-2 flex-wrap text-[12px] text-ink-soft mt-1">
               <span className="font-mono">{l.phone}</span>
               {l.email && <span>· {l.email}</span>}
@@ -54,7 +54,7 @@ export default async function LeadInspectorPage({ params }: { params: { leadId: 
               {(l.city || l.state) && <span>· {[l.city, l.state].filter(Boolean).join(", ")}</span>}
             </div>
             <div className="flex items-center gap-2 flex-wrap mt-2">
-              <Link href={`/admin/accounts/${d.account.id}`}><Pill tone="sky">{d.account.name}</Pill></Link>
+              <Link href={`/accounts/${d.account.id}`}><Pill tone="sky">{d.account.name}</Pill></Link>
               {d.workspaceName && <Pill tone="slate">{d.workspaceName}</Pill>}
               {l.isSql && <Pill tone="emerald">SQL</Pill>}
               {l.isMissed && <Pill tone="red">missed</Pill>}
@@ -68,7 +68,7 @@ export default async function LeadInspectorPage({ params }: { params: { leadId: 
         </div>
         <div className="text-right">
           <p className="text-[10px] font-bold uppercase tracking-wider text-ink-muted">Next action</p>
-          <p className="text-[15px] font-black text-ink">{d.nextAction.label}</p>
+          <p className="text-[15px] font-semibold text-ink">{d.nextAction.label}</p>
           <p className="text-[11px] text-ink-muted max-w-[220px]">P{d.nextAction.priority} · {d.nextAction.reason}</p>
         </div>
       </div>
@@ -275,7 +275,7 @@ export default async function LeadInspectorPage({ params }: { params: { leadId: 
           {l.gradeChangedAt && <span>· grade last changed {ago(l.gradeChangedAt)}{l.previousGrade && ` (from ${l.previousGrade})`}</span>}
           {l.sqlCrossedAt && <span>· crossed SQL {ago(l.sqlCrossedAt)}</span>}
           {d.intakeSessionId && (
-            <Link href={`/admin/intake/${d.intakeSessionId}`} className="text-sky-600 font-semibold hover:text-sky-700">
+            <Link href={`/intake/${d.intakeSessionId}`} className="text-sky-600 font-semibold hover:text-sky-700">
               · view the intake session that brought this lead in →
             </Link>
           )}
@@ -290,7 +290,7 @@ export default async function LeadInspectorPage({ params }: { params: { leadId: 
 
       {/* ── Recommendation history ── */}
       <section>
-        <SectionLabel right={<Link href="/admin/recommendations" className="text-sky-600 font-semibold hover:text-sky-700">platform RAR →</Link>}>
+        <SectionLabel right={<Link href="/recommendations" className="text-sky-600 font-semibold hover:text-sky-700">platform RAR →</Link>}>
           Recommendation history · {d.recommendationEvents.length}
         </SectionLabel>
         {d.recommendationEvents.length === 0 ? (
@@ -331,7 +331,7 @@ export default async function LeadInspectorPage({ params }: { params: { leadId: 
 
       {/* ── Signals ── */}
       <section>
-        <SectionLabel right={<Link href={`/admin/signals?lead=${l.id}`} className="text-sky-600 font-semibold hover:text-sky-700">signal explorer →</Link>}>
+        <SectionLabel right={<Link href={`/signals?lead=${l.id}`} className="text-sky-600 font-semibold hover:text-sky-700">signal explorer →</Link>}>
           Signals · {d.signals.length}
         </SectionLabel>
         {d.signals.length === 0 ? (
@@ -402,7 +402,7 @@ export default async function LeadInspectorPage({ params }: { params: { leadId: 
                   <div className="flex items-baseline justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-[12.5px] text-ink">
-                        <span className="text-[9.5px] font-black uppercase tracking-wider text-ink-muted mr-2">{e.kind}</span>
+                        <span className="text-[9.5px] font-semibold uppercase tracking-wider text-ink-muted mr-2">{e.kind}</span>
                         <span className="font-semibold">{e.title}</span>
                         {e.detail && <span className="text-ink-soft"> — {e.detail}</span>}
                       </p>

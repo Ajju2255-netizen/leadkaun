@@ -12,7 +12,7 @@ import { Suspense, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Eye, EyeOff } from "lucide-react"
-import { LeadkaunMark } from "@/components/shared/LeadkaunMark"
+import { LeadkaunLogo } from "@/components/shared/LeadkaunLogo"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 
 function LoginForm() {
@@ -52,11 +52,8 @@ function LoginForm() {
 
       {/* ── Brand mark ──────────────────────────────────────────────────────── */}
       <div className="flex flex-col items-center gap-3">
-        <LeadkaunMark size={44} gloss />
-        <div className="text-center">
-          <h1 className="text-[22px] font-bold text-ink tracking-[-0.025em]">Leadkaun</h1>
-          <p className="text-[13px] text-ink-muted mt-0.5">Sign in to your workspace</p>
-        </div>
+        <LeadkaunLogo height={40} />
+        <p className="text-[13px] text-ink-muted text-center">Sign in to your workspace</p>
       </div>
 
       {/* ── Form ────────────────────────────────────────────────────────────── */}

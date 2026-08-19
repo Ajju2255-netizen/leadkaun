@@ -8,6 +8,8 @@ import {
 } from "../_components/ui"
 import { IntakeSource, IntakeState } from "@prisma/client"
 
+export const metadata = { title: "Intake sessions" }
+
 export const dynamic = "force-dynamic"
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) || undefined
@@ -65,7 +67,7 @@ export default async function IntakePage({ searchParams }: { searchParams: Recor
         title="Intake sessions"
         subtitle="Every dataset that has entered Leadkaun, through any connector. A session records structural metadata and the frozen report the customer saw — never their rows."
         right={
-          <Link href="/admin/intake/analytics" className="text-[12px] font-semibold text-sky-600 hover:text-sky-700">
+          <Link href="/intake/analytics" className="text-[12px] font-semibold text-sky-600 hover:text-sky-700">
             Intake analytics →
           </Link>
         }
@@ -102,7 +104,7 @@ export default async function IntakePage({ searchParams }: { searchParams: Recor
             ) : rows.map((s) => (
               <Tr key={s.id}>
                 <Td>
-                  <Link href={`/admin/intake/${s.id}`} className="block group">
+                  <Link href={`/intake/${s.id}`} className="block group">
                     <p className="text-[12.5px] font-bold text-ink group-hover:text-sky-600 transition-colors font-mono">
                       {s.id.slice(-8)}
                     </p>
@@ -112,7 +114,7 @@ export default async function IntakePage({ searchParams }: { searchParams: Recor
                   </Link>
                 </Td>
                 <Td>
-                  <Link href={`/admin/accounts/${s.accountId}`} className="text-sky-600 font-semibold hover:text-sky-700">
+                  <Link href={`/accounts/${s.accountId}`} className="text-sky-600 font-semibold hover:text-sky-700">
                     {s.accountName}
                   </Link>
                 </Td>

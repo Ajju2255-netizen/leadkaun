@@ -4,8 +4,10 @@ import { getPaymentLedger, listInvoices } from "@/lib/admin/subscriptions"
 import { FilterBar, type SelectFilter } from "../../_components/FilterBar"
 import {
   PageHeader, Card, Stat, SectionLabel, Pill, EmptyState,
-  TableWrap, THead, TBody, Th, Td, Tr, num, inr, dateOnly, dateTime,
+  TableWrap, THead, TBody, Th, Td, Tr, num, inr, dateOnly, dateTime, BackLink,
 } from "../../_components/ui"
+
+export const metadata = { title: "Payments" }
 
 export const dynamic = "force-dynamic"
 
@@ -55,9 +57,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Rec
         title="Payments &amp; invoices"
         subtitle="Money that actually moved. Every row here was written by the Razorpay webhook — a manually-set plan produces MRR but never a payment, so this ledger and the MRR figure are allowed to disagree."
         right={
-          <Link href="/admin/billing" className="text-[12px] font-semibold text-sky-600 hover:text-sky-700">
-            ← Subscriptions
-          </Link>
+          <BackLink href="/billing">Subscriptions</BackLink>
         }
       />
 
@@ -68,7 +68,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Rec
             Both tables are written only inside the <code>subscription.charged</code> handler in{" "}
             <code>/api/billing/webhook</code>, and only on a settled charge. If subscriptions are active but this stays
             empty, either every plan was set by hand from an Account 360, or Razorpay is not delivering webhooks —
-            check <Link href="/admin/ops/integrations" className="text-sky-600 font-semibold hover:text-sky-700">Integrations</Link>.
+            check <Link href="/ops/integrations" className="text-sky-600 font-semibold hover:text-sky-700">Integrations</Link>.
           </p>
         </Card>
       ) : (
@@ -85,7 +85,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Rec
           {accountId && (
             <p className="text-[12px] text-ink-soft">
               Filtered to one account.{" "}
-              <Link href="/admin/billing/payments" className="text-sky-600 font-semibold hover:text-sky-700">Show all</Link>
+              <Link href="/billing/payments" className="text-sky-600 font-semibold hover:text-sky-700">Show all</Link>
             </p>
           )}
 
@@ -111,7 +111,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Rec
                   ) : ledger.rows.map((p) => (
                     <Tr key={p.id}>
                       <Td>
-                        <Link href={`/admin/accounts/${p.accountId}`} className="font-bold text-ink hover:text-sky-600">
+                        <Link href={`/accounts/${p.accountId}`} className="font-bold text-ink hover:text-sky-600">
                           {p.accountName}
                         </Link>
                       </Td>
@@ -157,7 +157,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Rec
                       <Tr key={i.id}>
                         <Td className="font-mono text-[12px] font-semibold text-ink">{i.number ?? i.id.slice(-8)}</Td>
                         <Td>
-                          <Link href={`/admin/accounts/${i.accountId}`} className="font-bold text-ink hover:text-sky-600">
+                          <Link href={`/accounts/${i.accountId}`} className="font-bold text-ink hover:text-sky-600">
                             {i.accountName}
                           </Link>
                         </Td>

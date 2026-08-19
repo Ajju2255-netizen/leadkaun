@@ -1,8 +1,10 @@
 import { getAcquisition } from "@/lib/admin/growth"
 import {
   PageHeader, Card, Stat, SectionLabel, BarRow, EmptyState,
-  TableWrap, THead, TBody, Th, Td, Tr, num, inr, pctOrDash,
+  TableWrap, THead, TBody, Th, Td, Tr, num, inr, pctOrDash, NotWired,
 } from "../../_components/ui"
+
+export const metadata = { title: "Acquisition" }
 
 export const dynamic = "force-dynamic"
 
@@ -65,14 +67,14 @@ export default async function AcquisitionPage() {
         <Stat label="Distinct sources" value={num(a.bySource.length)} />
       </div>
 
-      <div className="rounded-2xl border border-dashed border-slate-300 bg-white/50 px-5 py-3.5">
+      <NotWired>
         <p className="text-[12px] text-ink-soft leading-relaxed">
           <span className="font-bold text-ink">CAC and LTV are not shown, because they cannot be computed here.</span>{" "}
           CAC needs ad spend, which lives in Meta/Google and is not connected. LTV needs a retention curve over a
           meaningful number of churned paying accounts. Both would be guesses today, and a guessed CAC is worse than
           no CAC. What <em>is</em> real: signups, activation rate and MRR per source, below.
         </p>
-      </div>
+      </NotWired>
 
       <section>
         <SectionLabel right="which channels produce customers, not just signups">By source</SectionLabel>
