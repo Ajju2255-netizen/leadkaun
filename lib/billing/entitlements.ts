@@ -39,9 +39,17 @@ export type Entitlement =
 
 /** Minimum tier rank that unlocks each entitlement. */
 const MIN_RANK: Record<Entitlement, number> = {
-  // Growth (2) and up — the "you're leaving money on the table" upgrade.
+  // Starter (1) and up. Moved down from Growth 2026-08: the entire marketing
+  // thesis is "the revenue going cold, priced in rupees" — it is the homepage
+  // headline, the missed-revenue calculator and the hook in the sample
+  // workspace. Gating it at Growth meant the tier we ask people to buy first
+  // (₹2,999) unlocked no features at all, and the one story that sells the
+  // product was invisible until ₹7,999. A first paid tier has to deliver the
+  // thing the site promised.
+  missed_opportunity: 1,
+  // Growth (2) and up — genuine team-scale features, where the pitch really is
+  // "you now have enough reps and history for this to mean something".
   ai_learning: 2,
-  missed_opportunity: 2,
   rep_tracking: 2,
   advanced_analytics: 2,
   revenue_dashboard: 2,
@@ -55,8 +63,11 @@ const MIN_RANK: Record<Entitlement, number> = {
 }
 
 /** Human label for the minimum tier of an entitlement, for upgrade prompts. */
-export function requiredTierLabel(e: Entitlement): "Growth" | "Scale" {
-  return MIN_RANK[e] >= 3 ? "Scale" : "Growth"
+export function requiredTierLabel(e: Entitlement): "Starter" | "Growth" | "Scale" {
+  const rank = MIN_RANK[e]
+  if (rank >= 3) return "Scale"
+  if (rank >= 2) return "Growth"
+  return "Starter"
 }
 
 export type AccountTier = { key: string; name: string; rank: number }

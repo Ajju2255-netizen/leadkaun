@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma"
+import { isSampleWorkspace } from "@/lib/workspace/sample"
 import { requireWorkspace } from "@/lib/auth/middleware"
 import { handleAuthError } from "@/lib/auth/middleware"
 import { requireEntitlement, handleFeatureLock } from "@/lib/billing/entitlements"
@@ -20,7 +21,14 @@ export const dynamic = "force-dynamic"
 export async function GET(_req: Request) {
   try {
     const session = await requireWorkspace("ADMIN", "MANAGER")
-    await requireEntitlement(session.account.id, "missed_opportunity")
+    // The Sample workspace is exempt. It exists to show a new account what the
+    // product does before they import anything, and "₹ going cold" is the whole
+    // pitch — gating it meant a Free user was shown a locked screen full of
+    // fabricated leads, which is the opposite of a demo. Sample data is
+    // invented and workspace-scoped, so nothing real is exposed.
+    if (!isSampleWorkspace(session.workspace.slug)) {
+      await requireEntitlement(session.account.id, "missed_opportunity")
+    }
     const accountId = session.account.id
     const workspaceId = session.workspace.id
 

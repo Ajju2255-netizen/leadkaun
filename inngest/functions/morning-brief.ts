@@ -2,6 +2,7 @@ import * as React from "react"
 import { inngest } from "@/inngest/client"
 import { recordJobRun } from "@/lib/events/job-run"
 import { prisma } from "@/lib/prisma"
+import { SAMPLE_WORKSPACE_SLUG } from "@/lib/workspace/provision"
 import { sendEmail } from "@/lib/email/send"
 import { MorningBriefRep } from "@/emails/MorningBriefRep"
 import { MorningBriefManager } from "@/emails/MorningBriefManager"
@@ -39,6 +40,14 @@ export const morningBriefFn = inngest.createFunction(
 
     let emailsSent = 0
 
+    // The Sample workspace is a demo fixture of 24 invented leads, handed to
+    // every new account so the product can be understood before anything is
+    // imported. Every other surface scopes it out by workspace; this job
+    // queried by account_id alone, so those fabricated leads were landing in
+    // the real 8:30 IST brief — a manager's pipeline value and "uncalled Grade
+    // A" list both included people who do not exist.
+    const NOT_SAMPLE = { workspace: { slug: { not: SAMPLE_WORKSPACE_SLUG } } } as const
+
     for (const account of accounts) {
       if (account.users.length === 0) continue
 
@@ -60,6 +69,7 @@ export const morningBriefFn = inngest.createFunction(
                 prisma.lead.findMany({
                   where: {
                     account_id:      account.id,
+                    ...NOT_SAMPLE,
                     assigned_rep_id: user.id,
                     grade:           { in: ["A", "B"] },
                     is_junk:         false,
@@ -148,11 +158,11 @@ export const morningBriefFn = inngest.createFunction(
             const [pipelineValue, totalLeads, overdueFollowUps, rawUncalledA, repData] =
               await Promise.all([
                 prisma.lead.aggregate({
-                  where: { account_id: account.id, is_junk: false, won_at: null, lost_at: null },
+                  where: { account_id: account.id, is_junk: false, won_at: null, lost_at: null, ...NOT_SAMPLE },
                   _sum:  { expected_value: true },
                 }),
                 prisma.lead.count({
-                  where: { account_id: account.id, is_junk: false, won_at: null, lost_at: null },
+                  where: { account_id: account.id, is_junk: false, won_at: null, lost_at: null, ...NOT_SAMPLE },
                 }),
                 prisma.followUpAction.count({
                   where: { account_id: account.id, status: "OVERDUE" },
@@ -160,6 +170,7 @@ export const morningBriefFn = inngest.createFunction(
                 prisma.lead.findMany({
                   where: {
                     account_id:       account.id,
+                    ...NOT_SAMPLE,
                     grade:            "A",
                     first_contact_at: null,
                     is_junk:          false,

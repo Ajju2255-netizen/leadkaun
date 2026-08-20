@@ -12,7 +12,10 @@ export default async function AdminAuthedLayout({ children }: { children: React.
   // Server-side redirect() resolves against the route tree, NOT the public URL
   // space — the clean forms ("/login") don't exist there and would 404. Use the
   // internal paths; middleware collapses them back to clean URLs in the browser.
-  if (!session) redirect("/admin/login")
+  // ?denied tells the login page this was a rejected gate, not a fresh visit.
+  // Without it a non-admin who types a correct password gets bounced back to a
+  // blank form with no clue why.
+  if (!session) redirect("/admin/login?denied=1")
   if (!session.mfaEnrolled || !session.mfaElevated) redirect("/admin/security/mfa")
 
   const readOnly = session.role !== "SUPER_ADMIN"

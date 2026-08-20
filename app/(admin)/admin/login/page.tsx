@@ -1,17 +1,26 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
 import { ShieldCheck } from "lucide-react"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { Button, Input } from "../(authed)/_components/ui"
 
 export default function AdminLogin() {
-  const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+
+  // A rejected gate redirects back here. Read it on mount rather than with
+  // useSearchParams(), which would force this page into a Suspense boundary.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has("denied")) {
+      setErr(
+        "Password accepted, but this account is not an active platform admin. " +
+          "Check the PLATFORM_ADMIN_EMAILS allowlist and the platform_admins row."
+      )
+    }
+  }, [])
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -19,8 +28,12 @@ export default function AdminLogin() {
     const supabase = getSupabaseBrowserClient()
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) { setErr(error.message); setLoading(false); return }
-    // The (authed) layout re-checks platform-admin status + MFA and routes onward.
-    router.push("/")
+    // Document navigation, NOT router.push(). The (authed) layout re-checks
+    // platform-admin status + MFA and bounces a rejected admin back to this very
+    // route; an RSC navigation to the same segment reuses this component, so the
+    // form kept `loading` and sat on "Signing in…" forever showing no error at
+    // all. A full load always remounts, so the ?denied message above is seen.
+    window.location.assign("/")
   }
 
   return (

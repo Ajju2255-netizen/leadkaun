@@ -122,13 +122,19 @@ export async function provisionSampleWorkspace(
           return { ...base, stage_id: stageBy("won").id, won_at: daysAgo(3 + i), won_value: l.value ?? 0,
                    first_contact_at: daysAgo(10 + i), speed_to_lead_hours: 1.5 + (i % 4) }
         case "missed":
+          // expected_value is what /api/analytics/missed sums into "₹ at risk"
+          // (it reads `expected_value ?? 0`). Without it the sample's Missed
+          // page showed ₹0 — the single sharpest hook in the fixture, and the
+          // whole reason the sample exists, rendered as a zero.
           return { ...base, stage_id: stageBy("contacted").id, is_missed: true,
+                   expected_value: l.value ?? 0,
                    missed_at: daysAgo(4 + (i % 5)), last_action_at: daysAgo(9 + (i % 6)),
                    first_contact_at: daysAgo(12 + i) }
         case "hot":
           return { ...base, stage_id: stageBy("new_inquiry").id, last_action_at: daysAgo(0) }
         case "working":
           return { ...base, stage_id: stageBy(i % 2 ? "qualified" : "proposal_sent").id,
+                   expected_value: l.value ?? 0,
                    first_contact_at: daysAgo(2 + (i % 5)), last_action_at: daysAgo(1 + (i % 3)),
                    speed_to_lead_hours: 2 + (i % 6) }
         default:
