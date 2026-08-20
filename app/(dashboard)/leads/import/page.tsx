@@ -7,14 +7,15 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import Papa from "papaparse"
 import { mapHeader } from "@/lib/import/column-map"
+import { RequiredColumnsCard } from "@/components/import/RequiredColumnsCard"
+import { WhatHappensNext } from "@/components/import/WhatHappensNext"
 import {
   Download, FileSpreadsheet, UserPlus, X,
   CloudUpload, Cog, ShieldCheck, Users, CheckCircle2, Layers,
   AlertCircle, Clock, Star, IndianRupee, ArrowRight,
-  Sparkles, RotateCw, Loader2,
+  Sparkles, Loader2, ChevronRight,
 } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
-import { EmptyState } from "@/components/shared/EmptyState"
 import { ThemedSelect } from "@/components/shared/ThemedSelect"
 import { sourceAgeToDate, SOURCE_AGE_OPTIONS } from "@/lib/scoring/freshness"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
@@ -69,24 +70,6 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB — matches the UI promise
 //   • budget → 25L, 1.2Cr, or a plain number like 500000
 //   • notes → free text; keywords (demo, callback, site visit, "not interested")
 //             nudge intent up or down
-const SAMPLE_CSV =
-  "name,phone,email,company,designation,city,state,pincode,budget,interest_level,last_contact_days,notes\n" +
-  "Rohan Sharma,98765 43210,rohan@example.com,Acme Realty,Director,Bangalore,Karnataka,560066,25L,High,1,Wants a 3BHK in Whitefield — asked for a site visit\n" +
-  "Priya Nair,+91 99887 76655,priya@example.com,Nair Exports,Owner,Mumbai,Maharashtra,400001,1.2Cr,Medium,3,Requested a callback next week\n" +
-  "Imran Khan,9812345678,,,Manager,Lucknow,Uttar Pradesh,226001,500000,Low,10,Comparing vendors — no urgency yet\n"
-
-function downloadSampleCsv() {
-  const blob = new Blob([SAMPLE_CSV], { type: "text/csv;charset=utf-8;" })
-  const url  = URL.createObjectURL(blob)
-  const a    = document.createElement("a")
-  a.href = url
-  a.download = "leadkaun-import-template.csv"
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  URL.revokeObjectURL(url)
-}
-
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatINR(n: number): string {
@@ -444,6 +427,23 @@ export default function ImportPage() {
 
   // Upload state
   const [uploading, setUploading] = useState(false)
+
+  /**
+   * Leaving mid import loses the batch.
+   *
+   * The import runs in this tab, batch by batch, so a close or a reload halfway
+   * through abandons it with rows already written. A beforeunload prompt is the
+   * only guard the platform actually gives us here: App Router has no
+   * navigation event to hook, and the workarounds that patch history end up
+   * trapping people, which is worse than the problem.
+   */
+  useEffect(() => {
+    if (!uploading) return
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = "" }
+    window.addEventListener("beforeunload", warn)
+    return () => window.removeEventListener("beforeunload", warn)
+  }, [uploading])
+
   const [progress,  setProgress]  = useState<number | null>(null)
   const [fileName,  setFileName]  = useState<string>("")
   const [result,    setResult]    = useState<{
@@ -908,6 +908,12 @@ export default function ImportPage() {
         /* ── Guided import panel: batch details → upload → other methods ─── */
         <div className="rounded-2xl border border-slate-200/70 bg-white p-5 sm:p-6 space-y-6">
 
+          {/* Before anything is asked of them: what to bring, and what they get
+              for it. Both of these used to live under the dropzone, which is
+              past the point where people were giving up. */}
+          <RequiredColumnsCard />
+          <WhatHappensNext />
+
           {/* Step 1 — batch details */}
           <div>
             <div className="flex items-center gap-2 mb-4">
@@ -952,21 +958,19 @@ export default function ImportPage() {
                 or <span className="font-semibold text-sky-600">browse files</span> · CSV, max 10 MB
               </p>
               {(!sourceId || !stageId) && (
-                <p className="text-[12px] font-medium text-amber-600 mt-3">Pick a source and stage above first.</p>
+                <p className="text-[12px] font-medium text-amber-600 mt-3">Choose a source and stage in step 1 first.</p>
               )}
             </div>
 
-            {/* helper + secondary methods */}
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5">
-              <button
-                type="button"
-                onClick={downloadSampleCsv}
-                className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-sky-700 hover:text-sky-800 transition-colors"
-              >
-                <Download className="w-3.5 h-3.5" /> Download sample template
-              </button>
-              <div className="flex items-center gap-2">
-                <span className="text-[12px] text-ink-muted">Other ways:</span>
+            {/* Other ways to import, folded away. Three competing methods in
+                front of someone who has not used one yet is a choice they are
+                not equipped to make. */}
+            <details className="mt-4 group">
+              <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 text-[12px] font-semibold text-ink-soft transition-colors hover:text-ink">
+                <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" strokeWidth={2.4} />
+                Other ways to bring leads in
+              </summary>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   disabled={uploading}
@@ -984,15 +988,8 @@ export default function ImportPage() {
                   <UserPlus className="w-3.5 h-3.5 text-violet-600" /> Add manually
                 </button>
               </div>
-            </div>
+            </details>
 
-            {/* recognised columns */}
-            <p className="mt-3 text-[11.5px] text-ink-muted leading-relaxed">
-              <span className="font-semibold text-ink-soft">Required:</span> name, phone.{" "}
-              <span className="font-semibold text-ink-soft">Optional:</span> email, company, designation, city, state, pincode,
-              budget, interest level (High/Medium/Low), last contact days, notes.
-              Column names are matched automatically — “Mobile No”, “Full Name”, etc. all work.
-            </p>
           </div>
         </div>
       ) : (
@@ -1123,18 +1120,20 @@ export default function ImportPage() {
         </div>
       )}
 
-      {/* ── Regrade utility ──────────────────────────────────────────────── */}
-      <RegradeButton />
+      {/* Regrade re-scores every lead in the workspace. It is an operator tool
+          and it used to sit here, on the page a brand new account lands on with
+          no leads to regrade. Reachable from the scoring settings instead.
 
-      {/* ── Import History ───────────────────────────────────────────────── */}
+          Import history is hidden until there is some. A card reading "no
+          imports yet" on the page where you are trying to make your first one
+          is an empty shelf, not information. */}
+      {(historyLoading || jobs.length > 0) && (
       <div className="rounded-2xl border border-slate-200/70 bg-white p-5">
         <h2 className="text-[15px] font-semibold text-ink mb-4">Import history</h2>
         {historyLoading ? (
           <div className="space-y-2">
             {[1,2,3].map((i) => <Skeleton key={i} className="h-12 w-full rounded-lg" />)}
           </div>
-        ) : jobs.length === 0 ? (
-          <EmptyState icon={CloudUpload} title="No imports yet" description="Upload a CSV above — your import history will appear here." />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -1156,6 +1155,7 @@ export default function ImportPage() {
           </div>
         )}
       </div>
+      )}
 
       </>
       )}
@@ -1202,53 +1202,6 @@ function HistoryRow({ job }: { job: ImportJob }) {
     </tr>
   )
 }
-
-function RegradeButton() {
-  const [status, setStatus] = useState<"idle" | "loading" | "done">("idle")
-  const [result, setResult] = useState<{ updated: number; total: number } | null>(null)
-
-  async function handleRegrade() {
-    setStatus("loading")
-    try {
-      const res = await fetch("/api/admin/regrade", { method: "POST", credentials: "include" })
-      const data = await res.json()
-      setResult(data)
-      setStatus("done")
-    } catch {
-      setStatus("idle")
-      toast.error("Regrade failed. Please try again.")
-    }
-  }
-
-  return (
-    <div className="rounded-2xl border border-slate-200/70 bg-white px-5 py-4 flex items-center justify-between gap-4">
-      <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-lg bg-violet-50 flex items-center justify-center shrink-0">
-          <RotateCw className="w-4 h-4 text-violet-600" strokeWidth={2.2} />
-        </div>
-        <div>
-          <p className="text-[13px] font-semibold text-ink">Regrade all leads</p>
-          <p className="text-[12px] text-ink-muted mt-0.5">
-            {status === "done" && result
-              ? `Updated ${result.updated} of ${result.total} leads`
-              : "Re-run scoring on every lead with the latest grade thresholds"}
-          </p>
-        </div>
-      </div>
-      <button
-        onClick={handleRegrade}
-        disabled={status === "loading"}
-        className={`h-9 px-4 rounded-lg text-[12px] font-semibold transition-colors shrink-0
-          ${status === "done" ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                              : "bg-slate-100 hover:bg-slate-200 text-ink-soft disabled:opacity-50"}`}
-      >
-        {status === "loading" ? "Regrading…" : status === "done" ? "Done" : "Run regrade"}
-      </button>
-    </div>
-  )
-}
-
-// ── Connected Google Sheet (auto-sync status) ──────────────────────────────────
 
 interface SheetSyncStatus {
   connected: boolean
