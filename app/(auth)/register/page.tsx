@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { LeadkaunMark } from "@/components/shared/LeadkaunMark"
-import { Target, ListChecks, AlertCircle, Eye, EyeOff } from "lucide-react"
+import { Target, ListChecks, AlertCircle, Eye, EyeOff, Check, Pencil } from "lucide-react"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { trackCompleteRegistration, sendCompleteRegistrationServerSide } from "@/lib/analytics/meta-pixel"
 import { trackSignUp } from "@/lib/analytics/ga4"
@@ -32,6 +32,91 @@ const BENEFITS = [
   { Icon: AlertCircle, text: "Catch missed opportunities before they go cold" },
 ]
 
+/** Keys the marketing handoff can carry, in the order they are summarised. */
+const HANDOFF_KEYS = ["orgName", "firstName", "lastName", "email", "phone"] as const
+type FormKey = typeof HANDOFF_KEYS[number] | "password"
+
+/**
+ * Subcomponents live at module scope on purpose. Declared inside RegisterPage
+ * they would be a new component type on every keystroke, so React would unmount
+ * and remount each input and the field would lose focus after one character.
+ */
+function TextField({
+  name, label, value, onChange, ...rest
+}: {
+  name: FormKey
+  label: string
+  value: string
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+} & Omit<React.InputHTMLAttributes<HTMLInputElement>, "name" | "value" | "onChange">) {
+  return (
+    <div className="space-y-1.5">
+      <label htmlFor={name} className={labelCls}>{label}</label>
+      <input id={name} name={name} required value={value} onChange={onChange} className={inputCls} {...rest} />
+    </div>
+  )
+}
+
+function PhoneField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="space-y-1.5">
+      <label htmlFor="phone" className={labelCls}>Mobile number</label>
+      <div className="flex items-center gap-2">
+        {/* India first: the country code is a fixed affix rather than one more
+            thing to pick on a phone keyboard. */}
+        <span className="inline-flex h-12 shrink-0 items-center rounded-xl glass-1 gloss-edge border border-white/70 px-3 text-[15px] text-ink-soft sm:h-11 sm:text-[14px]">
+          +91
+        </span>
+        <input
+          id="phone" name="phone" required
+          type="tel" inputMode="numeric" autoComplete="tel-national"
+          pattern="[0-9]{10}" maxLength={10}
+          placeholder="98765 43210"
+          value={value}
+          onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, 10))}
+          className={inputCls}
+        />
+      </div>
+      <p className="text-[11px] text-ink-faint">So we can reach you about your account. We never call to sell.</p>
+    </div>
+  )
+}
+
+function PasswordField({
+  value, onChange, show, onToggle,
+}: {
+  value: string
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  show: boolean
+  onToggle: () => void
+}) {
+  return (
+    <div className="space-y-1.5">
+      <label htmlFor="password" className={labelCls}>Password</label>
+      <div className="relative">
+        <input
+          id="password" name="password" required
+          type={show ? "text" : "password"}
+          autoComplete="new-password"
+          placeholder="At least 8 characters"
+          minLength={8}
+          value={value} onChange={onChange}
+          className={`${inputCls} pr-11`}
+        />
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-label={show ? "Hide password" : "Show password"}
+          tabIndex={-1}
+          className="absolute right-1.5 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-lg text-ink-faint transition-colors hover:text-ink-soft"
+        >
+          {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function RegisterPage() {
   const router = useRouter()
 
@@ -47,27 +132,69 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
 
-  // Pre-fill from the marketing hero signup handoff (?email=&firstName=&lastName=
-  // &org=) so the visitor only sets a password here.
+  /**
+   * Which fields arrived already answered from the marketing hero form.
+   *
+   * This is the whole point of the handoff and it had stopped working. The
+   * marketing card asks for name, email and company, then sends them here as
+   * query params so that, in its own words, "the only remaining step is setting
+   * a password". This page went on rendering all six fields as ordinary empty
+   * looking inputs, so a visitor who had just typed their name, email and
+   * company was met by a form asking for their name, email and company. Then
+   * signup started collecting a phone number on 19 Aug and the marketing card
+   * was never told, so the one remaining step quietly became three.
+   *
+   * Anything already answered is now shown as settled, and only the genuinely
+   * missing fields are asked for. Nobody is made to type the same thing twice.
+   */
+  const [prefilled, setPrefilled] = useState<Set<string>>(new Set())
+  const [editing, setEditing] = useState(false)
+
   useEffect(() => {
     try {
       const p = new URLSearchParams(window.location.search)
+      const incoming: Partial<Record<FormKey, string>> = {
+        email:     p.get("email")     ?? undefined,
+        phone:     p.get("phone")     ?? undefined,
+        firstName: p.get("firstName") ?? undefined,
+        lastName:  p.get("lastName")  ?? undefined,
+        orgName:   p.get("org")       ?? undefined,
+      }
+      const known = new Set<string>()
+      for (const k of HANDOFF_KEYS) {
+        if ((incoming[k] ?? "").trim()) known.add(k)
+      }
+      if (known.size === 0) return
       setForm((prev) => ({
         ...prev,
-        email:     p.get("email")     ?? prev.email,
-        phone:     p.get("phone")     ?? prev.phone,
-        firstName: p.get("firstName") ?? prev.firstName,
-        lastName:  p.get("lastName")  ?? prev.lastName,
-        orgName:   p.get("org")       ?? prev.orgName,
+        ...Object.fromEntries(
+          HANDOFF_KEYS.filter((k) => known.has(k)).map((k) => [k, (incoming[k] ?? "").trim()])
+        ),
       }))
+      setPrefilled(known)
     } catch {
-      /* ignore */
+      /* a malformed query string just means no handoff */
     }
   }, [])
+
+  // Continuation mode: we already know things, and the visitor has not asked to
+  // change them. Editing drops back to the full form with everything still filled.
+  const continuing = prefilled.size > 0 && !editing
+  const asks = (k: FormKey) => !continuing || !prefilled.has(k)
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
   }
+
+  const fullName = [form.firstName, form.lastName].filter(Boolean).join(" ")
+  const summary: { label: string; value: string }[] = [
+    { label: "Organisation", value: form.orgName },
+    { label: "Name",         value: fullName },
+    { label: "Work email",   value: form.email },
+    { label: "Mobile",       value: form.phone ? `+91 ${form.phone}` : "" },
+  ].filter((r) => r.value && prefilled.has(
+    r.label === "Organisation" ? "orgName" : r.label === "Name" ? "firstName" : r.label === "Work email" ? "email" : "phone"
+  ))
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -182,114 +309,108 @@ export default function RegisterPage() {
         {/* Form column */}
         <div className="mx-auto w-full max-w-[440px] lg:mx-0 lg:w-[55%]">
 
-          {/* Brand header. Centred on a phone where it is the only branding,
-              left aligned from lg where the panel beside it already carries it. */}
           <div className="mb-6 flex flex-col items-center gap-3 lg:mb-5 lg:items-start lg:gap-0">
             <LeadkaunMark size={40} gloss className="self-center lg:hidden" />
             <div className="text-center lg:text-left">
               <h1 className="text-[22px] font-bold tracking-[-0.025em] text-ink lg:text-[20px]">
-                Create your workspace
+                {continuing
+                  ? (form.firstName ? `Almost there, ${form.firstName}.` : "Almost there.")
+                  : "Create your workspace"}
               </h1>
               <p className="mt-1 text-[13px] text-ink-muted">
-                Free to start. You can invite your reps once you are in.
+                {continuing
+                  ? "We have your details. Just a couple of things left."
+                  : "Free to start. You can invite your reps once you are in."}
               </p>
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} noValidate={false} className="glass-3 gloss-edge space-y-4 rounded-2xl p-5 sm:p-7">
+          <form onSubmit={handleSubmit} className="glass-3 gloss-edge space-y-4 rounded-2xl p-5 sm:p-7">
 
-            <div className="space-y-1.5">
-              <label htmlFor="orgName" className={labelCls}>Organisation name</label>
-              <input
-                id="orgName" name="orgName" required
-                autoComplete="organization"
+            {/* What we already know, shown as settled rather than asked again. */}
+            {continuing && summary.length > 0 && (
+              <div className="rounded-xl border border-sky-100 bg-sky-50/60 p-3.5">
+                <div className="flex items-start justify-between gap-3">
+                  <ul className="min-w-0 space-y-1.5">
+                    {summary.map((row) => (
+                      <li key={row.label} className="flex items-start gap-2">
+                        <Check className="mt-[3px] h-3.5 w-3.5 shrink-0 text-sky-600" strokeWidth={3} />
+                        <span className="min-w-0 text-[13px] leading-snug text-ink-soft">
+                          <span className="text-ink-muted">{row.label}: </span>
+                          <span className="font-medium text-ink break-words">{row.value}</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    type="button"
+                    onClick={() => setEditing(true)}
+                    className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[12px] font-semibold text-sky-700 transition-colors hover:bg-sky-100/70"
+                  >
+                    <Pencil className="h-3 w-3" strokeWidth={2.5} />
+                    Edit
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {asks("orgName") && (
+              <TextField
+                name="orgName" label="Organisation name" autoComplete="organization"
                 placeholder="Acme Real Estate"
                 value={form.orgName} onChange={handleChange}
-                className={inputCls}
               />
-            </div>
+            )}
 
-            {/* Two up even on the narrowest phone: at 360px each field still
-                gets ~138px, which comfortably holds a first name. */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label htmlFor="firstName" className={labelCls}>First name</label>
-                <input
-                  id="firstName" name="firstName" required
-                  autoComplete="given-name"
-                  placeholder="Arjun"
-                  value={form.firstName} onChange={handleChange}
-                  className={inputCls}
+            {/* Side by side only when both are being asked for. On the narrowest
+                phone each still gets about 138px, which holds a first name. */}
+            {asks("firstName") && asks("lastName") ? (
+              <div className="grid grid-cols-2 gap-3">
+                <TextField
+                  name="firstName" label="First name" autoComplete="given-name"
+                  placeholder="Arjun" value={form.firstName} onChange={handleChange}
+                />
+                <TextField
+                  name="lastName" label="Last name" autoComplete="family-name"
+                  placeholder="Sharma" value={form.lastName} onChange={handleChange}
                 />
               </div>
-              <div className="space-y-1.5">
-                <label htmlFor="lastName" className={labelCls}>Last name</label>
-                <input
-                  id="lastName" name="lastName" required
-                  autoComplete="family-name"
-                  placeholder="Sharma"
-                  value={form.lastName} onChange={handleChange}
-                  className={inputCls}
-                />
-              </div>
-            </div>
+            ) : (
+              <>
+                {asks("firstName") && (
+                  <TextField
+                    name="firstName" label="First name" autoComplete="given-name"
+                    placeholder="Arjun" value={form.firstName} onChange={handleChange}
+                  />
+                )}
+                {asks("lastName") && (
+                  <TextField
+                    name="lastName" label="Last name" autoComplete="family-name"
+                    placeholder="Sharma" value={form.lastName} onChange={handleChange}
+                  />
+                )}
+              </>
+            )}
 
-            <div className="space-y-1.5">
-              <label htmlFor="email" className={labelCls}>Work email</label>
-              <input
-                id="email" name="email" type="email" required
+            {asks("email") && (
+              <TextField
+                name="email" label="Work email" type="email"
                 autoComplete="email" inputMode="email" autoCapitalize="none" spellCheck={false}
                 placeholder="arjun@acmerealty.in"
                 value={form.email} onChange={handleChange}
-                className={inputCls}
               />
-            </div>
+            )}
 
-            {/* Phone is collected, not verified. India first: the product is built
-                for Indian B2B teams, so the country code is a fixed affix rather
-                than one more thing to pick on a phone keyboard. */}
-            <div className="space-y-1.5">
-              <label htmlFor="phone" className={labelCls}>Mobile number</label>
-              <div className="flex items-center gap-2">
-                <span className="inline-flex h-12 shrink-0 items-center rounded-xl glass-1 gloss-edge border border-white/70 px-3 text-[15px] text-ink-soft sm:h-11 sm:text-[14px]">
-                  +91
-                </span>
-                <input
-                  id="phone" name="phone" required
-                  type="tel" inputMode="numeric" autoComplete="tel-national"
-                  pattern="[0-9]{10}" maxLength={10}
-                  placeholder="98765 43210"
-                  value={form.phone}
-                  onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value.replace(/\D/g, "").slice(0, 10) }))}
-                  className={inputCls}
-                />
-              </div>
-              <p className="text-[11px] text-ink-faint">So we can reach you about your account. We never call to sell.</p>
-            </div>
+            {asks("phone") && (
+              <PhoneField value={form.phone} onChange={(v) => setForm((prev) => ({ ...prev, phone: v }))} />
+            )}
 
-            <div className="space-y-1.5">
-              <label htmlFor="password" className={labelCls}>Password</label>
-              <div className="relative">
-                <input
-                  id="password" name="password" required
-                  type={showPassword ? "text" : "password"}
-                  autoComplete="new-password"
-                  placeholder="At least 8 characters"
-                  minLength={8}
-                  value={form.password} onChange={handleChange}
-                  className={`${inputCls} pr-11`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                  tabIndex={-1}
-                  className="absolute right-1.5 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-lg text-ink-faint transition-colors hover:text-ink-soft"
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-            </div>
+            <PasswordField
+              value={form.password}
+              onChange={handleChange}
+              show={showPassword}
+              onToggle={() => setShowPassword((v) => !v)}
+            />
 
             {error && (
               <p
