@@ -68,12 +68,12 @@ async function resolveWorkspaces(
 ): Promise<{ workspace: SessionWorkspace | null; workspaces: SessionWorkspace[] }> {
   const rows = role === "ADMIN"
     ? await prisma.workspace.findMany({
-        where: { account_id: accountId, archived_at: null },
+        where: { account_id: accountId, archived_at: null, deleted_at: null },
         orderBy: [{ is_default: "desc" }, { name: "asc" }],
         select: { id: true, name: true, slug: true, is_default: true },
       })
     : (await prisma.workspaceMember.findMany({
-        where: { user_id: userId, workspace: { account_id: accountId, archived_at: null } },
+        where: { user_id: userId, workspace: { account_id: accountId, archived_at: null, deleted_at: null } },
         orderBy: { workspace: { is_default: "desc" } },
         select: { workspace: { select: { id: true, name: true, slug: true, is_default: true } } },
       })).map((m) => m.workspace)
@@ -168,12 +168,19 @@ export async function getServerSession(): Promise<AuthSession | null> {
             onboarding_completed_at: true,
             sql_fit_threshold: true,
             sql_intent_threshold: true,
+            deleted_at: true,
           },
         },
       },
     })
 
+    // Every authenticated read in the product resolves through here, so this is
+    // the one place a platform-admin deletion has to bite. A deleted user, or
+    // any user of a deleted account, gets no session at all — which the auth
+    // middleware turns into a redirect to /login, the same as never having
+    // signed in. Nothing is destroyed; access simply stops.
     if (!dbUser || !dbUser.is_active) return null
+    if (dbUser.deleted_at || dbUser.account.deleted_at) return null
   }
 
   const { workspace, workspaces } = await resolveWorkspaces(dbUser.account_id, dbUser.id, dbUser.role)

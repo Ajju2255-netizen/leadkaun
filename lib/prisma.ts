@@ -3,6 +3,7 @@
 import { PrismaClient } from "@prisma/client"
 import { PrismaPg } from "@prisma/adapter-pg"
 import { Pool } from "pg"
+import { softDeleteExtension } from "./prisma-soft-delete"
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient }
 
@@ -21,7 +22,7 @@ function createPrismaClient() {
   return new PrismaClient({
     adapter,
     log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
-  })
+  }).$extends(softDeleteExtension)
 }
 
 export const prisma: PrismaClient =

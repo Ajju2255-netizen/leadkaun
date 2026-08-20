@@ -70,7 +70,9 @@ export type LeadFilters = {
 }
 
 export async function listLeads(f: LeadFilters = {}): Promise<{ rows: LeadRow[]; truncated: boolean }> {
-  const where: Prisma.LeadWhereInput = {}
+  // Soft-deleted records leave the admin lists by default. Nothing is erased —
+  // the row is still there and Restore on the detail page brings it back.
+  const where: Prisma.LeadWhereInput = { deleted_at: null }
   if (f.accountId) where.account_id = f.accountId
   if (f.workspaceId) where.workspace_id = f.workspaceId
   if (f.grade) where.grade = f.grade
@@ -216,6 +218,7 @@ export type LeadInspector = {
     wonValue: number | null
     winReason: string | null
     lossReason: string | null
+    deletedAt: Date | null
   }
   account: { id: string; name: string }
   workspaceName: string | null
@@ -439,6 +442,7 @@ export async function getLeadInspector(leadId: string): Promise<LeadInspector | 
       wonValue: lead.won_value,
       winReason: lead.win_reason,
       lossReason: lead.loss_reason,
+      deletedAt: lead.deleted_at ?? null,
     },
     account: { id: lead.account.id, name: lead.account.name },
     workspaceName: workspace?.name ?? null,

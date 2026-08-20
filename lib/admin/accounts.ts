@@ -92,6 +92,9 @@ export async function listAccounts(f: AccountFilters = {}): Promise<{ rows: Acco
   const [accounts, leadsBy, activeLeadsBy, wonBy, lastBy, adoptionBy, subs, importedSet, actedSet, plans, wsBy] =
     await Promise.all([
       prisma.account.findMany({
+        // Soft-deleted accounts leave the list by default; the row survives and
+        // Restore on the detail page brings it back.
+        where: { deleted_at: null },
         select: {
           id: true, name: true, industry: true, city: true, state: true, team_size: true,
           created_at: true, icp_configured: true, signup_utm_source: true,
@@ -368,7 +371,7 @@ export async function getAccountTeam(accountId: string): Promise<RepRow[]> {
   const d30 = new Date(Date.now() - 30 * DAY)
   const [users, assignedBy, contactedBy, wonBy, signalsBy, lastBy, adoptedBy] = await Promise.all([
     prisma.user.findMany({
-      where: { account_id: accountId },
+      where: { account_id: accountId, deleted_at: null },
       select: { id: true, first_name: true, last_name: true, email: true, role: true, is_active: true },
       orderBy: [{ role: "asc" }, { first_name: "asc" }],
     }),

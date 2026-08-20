@@ -1,4 +1,6 @@
 import { notFound } from "next/navigation"
+import { DeleteRecord } from "../../_components/DeleteRecord"
+import { getPlatformSession } from "@/lib/auth/platform"
 import Link from "next/link"
 import { AlertTriangle, Check, Minus } from "lucide-react"
 import { getLeadInspector, type EvidenceEntry } from "@/lib/admin/leads"
@@ -32,8 +34,9 @@ function ScoreBar({ label, value, tone }: { label: string; value: number; tone: 
 }
 
 export default async function LeadInspectorPage({ params }: { params: { leadId: string } }) {
-  const d = await getLeadInspector(params.leadId)
+  const [d, session] = await Promise.all([getLeadInspector(params.leadId), getPlatformSession()])
   if (!d) notFound()
+  const canWrite = session?.role === "SUPER_ADMIN"
   const { lead: l, explanation: ex, confidence: conf, live, icp } = d
 
   return (
@@ -483,6 +486,23 @@ export default async function LeadInspectorPage({ params }: { params: { leadId: 
           {" · WhatsApp stage "}<span className="font-mono">{l.waStage}</span>
           {" · intent baseline "}<span className="font-mono">{num(l.intentBaseline)}</span>
         </p>
+      </section>
+
+      <section>
+        <SectionLabel>Danger zone</SectionLabel>
+        <Card>
+          <DeleteRecord
+            entity="lead"
+            id={l.id}
+            name={l.name || l.id}
+            deleted={Boolean(l.deletedAt)}
+            canWrite={canWrite}
+          />
+          <p className="mt-2.5 text-[10.5px] leading-snug text-ink-faint">
+            A soft delete. The lead leaves every queue, list and count in the product, but the row
+            and its signals stay in the database and Restore puts it back.
+          </p>
+        </Card>
       </section>
     </div>
   )

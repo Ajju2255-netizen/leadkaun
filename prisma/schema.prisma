@@ -262,6 +262,11 @@ model Account {
   created_at       DateTime   @default(now())
   updated_at       DateTime   @updatedAt
 
+  /// Platform-admin soft delete. The row and every child row survive; the
+  /// account is blocked from signing in and hidden from admin lists. Distinct
+  /// from a cancelled subscription, which is a billing state, not a removal.
+  deleted_at DateTime?
+
   // ICP Configuration
   icp_configured          Boolean    @default(false)
   // Three separate concepts, deliberately:
@@ -307,6 +312,7 @@ model Account {
   notifications     Notification[]
   workspaces        Workspace[]
 
+  @@index([deleted_at])
   @@map("accounts")
 }
 
@@ -326,11 +332,16 @@ model Workspace {
   created_at  DateTime  @default(now())
   updated_at  DateTime  @updatedAt
 
+  /// Platform-admin soft delete. Distinct from archived_at, which is a
+  /// customer-initiated tidy-up that keeps the workspace reachable.
+  deleted_at DateTime?
+
   account Account           @relation(fields: [account_id], references: [id])
   members WorkspaceMember[]
 
   @@unique([account_id, slug])
   @@index([account_id])
+  @@index([deleted_at])
   @@map("workspaces")
 }
 
@@ -382,6 +393,10 @@ model User {
   created_at DateTime  @default(now())
   updated_at DateTime  @updatedAt
 
+  /// Platform-admin soft delete. Stronger than is_active, which is an
+  /// in-product deactivation an account ADMIN can perform themselves.
+  deleted_at DateTime?
+
   account           Account           @relation(fields: [account_id], references: [id])
   assigned_leads    Lead[]            @relation("AssignedRep")
   signals           Signal[]
@@ -391,6 +406,7 @@ model User {
 
   @@unique([account_id, email])
   @@index([account_id])
+  @@index([deleted_at])
   @@map("users")
 }
 
@@ -485,6 +501,10 @@ model Lead {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
+  /// Platform-admin soft delete. Distinct from is_junk, which is a scoring
+  /// outcome, and from won_at/lost_at, which are pipeline outcomes.
+  deleted_at DateTime?
+
   // Relations
   account               Account               @relation(fields: [account_id], references: [id])
   assigned_rep          User?                 @relation("AssignedRep", fields: [assigned_rep_id], references: [id])
@@ -508,6 +528,7 @@ model Lead {
   @@index([workspace_id, is_sql])
   @@index([workspace_id, imported_at])
   @@index([workspace_id, is_junk])
+  @@index([deleted_at])
   @@map("leads")
 }
 
@@ -1003,6 +1024,10 @@ enum AccountEventType {
   PAYMENT_SUCCEEDED
   PAYMENT_FAILED
   FEATURE_FLAG_CHANGED
+  // Platform-admin soft delete. Its own type so a deletion never hides inside
+  // the feature-flag audit trail.
+  RECORD_SOFT_DELETED
+  RECORD_RESTORED
   IMPERSONATED
 }
 

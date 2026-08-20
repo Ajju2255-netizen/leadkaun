@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation"
+import { DeleteRecord } from "../../_components/DeleteRecord"
 import Link from "next/link"
 import { Check, Minus } from "lucide-react"
 import { getCompany360 } from "@/lib/admin/metrics"
@@ -13,6 +14,7 @@ import { getAccountRevenueHistory } from "@/lib/admin/revenue-history"
 import { getPlatformSession } from "@/lib/auth/platform"
 import { Timeline } from "../../_components/Timeline"
 import { LoginAsButton } from "./LoginAsButton"
+import { DeleteAccountButton } from "./DeleteAccountButton"
 import { FlagToggles } from "./FlagToggles"
 import { PlanEditor } from "./PlanEditor"
 import {
@@ -231,10 +233,11 @@ export default async function Account360({ params }: { params: { accountId: stri
               <Th className="text-right">Won</Th>
               <Th className="text-right">Signals 30d</Th>
               <Th>Last active</Th>
+              <Th className="text-right">Remove</Th>
             </THead>
             <TBody>
               {team.length === 0 ? (
-                <tr><td colSpan={8}><EmptyState>No users.</EmptyState></td></tr>
+                <tr><td colSpan={9}><EmptyState>No users.</EmptyState></td></tr>
               ) : team.map((u) => (
                 <Tr key={u.id}>
                   <Td>
@@ -256,6 +259,9 @@ export default async function Account360({ params }: { params: { accountId: stri
                   <Td className="text-right tabular-nums text-emerald-600 font-semibold">{num(u.won)}</Td>
                   <Td className="text-right tabular-nums">{num(u.signals30d)}</Td>
                   <Td className="text-ink-muted whitespace-nowrap">{ago(u.lastActiveAt)}</Td>
+                  <Td className="text-right">
+                    <DeleteRecord entity="user" id={u.id} name={u.name} deleted={false} canWrite={canWrite} />
+                  </Td>
                 </Tr>
               ))}
             </TBody>
@@ -278,7 +284,10 @@ export default async function Account360({ params }: { params: { accountId: stri
                 <p className="text-[13px] text-ink font-medium">
                   {w.name} {w.isDefault && <Pill tone="sky">default</Pill>}
                 </p>
-                <span className="text-[12px] text-ink-muted tabular-nums">{num(w.leadCount)} leads</span>
+                <span className="flex items-center gap-3">
+                  <span className="text-[12px] text-ink-muted tabular-nums">{num(w.leadCount)} leads</span>
+                  <DeleteRecord entity="workspace" id={w.id} name={w.name} deleted={false} canWrite={canWrite} />
+                </span>
               </div>
             ))}
           </div>
@@ -333,6 +342,23 @@ export default async function Account360({ params }: { params: { accountId: stri
             <p className="text-[10.5px] text-ink-faint mt-3 leading-snug">
               Weighted over 14 days: imports 20 · active users 20 · recommendation adoption 20 · activity 25 · brief opens 15.
               Nothing hidden — each missing input is listed above.
+            </p>
+          </Card>
+        </section>
+
+        <section>
+          <SectionLabel>Danger zone</SectionLabel>
+          <Card>
+            <DeleteRecord
+              entity="account"
+              id={c.account.id}
+              name={c.account.name}
+              deleted={Boolean(c.account.deletedAt)}
+              canWrite={canWrite}
+            />
+            <p className="mt-2.5 text-[10.5px] leading-snug text-ink-faint">
+              A soft delete. Sign-in stops for every user on the account and it leaves the admin
+              lists, but no row is erased — restore puts it back exactly as it was.
             </p>
           </Card>
         </section>
@@ -443,6 +469,26 @@ export default async function Account360({ params }: { params: { accountId: stri
           subscription exists — editing here does not change anything at the provider.
         </p>
       </section>
+
+      {/* ── Danger zone ──
+          Deliberately the only place in the product where an account can be
+          destroyed. The customer app has no self serve delete, so this is it. */}
+      {canWrite && (
+        <section className="max-w-xl">
+          <SectionLabel right="permanent">Danger zone</SectionLabel>
+          <DeleteAccountButton
+            accountId={c.account.id}
+            accountName={c.account.name}
+            leadCount={c.usage.leads}
+            userCount={team.length}
+          />
+          <p className="text-[10.5px] text-ink-faint mt-1.5">
+            Removes every lead, workspace, note, signal and invoice under this account, and the users&rsquo; logins.
+            A record of the deletion is posted to the admin Slack before anything is removed, because the account&rsquo;s
+            own event history is one of the things being destroyed.
+          </p>
+        </section>
+      )}
     </div>
   )
 }

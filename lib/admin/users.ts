@@ -51,7 +51,9 @@ function statusOf(u: { is_active: boolean; joined_at: Date | null }): UserStatus
 }
 
 export async function listUsers(f: UserFilters = {}): Promise<UserRow[]> {
-  const where: Prisma.UserWhereInput = {}
+  // Soft-deleted records leave the admin lists by default. Nothing is erased —
+  // the row is still there and Restore on the detail page brings it back.
+  const where: Prisma.UserWhereInput = { deleted_at: null }
   if (f.accountId) where.account_id = f.accountId
   if (f.role) where.role = f.role
   if (f.q) {

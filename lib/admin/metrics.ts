@@ -140,7 +140,7 @@ export async function getCustomersList(): Promise<CustomerRow[]> {
 }
 
 export type Company360 = {
-  account: { id: string; name: string; industry: string; city: string; state: string; teamSize: string; createdAt: Date; icpConfigured: boolean }
+  account: { id: string; name: string; industry: string; city: string; state: string; teamSize: string; createdAt: Date; icpConfigured: boolean; deletedAt: Date | null }
   owner: { name: string; email: string } | null
   usage: { leads: number; activities: number; recommendationsUsed: number; followUps: number; won: number; wonValueInr: number }
   team: { id: string; name: string; email: string; role: string; isActive: boolean }[]
@@ -151,7 +151,7 @@ export type Company360 = {
 export async function getCompany360(accountId: string): Promise<Company360 | null> {
   const account = await prisma.account.findUnique({
     where: { id: accountId },
-    select: { id: true, name: true, industry: true, city: true, state: true, team_size: true, created_at: true, icp_configured: true },
+    select: { id: true, name: true, industry: true, city: true, state: true, team_size: true, created_at: true, icp_configured: true, deleted_at: true },
   })
   if (!account) return null
 
@@ -163,7 +163,7 @@ export async function getCompany360(accountId: string): Promise<Company360 | nul
     prisma.followUpAction.count({ where: { account_id: accountId } }),
     prisma.lead.aggregate({ where: { account_id: accountId, won_at: { not: null } }, _count: { _all: true }, _sum: { won_value: true } }),
     prisma.user.findMany({ where: { account_id: accountId }, select: { id: true, first_name: true, last_name: true, email: true, role: true, is_active: true }, orderBy: [{ role: "asc" }, { first_name: "asc" }] }),
-    prisma.workspace.findMany({ where: { account_id: accountId }, select: { id: true, name: true, is_default: true } }),
+    prisma.workspace.findMany({ where: { account_id: accountId, deleted_at: null }, select: { id: true, name: true, is_default: true } }),
     prisma.lead.groupBy({ by: ["workspace_id"], where: { account_id: accountId }, _count: { _all: true } }),
     prisma.signal.aggregate({ where: { account_id: accountId }, _max: { created_at: true } }),
   ])
@@ -172,6 +172,7 @@ export async function getCompany360(accountId: string): Promise<Company360 | nul
   return {
     account: {
       id: account.id, name: account.name, industry: account.industry, city: account.city, state: account.state,
+      deletedAt: account.deleted_at ?? null,
       teamSize: account.team_size, createdAt: account.created_at, icpConfigured: account.icp_configured,
     },
     owner: owner ? { name: `${owner.first_name} ${owner.last_name}`.trim(), email: owner.email } : null,
