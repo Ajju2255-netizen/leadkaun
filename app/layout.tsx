@@ -17,7 +17,9 @@ const geistMono = localFont({
 })
 
 export const metadata: Metadata = {
-  title: "Leadkaun — Sales Behaviour OS",
+  // Separator is a middle dot, not a dash. This string is the browser tab on
+  // every page of the product, including signup, where dashes are not wanted.
+  title: "Leadkaun · Sales Behaviour OS",
   description: "India's first sales behaviour operating system",
 }
 
