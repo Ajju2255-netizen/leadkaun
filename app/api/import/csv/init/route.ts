@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { requireWorkspace, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
+import { isSampleWorkspace } from "@/lib/workspace/sample"
 import { rateLimited, LIMITS } from "@/lib/rate-limit"
 import { MAX_IMPORT_ROWS } from "@/lib/import/process-rows"
 import { getLeadUsage } from "@/lib/billing/lead-usage"
@@ -23,6 +24,22 @@ export async function POST(req: Request) {
     const session = await requireWorkspace()
     if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER") {
       return apiError("Only Admins and Managers can import leads", "FORBIDDEN", 403)
+    }
+
+    // A real import must never land in the demo workspace. The client switches
+    // out of it before showing the upload form, but this is the layer that
+    // cannot be bypassed: a stale tab, a replayed request or a direct call
+    // would otherwise write the user's genuine leads into the workspace
+    // labelled "example leads, not yours". The damage compounds, because
+    // /api/import/csv/complete treats a sample import as not real, so it
+    // records no IMPORT_COMPLETED, never activates the account, and never
+    // clears the sample.
+    if (isSampleWorkspace(session.workspace.slug)) {
+      return apiError(
+        "Example leads live in their own workspace. Switch to your own workspace to import.",
+        "SAMPLE_WORKSPACE_WRITE",
+        409,
+      )
     }
 
     const limited = await rateLimited(`import:init:${session.account.id}`, LIMITS.importInit)

@@ -1,6 +1,7 @@
 "use client"
 
 import { useQuery } from "@tanstack/react-query"
+import { useCurrentUser } from "@/hooks/useCurrentUser"
 import type { LeadChannel } from "@/lib/scoring/channel-hint"
 
 export interface NextAction {
@@ -77,11 +78,19 @@ async function fetchQueue(repId?: string): Promise<QueueResponse> {
 
 /**
  * Priority queue hook — 30-second polling, refetch on window focus.
+ *
+ * The key carries the workspace because the queue is workspace scoped on the
+ * server (the API reads the lk_ws cookie) but was not scoped in the cache. So
+ * switching workspace served the previous workspace's leads from cache until
+ * something else happened to refetch. Prefix invalidation on ["queue"] still
+ * matches, so useQueueRealtime needs no change.
+ *
  * @param repId Optional rep filter (managers only)
  */
 export function useQueue(repId?: string) {
+  const { data: session } = useCurrentUser()
   return useQuery<QueueResponse>({
-    queryKey:             ["queue", repId ?? "all"],
+    queryKey:             ["queue", session?.workspace?.id ?? "none", repId ?? "all"],
     queryFn:              () => fetchQueue(repId),
     refetchInterval:      30 * 1000,
     refetchOnWindowFocus: true,

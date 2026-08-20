@@ -7,7 +7,7 @@ import { toast } from "sonner"
 import { FlaskConical, ArrowRight } from "lucide-react"
 
 import { useCurrentUser } from "@/hooks/useCurrentUser"
-import { SAMPLE_WORKSPACE_SLUG } from "@/lib/workspace/provision"
+import { isSample, realWorkspace, switchWorkspace } from "@/lib/workspace/switch"
 
 /**
  * Shown on every screen while the Sample workspace is active.
@@ -26,21 +26,12 @@ export function SampleWorkspaceBanner() {
   const queryClient = useQueryClient()
   const [removing, setRemoving] = useState(false)
 
-  const inSample = session?.workspace?.slug === SAMPLE_WORKSPACE_SLUG
-  if (!inSample) return null
+  if (!isSample(session?.workspace)) return null
 
-  const mainWorkspace = session?.workspaces?.find((w) => w.slug !== SAMPLE_WORKSPACE_SLUG)
+  const mainWorkspace = realWorkspace(session?.workspaces)
 
   async function switchToMainThen(path: string) {
-    if (mainWorkspace) {
-      await fetch("/api/workspaces/switch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ workspace_id: mainWorkspace.id }),
-      }).catch(() => {})
-    }
-    await queryClient.invalidateQueries()
+    if (mainWorkspace) await switchWorkspace(mainWorkspace.id, queryClient)
     router.push(path)
     router.refresh()
   }
@@ -69,7 +60,7 @@ export function SampleWorkspaceBanner() {
       </span>
 
       <span className="text-[12.5px] text-ink-soft min-w-0">
-        These are example leads, not yours — they&apos;re here so you can see how Leadkaun works.
+        These are example leads, not yours. They are here so you can see how Leadkaun works.
       </span>
 
       <span className="flex items-center gap-2 ml-auto shrink-0">

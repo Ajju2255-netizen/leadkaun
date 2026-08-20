@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { requireWorkspace } from "@/lib/auth/middleware"
 import { handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError, parseBody } from "@/lib/api/response"
+import { isSampleWorkspace } from "@/lib/workspace/sample"
 import { rateLimited, LIMITS } from "@/lib/rate-limit"
 import { processSignalAndUpdateScores } from "@/lib/scoring/orchestrator"
 import { getNextAction } from "@/lib/scoring/next-action"
@@ -139,6 +140,16 @@ const CreateLeadSchema = z.object({
 export async function POST(req: Request) {
   try {
     const session = await requireWorkspace()
+    // See app/api/import/csv/init/route.ts for why: a real write must never
+    // land in the demo workspace, and the server is the layer that cannot be
+    // bypassed.
+    if (isSampleWorkspace(session.workspace.slug)) {
+      return apiError(
+        "Example leads live in their own workspace. Switch to your own workspace to add leads.",
+        "SAMPLE_WORKSPACE_WRITE",
+        409,
+      )
+    }
 
     const limited = await rateLimited(`leads:create:${session.user.id}`, LIMITS.heavyWrite)
     if (limited) return limited

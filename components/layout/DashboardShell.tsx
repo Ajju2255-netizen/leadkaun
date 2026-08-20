@@ -23,11 +23,12 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import { ThemedSelect } from "@/components/shared/ThemedSelect"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { LeadkaunMark } from "@/components/shared/LeadkaunMark"
 import { LeadkaunLogo } from "@/components/shared/LeadkaunLogo"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { switchWorkspace as switchWorkspaceRequest } from "@/lib/workspace/switch"
 import { LeadLimitBanner } from "@/components/billing/LeadLimitBanner"
 import { PlanUsageCard } from "@/components/billing/PlanUsageCard"
 import type { AuthSession } from "@/lib/auth/session"
@@ -163,16 +164,19 @@ export function DashboardShell({
     router.refresh()
   }
 
+  const queryClient = useQueryClient()
   const [switching, setSwitching] = useState(false)
   async function switchWorkspace(id: string) {
     if (!id || id === session.workspace?.id || switching) return
     setSwitching(true)
     try {
-      await fetch("/api/workspaces/switch", {
-        method: "POST", credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workspace_id: id }),
-      })
+      // Invalidating is the part this used to miss. router.refresh() alone
+      // re-runs server components, but useCurrentUser caches for five minutes
+      // and the queue key was not workspace scoped, so switching from here left
+      // the sample banner and the lead list describing the workspace the user
+      // had just left. The shared helper does both, and the sample banner has
+      // always done both, which is why only this control looked broken.
+      await switchWorkspaceRequest(id, queryClient)
       router.refresh()
     } finally {
       setSwitching(false)

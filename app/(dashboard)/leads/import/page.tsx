@@ -9,7 +9,7 @@ import Papa from "papaparse"
 import { mapHeader } from "@/lib/import/column-map"
 import {
   Download, FileSpreadsheet, UserPlus, X,
-  CloudUpload, Cog, ShieldCheck, Users, CheckCircle2,
+  CloudUpload, Cog, ShieldCheck, Users, CheckCircle2, Layers,
   AlertCircle, Clock, Star, IndianRupee, ArrowRight,
   Sparkles, RotateCw, Loader2,
 } from "lucide-react"
@@ -18,6 +18,7 @@ import { EmptyState } from "@/components/shared/EmptyState"
 import { ThemedSelect } from "@/components/shared/ThemedSelect"
 import { sourceAgeToDate, SOURCE_AGE_OPTIONS } from "@/lib/scoring/freshness"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
+import { isSample, realWorkspace, switchWorkspace } from "@/lib/workspace/switch"
 import { IntakeReport } from "@/components/intake/IntakeReport"
 import { trackFunnel } from "@/lib/analytics/funnel"
 import type { IntakeReport as IntakeReportData } from "@/lib/intake/types"
@@ -402,6 +403,38 @@ export default function ImportPage() {
       /* ignore */
     }
   }, [])
+
+  /**
+   * Leads go in the user's own workspace, never in the demo one.
+   *
+   * Nine places link here and only the sample banner used to switch first, so
+   * anyone who reached this page while the Sample workspace was active imported
+   * their real leads into the workspace labelled "example leads, not yours".
+   * That also suppressed IMPORT_COMPLETED, skipped activation, and left the
+   * sample in place, so the account looked inert in the funnel while the user
+   * thought they were done.
+   *
+   * We move them rather than asking, because the answer is never "yes, put my
+   * real leads in the demo". We say so plainly instead: `movedFromSample` drives
+   * a notice that stays until they leave the page, so the workspace does not
+   * change silently underneath them. The server refuses a sample write anyway,
+   * which is the layer that actually cannot be bypassed.
+   */
+  const [movedFromSample, setMovedFromSample] = useState(false)
+  const [switchingWorkspace, setSwitchingWorkspace] = useState(false)
+  const target = realWorkspace(currentUser?.workspaces)
+
+  useEffect(() => {
+    if (!currentUser || !isSample(currentUser.workspace) || switchingWorkspace) return
+    if (!target) return          // no real workspace to move to; server guard refuses the write
+    setSwitchingWorkspace(true)
+    switchWorkspace(target.id, queryClient)
+      .then(() => {
+        setMovedFromSample(true)
+        router.refresh()
+      })
+      .finally(() => setSwitchingWorkspace(false))
+  }, [currentUser, target, switchingWorkspace, queryClient, router])
 
   const [stages,      setStages]      = useState<PipelineStage[]>([])
   const [sourceId,    setSourceId]    = useState<string>("")
@@ -840,10 +873,33 @@ export default function ImportPage() {
         <div>
           <h1 className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">Lead Ingestion</h1>
           <p className="text-[13px] text-ink-muted mt-1 leading-relaxed max-w-[560px]">
-            Import from CSV, Google Sheets, or add manually. Indian phone normalisation + dedup built in.
+            Import from CSV, Google Sheets, or add manually. Indian phone normalisation and dedup built in.
           </p>
+          {/* The page never used to say where the leads were going, which is
+              how importing into the demo workspace went unnoticed. */}
+          {currentUser?.workspace && (
+            <p className="text-[12px] text-ink-soft mt-1.5 inline-flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5 text-sky-500" strokeWidth={2.2} />
+              These leads go into <span className="font-semibold text-ink">{currentUser.workspace.name}</span>
+            </p>
+          )}
         </div>
       </div>
+
+      {/* Said out loud, because a workspace changing underneath you is exactly
+          the kind of silent move that makes this product confusing. */}
+      {movedFromSample && (
+        <div
+          className="flex items-start gap-2.5 rounded-xl px-4 py-3"
+          style={{ background: "rgba(14,165,233,0.07)", border: "1px solid rgba(14,165,233,0.22)" }}
+        >
+          <ShieldCheck className="w-4 h-4 text-sky-600 mt-[1px] shrink-0" strokeWidth={2.2} />
+          <p className="text-[12.5px] text-ink-soft leading-relaxed">
+            We moved you to <span className="font-semibold text-ink">{currentUser?.workspace?.name}</span>, your own
+            workspace. The 24 example leads stay where they are, so your real leads never mix with them.
+          </p>
+        </div>
+      )}
 
       {/* ── Connected Google Sheet (if auto-sync is on) ──────────────────── */}
       <ConnectedSheetCard />
