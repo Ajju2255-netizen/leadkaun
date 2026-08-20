@@ -6,8 +6,10 @@ import { Button, Input } from "../../_components/ui"
 
 /**
  * Starts an audited impersonation: the server writes the ImpersonationLog row
- * FIRST, then mints a one-time magic link. The customer app shows a persistent
- * "viewing as administrator" banner until it's exited.
+ * FIRST, then mints a one-time magic link. A strip then names the account you
+ * are viewing until you exit. Note who sees that strip: you do, in your own
+ * browser, because it is keyed to the impersonation cookie. The customer is in
+ * their own session and sees nothing.
  *
  * A reason is required before the request goes out — an audit row that just
  * says "Support" for everything is not an audit trail.
@@ -48,7 +50,7 @@ export function LoginAsButton({ accountId }: { accountId: string }) {
     <div className="rounded-2xl border border-slate-200/70 bg-white px-4 py-3 w-[340px]">
       <p className="text-[11px] font-bold uppercase tracking-wider text-orange-600">Audited impersonation</p>
       <p className="text-[11.5px] text-ink-muted mt-1 leading-snug">
-        Everything you do will be recorded against your admin account, and the customer sees a banner.
+        Everything you do will be recorded against your admin account. You will see a strip naming the account you are in, with a way back out.
       </p>
       <Input
         autoFocus value={reason} onChange={(e) => setReason(e.target.value)}
