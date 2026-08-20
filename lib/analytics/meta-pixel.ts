@@ -1,3 +1,4 @@
+import { isProductionBrowser } from "@/lib/runtime-env"
 /**
  * Meta Pixel — conversion tracking for the signup funnel.
  *
@@ -48,6 +49,9 @@ declare global {
  */
 export function trackCompleteRegistration(eventId?: string) {
   if (typeof window === "undefined" || typeof window.fbq !== "function") return
+  // The pixel loads on localhost too, so signup tests were writing real
+  // conversions into the ad account against leads that never existed.
+  if (!isProductionBrowser()) return
   try {
     // The eventID pairs this with the Conversions API copy of the same event so
     // Meta counts one conversion, not two, when both arrive.
@@ -70,6 +74,7 @@ export function trackCompleteRegistration(eventId?: string) {
  */
 export function sendCompleteRegistrationServerSide(params: { eventId: string; email: string }) {
   if (typeof window === "undefined") return
+  if (!isProductionBrowser()) return
   try {
     const body = JSON.stringify({
       eventId: params.eventId,

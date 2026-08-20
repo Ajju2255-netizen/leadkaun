@@ -16,6 +16,7 @@
 // ─────────────────────────────────────────────
 
 import { prisma } from "@/lib/prisma"
+import { isProductionRuntime } from "@/lib/runtime-env"
 
 function allowlist(): string[] {
   return (process.env.PLATFORM_ADMIN_EMAILS ?? "")
@@ -60,6 +61,16 @@ export type SlackBlock = { type: string; text?: { type: string; text: string }; 
 export async function postToSlack(text: string, blocks?: SlackBlock[]): Promise<boolean> {
   const url = process.env.ADMIN_SLACK_WEBHOOK_URL
   if (!url) return false
+
+  // The webhook being present is not evidence that this is production: .env.local
+  // carries the real one so the local app can talk to the real services. Two QA
+  // signups run against localhost therefore reached the founders' channel
+  // announcing a customer who did not exist, with a phone number that had been
+  // invented for the test. An alert channel nobody can trust is worse than none.
+  if (!isProductionRuntime()) {
+    console.info("[admin-notify] slack post skipped, not a production runtime:", text.slice(0, 120))
+    return false
+  }
   try {
     const res = await fetch(url, {
       method: "POST",

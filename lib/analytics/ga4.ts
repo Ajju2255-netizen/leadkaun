@@ -1,3 +1,4 @@
+import { isProductionBrowser } from "@/lib/runtime-env"
 /**
  * GA4 — organic acquisition measurement across the domain boundary.
  *
@@ -53,6 +54,7 @@ declare global {
  */
 export function trackSignUp(method: string = "email") {
   if (typeof window === "undefined" || typeof window.gtag !== "function") return
+  if (!isProductionBrowser()) return
   try {
     window.gtag("event", "sign_up", { method })
   } catch {

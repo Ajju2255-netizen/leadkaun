@@ -2,6 +2,7 @@ import { Resend } from "resend"
 import { render } from "@react-email/components"
 import * as React from "react"
 import { prisma } from "@/lib/prisma"
+import { isProductionRuntime } from "@/lib/runtime-env"
 
 const FROM_ADDRESS = process.env.RESEND_FROM_EMAIL ?? "noreply@leadkaun.com"
 
@@ -51,6 +52,15 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult
   if (!apiKey) {
     console.warn("sendEmail skipped — RESEND_API_KEY not configured")
     return { success: false, error: "RESEND_API_KEY not configured" }
+  }
+
+  // Same trap as the Slack webhook: the key in .env.local is the production one,
+  // so a signup tested on localhost sent a genuine welcome email to the throwaway
+  // address the test had invented. Mail to addresses that do not exist bounces,
+  // and bounces are charged against the sending domain's reputation.
+  if (!isProductionRuntime()) {
+    console.info(`[email] send skipped, not a production runtime: "${opts.subject}" to ${Array.isArray(opts.to) ? opts.to.join(", ") : opts.to}`)
+    return { success: false, error: "Non-production runtime: email not sent" }
   }
 
   try {
