@@ -17,9 +17,17 @@ const nextConfig = {
        * a proper Location header. Signed-in users still land correctly:
        * middleware bounces an authenticated visit to /login onward to the
        * dashboard, exactly as before.
+       *
+       * `missing` scopes this to the customer host. Resolving before middleware
+       * is exactly what made this unsafe to apply everywhere: on the admin host
+       * `/` IS Mission Control's dashboard, so a blanket rule 307'd it to
+       * /login before middleware could rewrite it onto the (admin) group. A
+       * signed-in admin was thrown straight back to the login form — the
+       * "stuck on Signing in…" bug, which looked like rejected credentials.
        */
       {
         source: "/",
+        missing: [{ type: "host", value: "admin\\..*" }],
         destination: "/login",
         permanent: false,
       },
