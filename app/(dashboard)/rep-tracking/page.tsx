@@ -268,7 +268,7 @@ export default function RepTrackingPage() {
           <User className="w-5 h-5" strokeWidth={2.25} fill="currentColor" />
         </div>
         <div>
-          <h1 className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">
+          <h1 data-tour="rep.body" className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">
             Sales Rep Tracking
           </h1>
           <p className="text-[13px] text-ink-muted mt-1">

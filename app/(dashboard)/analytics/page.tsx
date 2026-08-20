@@ -177,7 +177,7 @@ export default function AnalyticsPage() {
             <BarChart3 className="w-5 h-5" strokeWidth={2.2} />
           </span>
           <div>
-            <h1 className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">Analytics</h1>
+            <h1 data-tour="analytics.body" className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">Analytics</h1>
             <p className="text-[13px] text-ink-muted mt-1 leading-relaxed max-w-[560px]">
               Find what&apos;s slowing your pipeline — loss patterns, recovery potential, and where to act next.
             </p>

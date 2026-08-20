@@ -435,7 +435,7 @@ export default function IcpPage() {
         </div>
         <div>
           <div className="flex items-baseline gap-2">
-            <h1 className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">Best Customers</h1>
+            <h1 data-tour="settings.icp" className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">Best Customers</h1>
             <span className="text-[13px] text-slate-400 font-normal">ICP Settings</span>
           </div>
           <p className="text-[13px] text-ink-muted mt-1 leading-relaxed max-w-xl">

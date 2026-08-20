@@ -216,7 +216,7 @@ export default function DashboardPage() {
             <LayoutDashboard className="w-5 h-5" strokeWidth={2} />
           </span>
           <div>
-            <h1 className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">
+            <h1 data-tour="dashboard.kpis" className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">
               Sales Behaviour Pulse
             </h1>
             <p className="text-[13px] text-ink-muted mt-1 leading-relaxed max-w-[560px]">

@@ -314,7 +314,7 @@ export default function QueuePage() {
         </section>
 
         {/* ── ALL LEADS TABLE ───────────────────────────────────────────── */}
-        <section ref={tableRef} className="scroll-mt-4 rounded-2xl border border-slate-200/70 bg-white overflow-hidden">
+        <section ref={tableRef} data-tour="queue.list" className="scroll-mt-4 rounded-2xl border border-slate-200/70 bg-white overflow-hidden">
           {/* Toolbar — one row (no stacking): search (left, fills) · grade tabs + refine controls (right) */}
           <div className="flex items-center gap-2.5 flex-wrap px-4 sm:px-5 py-3.5">
             <div className="relative flex-1 min-w-[200px]">
@@ -336,7 +336,9 @@ export default function QueuePage() {
 
             <span className="hidden lg:block h-6 w-px bg-slate-200 shrink-0 mx-1" aria-hidden />
 
-            <QueueGradeTabs active={gradeTab} onChange={setGradeTab} counts={counts} />
+            <span data-tour="queue.grades" className="block">
+              <QueueGradeTabs active={gradeTab} onChange={setGradeTab} counts={counts} />
+            </span>
 
             {isManager && teamData && teamData.members.length > 0 && (
               <ThemedSelect

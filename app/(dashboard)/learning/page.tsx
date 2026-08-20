@@ -48,7 +48,7 @@ export default function LearningPage() {
           <Brain className="w-6 h-6" strokeWidth={2.2} />
         </div>
         <div>
-          <h1 className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">Learning Engine</h1>
+          <h1 data-tour="learning.body" className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">Learning Engine</h1>
           <p className="text-[13px] text-ink-muted mt-1 leading-relaxed">
             {isLoading
               ? "Reading your account…"

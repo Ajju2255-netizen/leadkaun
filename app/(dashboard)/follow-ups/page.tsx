@@ -280,7 +280,7 @@ export default function FollowUpsPage() {
       {/* ── HEADER ────────────────────────────────────────────────────── */}
       <header className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">Follow-ups</h1>
+          <h1 data-tour="followups.list" className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">Follow-ups</h1>
           <p className="text-[13px] text-ink-muted mt-1">Work top to bottom — overdue first.</p>
         </div>
         {isManager && teamData && teamData.members.length > 0 && (

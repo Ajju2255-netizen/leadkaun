@@ -258,7 +258,7 @@ export default function PipelinePage() {
             <KanbanSquare className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">Pipeline</h1>
+            <h1 data-tour="pipeline.board" className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">Pipeline</h1>
             <p className="text-[13px] text-ink-muted mt-1">
               Auto-stage tracker for every deal in motion — moves when calls and WhatsApp signals land
             </p>

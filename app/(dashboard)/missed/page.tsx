@@ -199,7 +199,7 @@ export default function MissedPage() {
           <AlertCircle className="w-5 h-5" strokeWidth={2.4} />
         </div>
         <div>
-          <h1 className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">
+          <h1 data-tour="missed.list" className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">
             Missed Opportunities
           </h1>
           <p className="text-[13px] text-ink-muted mt-1">

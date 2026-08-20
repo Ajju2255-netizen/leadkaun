@@ -286,7 +286,7 @@ export default function NotificationsPage() {
             <Bell className="w-5 h-5" strokeWidth={2.4} />
           </div>
           <div>
-            <h1 className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">Notifications</h1>
+            <h1 data-tour="notifications.body" className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">Notifications</h1>
             <p className="text-[13px] text-ink-muted mt-1">
               {isLoading
                 ? "Loading…"

@@ -6,6 +6,7 @@ import { AlertListener } from "@/components/providers/AlertListener"
 import { ImpersonationBanner } from "@/components/shared/ImpersonationBanner"
 import { SampleWorkspaceBanner } from "@/components/layout/SampleWorkspaceBanner"
 import { ResumeSetupCard } from "@/components/onboarding/ResumeSetupCard"
+import { TourProvider } from "@/components/tour/TourProvider"
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession()
@@ -35,9 +36,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
           Mounted once here so it listens on every dashboard page — audit B3:
           the server broadcaster existed but this listener was never mounted. */}
       <AlertListener />
-      <DashboardShell session={session}>
-        {children}
-      </DashboardShell>
+      {/* Wraps the shell rather than sitting inside it: the group layout
+          survives client navigation, which is what lets a tour step on one
+          route continue onto the next without going through the URL. */}
+      <TourProvider>
+        <DashboardShell session={session}>
+          {children}
+        </DashboardShell>
+      </TourProvider>
     </OfflineProvider>
   )
 }

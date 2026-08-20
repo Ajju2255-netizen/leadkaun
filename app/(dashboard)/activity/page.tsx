@@ -98,7 +98,7 @@ export default function ActivityPage() {
           <ActivityIcon className="w-5 h-5" strokeWidth={2.2} />
         </span>
         <div className="min-w-0">
-          <h1 className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">Activity</h1>
+          <h1 data-tour="activity.body" className="text-[24px] font-semibold text-ink tracking-[-0.02em] leading-tight">Activity</h1>
           <p className="text-[13px] text-ink-muted mt-1 leading-relaxed max-w-[560px]">
             {isManager
               ? "How the team is doing — what they did, whether they hit SLAs, what they recovered, and who's performing."

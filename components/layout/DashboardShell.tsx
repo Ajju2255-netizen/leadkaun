@@ -16,6 +16,7 @@ import {
   Bell,
   Upload,
   LogOut,
+  HelpCircle,
   Menu,
   X,
   Layers,
@@ -29,6 +30,7 @@ import { LeadkaunMark } from "@/components/shared/LeadkaunMark"
 import { LeadkaunLogo } from "@/components/shared/LeadkaunLogo"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { switchWorkspace as switchWorkspaceRequest } from "@/lib/workspace/switch"
+import { useTour } from "@/components/tour/TourProvider"
 import { LeadLimitBanner } from "@/components/billing/LeadLimitBanner"
 import { PlanUsageCard } from "@/components/billing/PlanUsageCard"
 import type { AuthSession } from "@/lib/auth/session"
@@ -165,6 +167,7 @@ export function DashboardShell({
   }
 
   const queryClient = useQueryClient()
+  const tour = useTour()
   const [switching, setSwitching] = useState(false)
   async function switchWorkspace(id: string) {
     if (!id || id === session.workspace?.id || switching) return
@@ -197,6 +200,7 @@ export function DashboardShell({
 
     return (
       <Link
+        data-tour={item.href === "/leads/import" ? "nav.import" : undefined}
         href={item.href}
         className={`
           relative flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13px]
@@ -274,7 +278,7 @@ export function DashboardShell({
 
         {/* Workspace switcher — the active lead-intelligence environment */}
         {session.workspace && (
-          <div className="px-3 py-2.5 border-b border-hairline">
+          <div data-tour="nav.workspace" className="px-3 py-2.5 border-b border-hairline">
             <p className="text-[9px] font-semibold text-ink-faint uppercase tracking-[0.12em] mb-1.5 px-1">Workspace</p>
             {session.workspaces.length > 1 ? (
               <ThemedSelect
@@ -339,6 +343,18 @@ export function DashboardShell({
                 </p>
               </div>
             </Link>
+            {/* The tour is not only a first run thing. Somebody who skipped it,
+                or joined the team later, needs a way back to it that is not
+                "sign up again". */}
+            {tour.available && (
+              <button
+                onClick={tour.start}
+                title="Take the tour"
+                className="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-ink-muted hover:text-sky-600 hover:bg-sky-50 transition-colors"
+              >
+                <HelpCircle className="w-3.5 h-3.5" strokeWidth={2} />
+              </button>
+            )}
             <button
               onClick={handleLogout}
               title="Sign out"
