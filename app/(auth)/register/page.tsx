@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { LeadkaunMark } from "@/components/shared/LeadkaunMark"
-import { Target, ListChecks, AlertCircle, Eye, EyeOff, Check, Pencil } from "lucide-react"
+import { Target, ListChecks, AlertCircle, Eye, EyeOff } from "lucide-react"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { trackCompleteRegistration, sendCompleteRegistrationServerSide } from "@/lib/analytics/meta-pixel"
 import { trackSignUp } from "@/lib/analytics/ga4"
@@ -32,9 +32,7 @@ const BENEFITS = [
   { Icon: AlertCircle, text: "Catch missed opportunities before they go cold" },
 ]
 
-/** Keys the marketing handoff can carry, in the order they are summarised. */
-const HANDOFF_KEYS = ["orgName", "firstName", "lastName", "email", "phone"] as const
-type FormKey = typeof HANDOFF_KEYS[number] | "password"
+type FormKey = "orgName" | "firstName" | "lastName" | "email" | "phone" | "password"
 
 /**
  * Subcomponents live at module scope on purpose. Declared inside RegisterPage
@@ -132,69 +130,9 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
 
-  /**
-   * Which fields arrived already answered from the marketing hero form.
-   *
-   * This is the whole point of the handoff and it had stopped working. The
-   * marketing card asks for name, email and company, then sends them here as
-   * query params so that, in its own words, "the only remaining step is setting
-   * a password". This page went on rendering all six fields as ordinary empty
-   * looking inputs, so a visitor who had just typed their name, email and
-   * company was met by a form asking for their name, email and company. Then
-   * signup started collecting a phone number on 19 Aug and the marketing card
-   * was never told, so the one remaining step quietly became three.
-   *
-   * Anything already answered is now shown as settled, and only the genuinely
-   * missing fields are asked for. Nobody is made to type the same thing twice.
-   */
-  const [prefilled, setPrefilled] = useState<Set<string>>(new Set())
-  const [editing, setEditing] = useState(false)
-
-  useEffect(() => {
-    try {
-      const p = new URLSearchParams(window.location.search)
-      const incoming: Partial<Record<FormKey, string>> = {
-        email:     p.get("email")     ?? undefined,
-        phone:     p.get("phone")     ?? undefined,
-        firstName: p.get("firstName") ?? undefined,
-        lastName:  p.get("lastName")  ?? undefined,
-        orgName:   p.get("org")       ?? undefined,
-      }
-      const known = new Set<string>()
-      for (const k of HANDOFF_KEYS) {
-        if ((incoming[k] ?? "").trim()) known.add(k)
-      }
-      if (known.size === 0) return
-      setForm((prev) => ({
-        ...prev,
-        ...Object.fromEntries(
-          HANDOFF_KEYS.filter((k) => known.has(k)).map((k) => [k, (incoming[k] ?? "").trim()])
-        ),
-      }))
-      setPrefilled(known)
-    } catch {
-      /* a malformed query string just means no handoff */
-    }
-  }, [])
-
-  // Continuation mode: we already know things, and the visitor has not asked to
-  // change them. Editing drops back to the full form with everything still filled.
-  const continuing = prefilled.size > 0 && !editing
-  const asks = (k: FormKey) => !continuing || !prefilled.has(k)
-
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
   }
-
-  const fullName = [form.firstName, form.lastName].filter(Boolean).join(" ")
-  const summary: { label: string; value: string }[] = [
-    { label: "Organisation", value: form.orgName },
-    { label: "Name",         value: fullName },
-    { label: "Work email",   value: form.email },
-    { label: "Mobile",       value: form.phone ? `+91 ${form.phone}` : "" },
-  ].filter((r) => r.value && prefilled.has(
-    r.label === "Organisation" ? "orgName" : r.label === "Name" ? "firstName" : r.label === "Work email" ? "email" : "phone"
-  ))
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -313,97 +251,43 @@ export default function RegisterPage() {
             <LeadkaunMark size={40} gloss className="self-center lg:hidden" />
             <div className="text-center lg:text-left">
               <h1 className="text-[22px] font-bold tracking-[-0.025em] text-ink lg:text-[20px]">
-                {continuing
-                  ? (form.firstName ? `Almost there, ${form.firstName}.` : "Almost there.")
-                  : "Create your workspace"}
+                Create your workspace
               </h1>
               <p className="mt-1 text-[13px] text-ink-muted">
-                {continuing
-                  ? "We have your details. Just a couple of things left."
-                  : "Free to start. You can invite your reps once you are in."}
+                Free to start. You can invite your reps once you are in.
               </p>
             </div>
           </div>
 
           <form onSubmit={handleSubmit} className="glass-3 gloss-edge space-y-4 rounded-2xl p-5 sm:p-7">
 
-            {/* What we already know, shown as settled rather than asked again. */}
-            {continuing && summary.length > 0 && (
-              <div className="rounded-xl border border-sky-100 bg-sky-50/60 p-3.5">
-                <div className="flex items-start justify-between gap-3">
-                  <ul className="min-w-0 space-y-1.5">
-                    {summary.map((row) => (
-                      <li key={row.label} className="flex items-start gap-2">
-                        <Check className="mt-[3px] h-3.5 w-3.5 shrink-0 text-sky-600" strokeWidth={3} />
-                        <span className="min-w-0 text-[13px] leading-snug text-ink-soft">
-                          <span className="text-ink-muted">{row.label}: </span>
-                          <span className="font-medium text-ink break-words">{row.value}</span>
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                  <button
-                    type="button"
-                    onClick={() => setEditing(true)}
-                    className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[12px] font-semibold text-sky-700 transition-colors hover:bg-sky-100/70"
-                  >
-                    <Pencil className="h-3 w-3" strokeWidth={2.5} />
-                    Edit
-                  </button>
-                </div>
-              </div>
-            )}
+            <TextField
+              name="orgName" label="Organisation name" autoComplete="organization"
+              placeholder="Acme Real Estate"
+              value={form.orgName} onChange={handleChange}
+            />
 
-            {asks("orgName") && (
+            {/* On the narrowest phone each still gets about 138px, which holds
+                a first name. */}
+            <div className="grid grid-cols-2 gap-3">
               <TextField
-                name="orgName" label="Organisation name" autoComplete="organization"
-                placeholder="Acme Real Estate"
-                value={form.orgName} onChange={handleChange}
+                name="firstName" label="First name" autoComplete="given-name"
+                placeholder="Arjun" value={form.firstName} onChange={handleChange}
               />
-            )}
-
-            {/* Side by side only when both are being asked for. On the narrowest
-                phone each still gets about 138px, which holds a first name. */}
-            {asks("firstName") && asks("lastName") ? (
-              <div className="grid grid-cols-2 gap-3">
-                <TextField
-                  name="firstName" label="First name" autoComplete="given-name"
-                  placeholder="Arjun" value={form.firstName} onChange={handleChange}
-                />
-                <TextField
-                  name="lastName" label="Last name" autoComplete="family-name"
-                  placeholder="Sharma" value={form.lastName} onChange={handleChange}
-                />
-              </div>
-            ) : (
-              <>
-                {asks("firstName") && (
-                  <TextField
-                    name="firstName" label="First name" autoComplete="given-name"
-                    placeholder="Arjun" value={form.firstName} onChange={handleChange}
-                  />
-                )}
-                {asks("lastName") && (
-                  <TextField
-                    name="lastName" label="Last name" autoComplete="family-name"
-                    placeholder="Sharma" value={form.lastName} onChange={handleChange}
-                  />
-                )}
-              </>
-            )}
-
-            {asks("email") && (
               <TextField
-                name="email" label="Work email" type="email"
-                autoComplete="email" inputMode="email" autoCapitalize="none" spellCheck={false}
-                placeholder="arjun@acmerealty.in"
-                value={form.email} onChange={handleChange}
+                name="lastName" label="Last name" autoComplete="family-name"
+                placeholder="Sharma" value={form.lastName} onChange={handleChange}
               />
-            )}
+            </div>
 
-            {asks("phone") && (
-              <PhoneField value={form.phone} onChange={(v) => setForm((prev) => ({ ...prev, phone: v }))} />
-            )}
+            <TextField
+              name="email" label="Work email" type="email"
+              autoComplete="email" inputMode="email" autoCapitalize="none" spellCheck={false}
+              placeholder="arjun@acmerealty.in"
+              value={form.email} onChange={handleChange}
+            />
+
+            <PhoneField value={form.phone} onChange={(v) => setForm((prev) => ({ ...prev, phone: v }))} />
 
             <PasswordField
               value={form.password}

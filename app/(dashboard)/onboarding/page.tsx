@@ -6,6 +6,8 @@ import { toast } from "sonner"
 import { useCurrentUser } from "@/hooks/useCurrentUser"
 import { CheckCircle2, Upload, ArrowRight } from "lucide-react"
 import { trackFunnel } from "@/lib/analytics/funnel"
+import { trackCompleteRegistration } from "@/lib/analytics/meta-pixel"
+import { trackSignUp } from "@/lib/analytics/ga4"
 import { SAMPLE_WORKSPACE_SLUG } from "@/lib/workspace/provision"
 
 /**
@@ -55,6 +57,32 @@ export default function OnboardingPage() {
   const [finishing, setFinishing] = useState(false)
 
   const isRep = session?.user.role === "REP"
+
+  /**
+   * Conversion events for signups that came from the marketing site's own form.
+   *
+   * The /register page fires these from its submit handler, but a marketing
+   * form signup never touches that page: it posts to /api/auth/signup and is
+   * redirected straight here with ?signup=1. Without this the ad platforms
+   * would only ever see half the signups, and the halves would grow or shrink
+   * with whichever form people happened to use.
+   *
+   * The flag is stripped from the URL immediately so a refresh, or a return to
+   * this page later in onboarding, cannot count the same signup twice.
+   */
+  useEffect(() => {
+    try {
+      const p = new URLSearchParams(window.location.search)
+      if (p.get("signup") !== "1") return
+      p.delete("signup")
+      const qs = p.toString()
+      window.history.replaceState({}, "", window.location.pathname + (qs ? `?${qs}` : ""))
+      trackCompleteRegistration(crypto.randomUUID())
+      trackSignUp("email")
+    } catch {
+      /* analytics must never break onboarding */
+    }
+  }, [])
 
   // Read from window rather than useSearchParams so this page needs no Suspense
   // boundary. /leads/import sends the user back here with ?step=icp&imported=1.
