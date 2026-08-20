@@ -32,6 +32,8 @@ export type SessionUser = {
 export type SessionAccount = {
   id: string
   name: string
+  /** Null until the first run wizard is finished. Drives the resume prompt. */
+  onboardingCompletedAt: string | null
   icpConfigured: boolean
   sqlFitThreshold: number
   sqlIntentThreshold: number
@@ -112,6 +114,7 @@ export async function getServerSession(): Promise<AuthSession | null> {
             id: true,
             name: true,
             icp_configured: true,
+            onboarding_completed_at: true,
             sql_fit_threshold: true,
             sql_intent_threshold: true,
           },
@@ -127,6 +130,7 @@ export async function getServerSession(): Promise<AuthSession | null> {
               id: true,
               name: true,
               icp_configured: true,
+              onboarding_completed_at: true,
               sql_fit_threshold: true,
               sql_intent_threshold: true,
             },
@@ -161,6 +165,7 @@ export async function getServerSession(): Promise<AuthSession | null> {
             id: true,
             name: true,
             icp_configured: true,
+            onboarding_completed_at: true,
             sql_fit_threshold: true,
             sql_intent_threshold: true,
           },
@@ -187,6 +192,7 @@ export async function getServerSession(): Promise<AuthSession | null> {
     account: {
       id: dbUser.account.id,
       name: dbUser.account.name,
+      onboardingCompletedAt: dbUser.account.onboarding_completed_at?.toISOString() ?? null,
       icpConfigured: dbUser.account.icp_configured,
       sqlFitThreshold: dbUser.account.sql_fit_threshold,
       sqlIntentThreshold: dbUser.account.sql_intent_threshold,

@@ -9,6 +9,9 @@ import { trackFunnel } from "@/lib/analytics/funnel"
 import { trackCompleteRegistration } from "@/lib/analytics/meta-pixel"
 import { trackSignUp } from "@/lib/analytics/ga4"
 import { SAMPLE_WORKSPACE_SLUG } from "@/lib/workspace/provision"
+import { switchWorkspace } from "@/lib/workspace/switch"
+import { TOUR_AUTOSTART_KEY } from "@/lib/tour/storage"
+import { useQueryClient } from "@tanstack/react-query"
 
 /**
  * Activation-first onboarding (Slice 1).
@@ -55,6 +58,7 @@ export default function OnboardingPage() {
   const [step, setStep]         = useState(1)
   const [imported, setImported] = useState(false)
   const [finishing, setFinishing] = useState(false)
+  const queryClient = useQueryClient()
 
   const isRep = session?.user.role === "REP"
 
@@ -100,16 +104,45 @@ export default function OnboardingPage() {
     if (!isRep) trackFunnel("onboarding_started")
   }, [isRep])
 
-  async function finish() {
+  /**
+   * Where the first run ends.
+   *
+   * It used to push straight to /queue, which for anyone who had not imported
+   * meant an empty queue reading "All clear", plus a sidebar of eleven
+   * destinations and no reason to trust any of them. The 24 example leads were
+   * sitting in a second workspace the whole time and nothing said so.
+   *
+   * So we land them in the sample, where the queue is full and the product can
+   * argue for itself. SampleWorkspaceBanner says on every screen that these are
+   * examples and offers the way out, and ?tour=1 starts the walkthrough.
+   *
+   * Order matters. onboarding-complete is written while the account is still on
+   * its own workspace, because /api/events/funnel drops anything raised from
+   * the sample. Completing first keeps that milestone real.
+   */
+  async function landInSample() {
     setFinishing(true)
     try {
       await fetch("/api/settings/onboarding-complete", { method: "POST", credentials: "include" })
     } catch {
-      /* completion is a marker, not a gate — never block the user on it */
+      /* completion is a marker, not a gate. Never block the user on it. */
     }
-    // Straight to the queue: the point of the product is who to call first.
+    const sampleWs = session?.workspaces?.find((w) => w.slug === SAMPLE_WORKSPACE_SLUG)
+    if (sampleWs) await switchWorkspace(sampleWs.id, queryClient)
+    // Hand off through storage, not the URL. /queue rebuilds its query string
+    // from filter state and router.replace()s, so it wipes any parameter it
+    // does not own and a ?tour=1 flag would survive or not depending on which
+    // effect ran first.
+    try {
+      sessionStorage.setItem(TOUR_AUTOSTART_KEY, "1")
+    } catch {
+      /* private browsing refuses writes; the tour is then launched manually */
+    }
     router.push("/queue")
+    router.refresh()
   }
+
+  const finish = landInSample
 
   // Invited reps never see the wizard — their workspace is already set up.
   if (isRep) {
@@ -148,7 +181,7 @@ export default function OnboardingPage() {
         </div>
       </div>
 
-      {step === 1 && <StepBringLeads firstName={session?.user.firstName} onSkip={() => setStep(2)} />}
+      {step === 1 && <StepBringLeads firstName={session?.user.firstName} onSkip={() => setStep(2)} onExplore={landInSample} />}
       {step === 2 && <StepMakeItYours imported={imported} onFinish={finish} finishing={finishing} />}
     </div>
   )
@@ -158,7 +191,7 @@ export default function OnboardingPage() {
    No Fit/Intent/Quality lecture. The user does not care yet; they signed up to
    see what Leadkaun does with their leads. */
 
-function StepBringLeads({ firstName, onSkip }: { firstName?: string; onSkip: () => void }) {
+function StepBringLeads({ firstName, onSkip, onExplore }: { firstName?: string; onSkip: () => void; onExplore: () => void }) {
   const router = useRouter()
   const { data: session } = useCurrentUser()
   const sampleWs = session?.workspaces?.find((w) => w.slug === SAMPLE_WORKSPACE_SLUG)
@@ -170,16 +203,15 @@ function StepBringLeads({ firstName, onSkip }: { firstName?: string; onSkip: () 
    * Deliberately NOT the primary action: real-data import stays the activation
    * path, and exploring the sample never counts as activation.
    */
-  async function exploreSample() {
+  /**
+   * Exploring used to abandon the wizard: it switched workspace and pushed the
+   * queue, leaving onboarding_completed_at null forever with nothing linking
+   * back. It now finishes the first run properly, which is the same thing the
+   * final button does, so the two paths cannot diverge again.
+   */
+  function exploreSample() {
     if (!sampleWs) return
-    await fetch("/api/workspaces/switch", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ workspace_id: sampleWs.id }),
-    }).catch(() => {})
-    router.push("/queue")
-    router.refresh()
+    onExplore()
   }
 
   function upload() {

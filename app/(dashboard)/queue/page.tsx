@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode, type ComponentProps } from "react"
 import { cn } from "@/lib/utils"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { trackFunnel } from "@/lib/analytics/funnel"
 import { SAMPLE_WORKSPACE_SLUG } from "@/lib/workspace/provision"
+import { switchWorkspace } from "@/lib/workspace/switch"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { useQueue } from "@/hooks/useQueue"
 import { useQueueRealtime } from "@/hooks/useQueueRealtime"
@@ -115,6 +116,7 @@ export default function QueuePage() {
   const isManager = session?.user.role === "ADMIN" || session?.user.role === "MANAGER"
   const searchParams = useSearchParams()
   const router       = useRouter()
+  const queryClient  = useQueryClient()
   const pathname     = usePathname()
 
   // Read initial state from URL search params so views are shareable
@@ -180,6 +182,20 @@ export default function QueuePage() {
    */
   const firedPriorityView = useRef(false)
   const inSampleWorkspace = session?.workspace?.slug === SAMPLE_WORKSPACE_SLUG
+  // Only worth pointing at the examples from somewhere that is not them. In the
+  // sample itself an empty queue means the examples were removed, and telling
+  // someone their examples are elsewhere while they stand in them is nonsense.
+  const sampleWs = inSampleWorkspace
+    ? undefined
+    : session?.workspaces?.find((w) => w.slug === SAMPLE_WORKSPACE_SLUG)
+
+  /** Hop to the example leads, so an empty queue is not a dead end. */
+  async function viewSample() {
+    if (!sampleWs) return
+    await switchWorkspace(sampleWs.id, queryClient)
+    router.refresh()
+  }
+
   useEffect(() => {
     if (firedPriorityView.current || leads.length === 0) return
     // Activation isolation: the Sample workspace always has leads, so without
@@ -371,18 +387,36 @@ export default function QueuePage() {
               {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-14 rounded-lg" />)}
             </div>
           ) : totalLeads === 0 ? (
+            /* "All clear" read as "nothing to do today" to someone who had
+               simply never imported, and it never said which workspace was
+               empty. When the example leads exist, say where they are: the
+               commonest reason this queue is bare is that the 24 samples are
+               sitting one workspace away. */
             <EmptyState
               icon={search.trim() ? Search : Inbox}
-              title={search.trim() ? `No results for “${search}”` : "All clear — queue is empty"}
+              title={search.trim() ? `No results for “${search}”` : "No leads here yet"}
               description={search.trim()
                 ? "Try a different name, company or number."
-                : "No active leads to chase. Import a fresh batch or wait for new inquiries to land."}
+                : sampleWs
+                  ? `${session?.workspace?.name ?? "This workspace"} starts empty, so this is where your own leads will land. The 24 example leads live in the Sample workspace.`
+                  : "Import a batch and your queue fills up, sorted by who is worth calling first."}
               action={search.trim() ? (
                 <button onClick={() => setSearch("")} className="text-[12px] text-sky-600 hover:text-sky-700 font-semibold">Clear search</button>
               ) : (
-                <a href="/leads/import" className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-[12px] font-semibold">
-                  <Upload className="w-3.5 h-3.5" /> Import leads
-                </a>
+                <span className="flex flex-wrap items-center justify-center gap-3">
+                  <a href="/leads/import" className="btn-primary inline-flex items-center gap-1.5 h-9 px-4 text-[12px]">
+                    <Upload className="w-3.5 h-3.5" /> Import leads
+                  </a>
+                  {sampleWs && (
+                    <button
+                      type="button"
+                      onClick={() => viewSample()}
+                      className="text-[12px] font-semibold text-sky-600 transition-colors hover:text-sky-700"
+                    >
+                      View the example leads
+                    </button>
+                  )}
+                </span>
               )}
               className="py-16"
             />
