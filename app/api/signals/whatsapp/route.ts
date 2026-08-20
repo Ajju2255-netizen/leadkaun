@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { maybeRecordActivation } from "@/lib/events/activation"
 import { prisma } from "@/lib/prisma"
 import { requireWorkspace, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError, parseBody, NOT_FOUND } from "@/lib/api/response"
@@ -237,6 +238,11 @@ export async function POST(req: Request) {
         intentScore:   result.intent_score,
       })
     }
+
+    // Durably record activation the first time a real rep action lands.
+
+    void maybeRecordActivation(session.account.id)
+
 
     return apiSuccess(result)
   } catch (e) {

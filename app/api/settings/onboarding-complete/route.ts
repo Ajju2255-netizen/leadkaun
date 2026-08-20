@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma"
+import { recordAccountEvent } from "@/lib/events/account-events"
 import { requireAuth, handleAuthError } from "@/lib/auth/middleware"
 import { apiSuccess, apiError } from "@/lib/api/response"
 import { rateLimited, LIMITS } from "@/lib/rate-limit"
@@ -29,6 +30,15 @@ export async function POST() {
     await prisma.account.update({
       where: { id: session.account.id },
       data:  { onboarding_completed_at: new Date() },
+    })
+
+    // The column alone was invisible to the AccountEvent funnel, so the step
+    // between onboarding_started and import_started could not be read.
+    await recordAccountEvent({
+      accountId: session.account.id,
+      actorUserId: session.user.id,
+      type: "ONBOARDING_COMPLETED",
+      summary: "Finished onboarding",
     })
 
     return apiSuccess({ ok: true })

@@ -52,10 +52,10 @@ enum LeadGrade {
 
 // Kind of a Score Evolution timeline entry (see LeadScoreEvent).
 enum ScoreEventKind {
-  CREATED       // lead first entered the system
-  ENRICHED      // data fields added/changed (may re-grade)
-  ACTIVITY      // a rep logged a call / WhatsApp / response
-  GRADE_CHANGE  // grade moved from re-scoring
+  CREATED // lead first entered the system
+  ENRICHED // data fields added/changed (may re-grade)
+  ACTIVITY // a rep logged a call / WhatsApp / response
+  GRADE_CHANGE // grade moved from re-scoring
   WON
   LOST
 }
@@ -66,13 +66,13 @@ enum ScoreEventKind {
 // EXPANDED is first-class on purpose: "opens the why but doesn't follow" vs
 // "follows without opening" is the clearest read on how much reps trust us.
 enum RecommendationEventType {
-  SHOWN      // the recommendation was rendered to a rep (RAR denominator)
-  EXPANDED   // the rep opened "Why did Leadkaun recommend this?"
-  ACCEPTED   // the rep chose to follow it
-  IGNORED    // the rep chose to skip it (see skip_reason)
-  DISMISSED  // the rep removed it from view
-  EXECUTED   // the rep actually acted (call/WhatsApp logged) — wired later
-  OUTCOME    // won/lost recorded against a followed recommendation — wired later
+  SHOWN // the recommendation was rendered to a rep (RAR denominator)
+  EXPANDED // the rep opened "Why did Leadkaun recommend this?"
+  ACCEPTED // the rep chose to follow it
+  IGNORED // the rep chose to skip it (see skip_reason)
+  DISMISSED // the rep removed it from view
+  EXECUTED // the rep actually acted (call/WhatsApp logged) — wired later
+  OUTCOME // won/lost recorded against a followed recommendation — wired later
 }
 
 // Structured skip reasons — buttons only, no free text. This becomes the first
@@ -100,16 +100,16 @@ enum IntakeSource {
 // connectors, and debugging clean). Progress states flow top-down; the last
 // three are terminal.
 enum IntakeState {
-  CREATED       // session opened, upload received
-  ANALYSING     // Intake Engine running (async-ready; today it's synchronous)
-  REPORT_READY  // Import Intelligence Report produced, awaiting the customer
-  VIEWED        // customer opened the report
-  APPROVED      // customer clicked "Start Prioritising Leads"
-  IMPORTING     // leads are being imported
-  COMPLETED     // import finished
-  ABANDONED     // left without deciding
-  CANCELLED     // explicitly cancelled (may carry a reason)
-  FAILED        // analysis or import failed
+  CREATED // session opened, upload received
+  ANALYSING // Intake Engine running (async-ready; today it's synchronous)
+  REPORT_READY // Import Intelligence Report produced, awaiting the customer
+  VIEWED // customer opened the report
+  APPROVED // customer clicked "Start Prioritising Leads"
+  IMPORTING // leads are being imported
+  COMPLETED // import finished
+  ABANDONED // left without deciding
+  CANCELLED // explicitly cancelled (may carry a reason)
+  FAILED // analysis or import failed
 }
 
 // Lightly-asked reason when a customer explicitly cancels. Product research.
@@ -263,7 +263,7 @@ model Account {
   updated_at       DateTime   @updatedAt
 
   // ICP Configuration
-  icp_configured     Boolean    @default(false)
+  icp_configured          Boolean    @default(false)
   // Three separate concepts, deliberately:
   //   onboarding_completed_at — the user finished the wizard
   //   icp_configured          — an ICP was actually saved
@@ -271,13 +271,13 @@ model Account {
   // onboarding-complete used to set icp_configured, which conflated the first two
   // and made activation unmeasurable.
   onboarding_completed_at DateTime?
-  icp_industries     String[]   @default([])
-  icp_states         String[]   @default([])
-  icp_business_types String[]   @default([])
-  icp_roles          String[]   @default([])
-  icp_budget_min     Int?
-  icp_budget_max     Int?
-  icp_sales_cycle    SalesCycle @default(FOUR_WEEKS)
+  icp_industries          String[]   @default([])
+  icp_states              String[]   @default([])
+  icp_business_types      String[]   @default([])
+  icp_roles               String[]   @default([])
+  icp_budget_min          Int?
+  icp_budget_max          Int?
+  icp_sales_cycle         SalesCycle @default(FOUR_WEEKS)
 
   // SQL Threshold (configurable per account)
   sql_fit_threshold    Int @default(55)
@@ -413,15 +413,15 @@ model Lead {
   pincode      String?
 
   // Source & Import
-  source_id      String
-  import_job_id  String?
-  imported_at    DateTime @default(now())
+  source_id           String
+  import_job_id       String?
+  imported_at         DateTime  @default(now())
   // Approximate date the SOURCE data was collected (set from the import's
   // "how old is this list?" answer). Null = unspecified → freshness falls back
   // to imported_at. Lets a year-old list imported today read as stale, not new.
   source_collected_at DateTime?
-  inquiry_text   String?
-  expected_value Int? // INR
+  inquiry_text        String?
+  expected_value      Int? // INR
 
   // Three-dimensional scores (0–100)
   fit_score     Int       @default(0)
@@ -486,18 +486,18 @@ model Lead {
   updated_at DateTime @updatedAt
 
   // Relations
-  account           Account          @relation(fields: [account_id], references: [id])
-  assigned_rep      User?            @relation("AssignedRep", fields: [assigned_rep_id], references: [id])
-  source            LeadSource       @relation(fields: [source_id], references: [id])
-  stage             PipelineStage    @relation(fields: [stage_id], references: [id])
-  import_job        ImportJobStatus? @relation(fields: [import_job_id], references: [id])
-  signals           Signal[]
-  notes             LeadNote[]
-  follow_up_actions FollowUpAction[]
-  win_attributions  WinAttribution[]
-  stage_history     StageHistory[]
-  notifications     Notification[]
-  score_events      LeadScoreEvent[]
+  account               Account               @relation(fields: [account_id], references: [id])
+  assigned_rep          User?                 @relation("AssignedRep", fields: [assigned_rep_id], references: [id])
+  source                LeadSource            @relation(fields: [source_id], references: [id])
+  stage                 PipelineStage         @relation(fields: [stage_id], references: [id])
+  import_job            ImportJobStatus?      @relation(fields: [import_job_id], references: [id])
+  signals               Signal[]
+  notes                 LeadNote[]
+  follow_up_actions     FollowUpAction[]
+  win_attributions      WinAttribution[]
+  stage_history         StageHistory[]
+  notifications         Notification[]
+  score_events          LeadScoreEvent[]
   recommendation_events RecommendationEvent[]
 
   @@unique([account_id, phone])
@@ -602,13 +602,13 @@ model LeadScoreEvent {
 
   // Frozen snapshot at this point in time
   grade         LeadGrade
-  confidence    Int            // 0–100 (computeConfidence at this moment)
+  confidence    Int // 0–100 (computeConfidence at this moment)
   fit_score     Int
   intent_score  Int
   quality_score Int
 
-  summary String  // human reason, e.g. "Company added" / "CEO responded" / "Grade C → B"
-  detail  Json?   // optional structured context (fields_added[], signal_type, …)
+  summary String // human reason, e.g. "Company added" / "CEO responded" / "Grade C → B"
+  detail  Json? // optional structured context (fields_added[], signal_type, …)
 
   lead Lead @relation(fields: [lead_id], references: [id], onDelete: Cascade)
 
@@ -630,11 +630,11 @@ model RecommendationEvent {
   event RecommendationEventType
 
   // Frozen snapshot of the recommendation at the moment of the event.
-  action_label    String?                   // e.g. "Call now"
-  grade_at_event  String?                   // lead grade when shown (A–F)
-  confidence_band String?                   // high | moderate | low | very_low
+  action_label    String? // e.g. "Call now"
+  grade_at_event  String? // lead grade when shown (A–F)
+  confidence_band String? // high | moderate | low | very_low
   skip_reason     RecommendationSkipReason? // only set on IGNORED
-  detail          Json?                     // optional structured context
+  detail          Json? // optional structured context
 
   created_at DateTime @default(now())
 
@@ -695,10 +695,14 @@ model IntakeSession {
   state          IntakeState          @default(CREATED)
   abandon_reason IntakeAbandonReason?
 
-  /** Set once approved and an import job is created. Not a hard relation. */
+  /**
+   * Set once approved and an import job is created. Not a hard relation.
+   */
   import_job_id String?
 
-  /** Immutable, append-only lifecycle timeline (for support / debugging / research). */
+  /**
+   * Immutable, append-only lifecycle timeline (for support / debugging / research).
+   */
   events IntakeSessionEvent[]
 
   created_at DateTime @default(now())
@@ -714,11 +718,11 @@ model IntakeSession {
 // never deleted (except by cascade). Six months from now, this is how support
 // reconstructs exactly what happened, and how research spots patterns.
 model IntakeSessionEvent {
-  id         String        @id @default(cuid())
+  id         String      @id @default(cuid())
   session_id String
-  state      IntakeState   // the state entered at this moment
-  note       String?       // optional context (e.g. cancel reason, error)
-  at         DateTime      @default(now())
+  state      IntakeState // the state entered at this moment
+  note       String? // optional context (e.g. cancel reason, error)
+  at         DateTime    @default(now())
 
   session IntakeSession @relation(fields: [session_id], references: [id], onDelete: Cascade)
 
@@ -899,22 +903,22 @@ model CustomField {
 }
 
 model Notification {
-  id           String    @id @default(cuid())
-  account_id   String
-  workspace_id String?
-  user_id      String? // null = visible to all managers; set = specific rep
-  lead_id      String?
-  type         NotifType
-  title        String
-  message      String
-  priority     String    @default("medium") // high | medium | low
-  action_url   String?
-  is_read      Boolean   @default(false)
+  id             String    @id @default(cuid())
+  account_id     String
+  workspace_id   String?
+  user_id        String? // null = visible to all managers; set = specific rep
+  lead_id        String?
+  type           NotifType
+  title          String
+  message        String
+  priority       String    @default("medium") // high | medium | low
+  action_url     String?
+  is_read        Boolean   @default(false)
   // Alert feedback (FM-14): dismissing hides the alert + records why, so we can
   // learn which alerts are noise. dismiss_reason e.g. "already_handled" | "not_relevant".
-  dismissed_at  DateTime?
+  dismissed_at   DateTime?
   dismiss_reason String?
-  created_at   DateTime  @default(now())
+  created_at     DateTime  @default(now())
 
   account Account @relation(fields: [account_id], references: [id])
   lead    Lead?   @relation(fields: [lead_id], references: [id], onDelete: SetNull)
@@ -932,7 +936,7 @@ model Notification {
 
 enum PlatformRole {
   SUPER_ADMIN // full access incl. impersonation + writes
-  SUPPORT     // read-only
+  SUPPORT // read-only
 }
 
 model PlatformAdmin {
@@ -980,6 +984,11 @@ enum AccountEventType {
   REPORT_VIEWED
   IMPORT_APPROVED
   FIRST_PRIORITY_VIEWED
+  // Closing two gaps: onboarding_completed existed only as a column on
+  // accounts, and "activated" was derived on every read in lib/admin/growth.ts
+  // (imported AND acted) with no durable record of when it happened.
+  ONBOARDING_COMPLETED
+  ACTIVATED
   ICP_CONFIGURED
   WORKSPACE_CREATED
   WORKSPACE_ARCHIVED
@@ -1149,13 +1158,13 @@ model Payment {
   provider_ref String?
   created_at   DateTime @default(now())
 
-  @@index([account_id, created_at])
-  @@index([status, created_at])
   // Razorpay retries webhooks on non-2xx. Without this, a retried
   // subscription.charged writes the payment twice and inflates revenue.
   // Postgres treats NULLs as distinct, so manual rows (provider_ref = null)
   // are unaffected.
   @@unique([provider, provider_ref])
+  @@index([account_id, created_at])
+  @@index([status, created_at])
   @@map("payments")
 }
 
@@ -1172,9 +1181,9 @@ model Invoice {
   provider_ref String?
   created_at   DateTime  @default(now())
 
-  @@index([account_id, created_at])
   @@unique([provider, provider_ref]) // same retry-idempotency reason as Payment
   @@unique([number]) // consecutive serial (invoice_serial_seq); no duplicates
+  @@index([account_id, created_at])
   @@map("invoices")
 }
 
