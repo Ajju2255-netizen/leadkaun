@@ -512,6 +512,13 @@ export default function ImportPage() {
   }
 
   async function processFile(file: File) {
+    // import_started used to fire only from the onboarding button, so anyone
+    // who reached this screen from the sidebar appeared in the funnel as an
+    // import that completed without ever starting. trackFunnel dedupes to one
+    // milestone per account, so firing it here as well is safe — it records
+    // whichever route the customer actually took.
+    if (!fromOnboarding) trackFunnel("import_started", { from: "leads-import" })
+
     // ── Guard the file before we touch it ────────────────────────────────────
     const isCsv = file.name.toLowerCase().endsWith(".csv") ||
       file.type === "text/csv" || file.type === "application/vnd.ms-excel"
@@ -577,7 +584,7 @@ export default function ImportPage() {
       } else {
         // Analysis is a bonus, never a gate — fall back to a direct import.
         toast.message("Imported directly — analysis wasn't available for this file.")
-        await runImport(rows, null)
+        await runImport(rows, null, false)
       }
     } catch (err) {
       console.error("Analyse failed:", err)
@@ -587,8 +594,11 @@ export default function ImportPage() {
   }
 
   // Run the actual chunked import (after the customer approves, or as a fallback).
-  async function runImport(rows: Record<string, string>[], sid: string | null) {
-    trackFunnel("import_approved", { rows: rows.length })
+  async function runImport(rows: Record<string, string>[], sid: string | null, approved = true) {
+    // Only when the customer actually approved the report. runImport is also
+    // the fallback when analysis fails, and firing "approved" there recorded a
+    // decision nobody made.
+    if (approved) trackFunnel("import_approved", { rows: rows.length })
     setReport(null)
     setUploading(true)
     setProgress(0)
