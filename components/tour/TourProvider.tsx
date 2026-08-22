@@ -6,7 +6,7 @@ import { useQueryClient } from "@tanstack/react-query"
 
 import { useCurrentUser } from "@/hooks/useCurrentUser"
 import { TOUR_STEPS } from "@/lib/tour/steps"
-import { markTourDone, readProgress, takeAutostart, tourRecord, writeProgress } from "@/lib/tour/storage"
+import { markTourDone, readProgress, tourRecord, writeProgress } from "@/lib/tour/storage"
 import { isSample, realWorkspace, switchWorkspace } from "@/lib/workspace/switch"
 import { TourOverlay } from "@/components/tour/TourOverlay"
 import { useAnchorRect } from "@/components/tour/useAnchorRect"
@@ -78,17 +78,25 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   }, [eligible, userId])
 
   /**
-   * Autostart, once, when onboarding has just handed over. The flag is consumed
-   * on read so a later navigation cannot retrigger it, and a stored record means
-   * this user has already finished or dismissed the current version.
+   * Autostart.
+   *
+   * This used to wait for a flag the onboarding wizard set on its way out.
+   * There is no wizard any more, so the condition is the situation itself:
+   * someone in the sample workspace who has not already seen the tour. That is
+   * exactly where registration now drops people, and it is the only place the
+   * tour makes sense, since every step describes example data.
+   *
+   * A stored record means finished or dismissed, and it is written on both, so
+   * this fires once. Someone who closes the tab mid tour has no record yet and
+   * gets picked up again from where they stopped.
    */
   useEffect(() => {
     if (!session || active) return
     if (session.user.role === "REP") return
-    if (!takeAutostart()) return
+    if (!inSample) return
     if (userId && tourRecord(userId)) return
     start()
-  }, [session, active, userId, start])
+  }, [session, active, inSample, userId, start])
 
   // Remember where they got to, so a mid tour reload resumes.
   useEffect(() => {

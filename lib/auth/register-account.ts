@@ -13,6 +13,7 @@ import { sendWelcomeAdminEmail } from "@/lib/email/lead-alerts"
 import { provisionWorkspaceDefaults, provisionSampleWorkspace } from "@/lib/workspace/provision"
 import { recordAccountEvent } from "@/lib/events/account-events"
 import { normalisePhone } from "@/lib/import/phone-normalise"
+import { WORKSPACE_COOKIE } from "@/lib/auth/session"
 import { announceSignupsToSlack } from "@/lib/admin/notify"
 
 export type RegisterInput = {
@@ -68,7 +69,7 @@ export async function registerAccount(input: RegisterInput): Promise<RegisterRes
     firstSeen: c.get("lk_first_seen")?.value ?? null,
   }
 
-  let created: { accountId: string; workspaceId: string; userId: string } | null = null
+  let created: { accountId: string; workspaceId: string; userId: string; sampleWorkspaceId: string } | null = null
   try {
     // 2. Create Account + User + default pipeline stages + lead sources in one transaction
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -81,6 +82,11 @@ export async function registerAccount(input: RegisterInput): Promise<RegisterRes
           state: "",
           team_size: "SOLO",
           monthly_lead_vol: "UNDER_50",
+          // There is no first run wizard to complete. Signing up IS the first
+          // run now, so this is stamped here rather than by a later step that
+          // no longer exists. Without it the account looks permanently
+          // half-configured to Mission Control's onboarding checklist.
+          onboarding_completed_at: new Date(),
           ...attribution,
         },
       })
@@ -119,9 +125,9 @@ export async function registerAccount(input: RegisterInput): Promise<RegisterRes
 
       // A second workspace of example leads, so the product can be understood
       // before anything is imported. Removed on first real import, or on demand.
-      await provisionSampleWorkspace(tx, { accountId: account.id, userId: user.id })
+      const sampleWorkspaceId = await provisionSampleWorkspace(tx, { accountId: account.id, userId: user.id })
 
-      return { accountId: account.id, workspaceId: workspace.id, userId: user.id }
+      return { accountId: account.id, workspaceId: workspace.id, userId: user.id, sampleWorkspaceId }
     })
   } catch (dbError) {
     // Rollback: delete the Supabase auth user we just created
@@ -176,5 +182,37 @@ export async function registerAccount(input: RegisterInput): Promise<RegisterRes
   // Send the admin welcome email (audit B8). Guarded — never blocks/fails signup.
   await sendWelcomeAdminEmail({ to: email, adminFirstName: firstName, orgName })
 
-  return { success: true, redirectTo: "/onboarding" }
+  /**
+   * Straight into the product, in the sample workspace.
+   *
+   * Signup used to hand off to a two step wizard: bring your leads, then set an
+   * ICP. Both were configuration standing between someone and the thing they
+   * signed up to look at, and the second was optional anyway. They are gone.
+   *
+   * The cookie is set here rather than by either caller because there are two
+   * front doors, the /register page's server action and the marketing form's
+   * POST endpoint, and they build their responses differently. next/headers is
+   * writable in both, so one line here covers both and they cannot drift.
+   *
+   * Landing in the sample matters: Main is empty on day one, so without this
+   * the first screen is a queue with nothing in it. The sample has 24 graded
+   * leads, announces itself on every screen, and the tour starts from there.
+   */
+  if (created?.sampleWorkspaceId) {
+    try {
+      c.set({
+        name: WORKSPACE_COOKIE,
+        value: created.sampleWorkspaceId,
+        path: "/",
+        maxAge: 31536000,
+        httpOnly: true,
+        sameSite: "lax",
+      })
+    } catch {
+      // Not writable in this context: they land in Main instead, which is
+      // correct but empty. Never worth failing a signup over.
+    }
+  }
+
+  return { success: true, redirectTo: "/queue" }
 }

@@ -15,9 +15,6 @@
 /** Bump to re-run the tour for everyone after a meaningful content change. */
 export const TOUR_VERSION = 1
 
-/** Set by onboarding immediately before it hands off to the queue. */
-export const TOUR_AUTOSTART_KEY = "lk_tour_autostart"
-
 export type TourRecord = {
   v: number
   status: "completed" | "dismissed"
@@ -90,11 +87,4 @@ export function readProgress(userId: string): number | null {
 
 export function writeProgress(userId: string, index: number): void {
   write(session(), progressKey(userId), String(index))
-}
-
-/** Consumes the one shot handoff flag set by onboarding. */
-export function takeAutostart(): boolean {
-  const flag = read(session(), TOUR_AUTOSTART_KEY) === "1"
-  if (flag) drop(session(), TOUR_AUTOSTART_KEY)
-  return flag
 }

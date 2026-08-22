@@ -1075,18 +1075,19 @@ export default function ImportPage() {
             </Link>
             <button
               onClick={() => {
-                if (fromOnboarding) {
-                  router.push("/onboarding?step=icp&imported=1")
-                } else {
-                  // first_priority_viewed is emitted by /queue itself — the event
-                  // should mean "reached the prioritisation experience", not
-                  // "clicked a particular button".
-                  router.push("/queue")
-                }
+                // Everyone goes to the queue now. This used to fork back into
+                // the wizard's ICP step, which no longer exists, and that fork
+                // was fragile anyway: it lived in useState seeded from the query
+                // string, so a refresh or the back button stranded people.
+                //
+                // first_priority_viewed is emitted by /queue itself. The event
+                // should mean "reached the prioritisation experience", not
+                // "clicked a particular button".
+                router.push("/queue")
               }}
               className="inline-flex items-center gap-1.5 h-10 px-4 rounded-lg text-[13px] font-semibold text-white bg-sky-600 hover:bg-sky-700 transition-colors active:scale-[0.98]"
             >
-              {fromOnboarding ? "Next: make it yours" : "Start executing"} <ArrowRight className="w-3.5 h-3.5" />
+              Start executing <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
