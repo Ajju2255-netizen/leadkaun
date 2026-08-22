@@ -14,7 +14,6 @@ import { getAccountRevenueHistory } from "@/lib/admin/revenue-history"
 import { getPlatformSession } from "@/lib/auth/platform"
 import { Timeline } from "../../_components/Timeline"
 import { LoginAsButton } from "./LoginAsButton"
-import { DeleteAccountButton } from "./DeleteAccountButton"
 import { FlagToggles } from "./FlagToggles"
 import { PlanEditor } from "./PlanEditor"
 import {
@@ -358,7 +357,7 @@ export default async function Account360({ params }: { params: { accountId: stri
             />
             <p className="mt-2.5 text-[10.5px] leading-snug text-ink-faint">
               A soft delete. Sign-in stops for every user on the account and it leaves the admin
-              lists, but no row is erased — restore puts it back exactly as it was.
+              lists, but no row is erased. Restore puts it back exactly as it was.
             </p>
           </Card>
         </section>
@@ -469,26 +468,6 @@ export default async function Account360({ params }: { params: { accountId: stri
           subscription exists — editing here does not change anything at the provider.
         </p>
       </section>
-
-      {/* ── Danger zone ──
-          Deliberately the only place in the product where an account can be
-          destroyed. The customer app has no self serve delete, so this is it. */}
-      {canWrite && (
-        <section className="max-w-xl">
-          <SectionLabel right="permanent">Danger zone</SectionLabel>
-          <DeleteAccountButton
-            accountId={c.account.id}
-            accountName={c.account.name}
-            leadCount={c.usage.leads}
-            userCount={team.length}
-          />
-          <p className="text-[10.5px] text-ink-faint mt-1.5">
-            Removes every lead, workspace, note, signal and invoice under this account, and the users&rsquo; logins.
-            A record of the deletion is posted to the admin Slack before anything is removed, because the account&rsquo;s
-            own event history is one of the things being destroyed.
-          </p>
-        </section>
-      )}
     </div>
   )
 }
